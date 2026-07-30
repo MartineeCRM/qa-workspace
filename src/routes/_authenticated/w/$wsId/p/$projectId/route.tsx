@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/dialog";
 import { Pill } from "@/components/app/badges";
 import { StagesManager } from "@/components/app/stages-manager";
+import { AttributeApiSettings } from "@/components/app/attribute-api-settings";
 import { useWorkspaceContext } from "@/lib/workspace-context";
 import { canEdit, errorMessage } from "@/lib/domain";
 import { cn } from "@/lib/utils";
@@ -36,6 +37,7 @@ function ProjectShell() {
   const editable = canEdit(role);
   const [stagesOpen, setStagesOpen] = useState(false);
   const [renameOpen, setRenameOpen] = useState(false);
+  const [apiSettingsOpen, setApiSettingsOpen] = useState(false);
 
   if (isLoading)
     return (
@@ -86,6 +88,9 @@ function ProjectShell() {
               <Button size="sm" variant="outline" onClick={() => setStagesOpen(true)}>
                 <SlidersHorizontal className="size-4" /> QA 환경 관리
               </Button>
+              <Button size="sm" variant="outline" onClick={() => setApiSettingsOpen(true)}>
+                Attribute API 설정
+              </Button>
             </div>
           ) : null}
         </div>
@@ -123,6 +128,11 @@ function ProjectShell() {
         stages={stages ?? []}
         open={stagesOpen}
         onOpenChange={setStagesOpen}
+      />
+      <AttributeApiSettings
+        projectId={projectId}
+        open={apiSettingsOpen}
+        onOpenChange={setApiSettingsOpen}
       />
       {renameOpen ? (
         <RenameProjectDialog
