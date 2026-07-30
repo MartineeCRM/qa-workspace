@@ -3,6 +3,9 @@
 .env.*
 !.env.example
 
+# Supabase CLI local cache
+supabase/.temp
+
 # Logs
 logs
 *.log
