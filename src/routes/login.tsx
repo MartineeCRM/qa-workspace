@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
-import { errorMessage } from "@/lib/domain";
+import { authErrorMessage } from "@/lib/domain";
 import { useAuth } from "@/lib/auth";
 
 export const Route = createFileRoute("/login")({
@@ -37,7 +37,7 @@ function LoginPage() {
     setBusy(true);
     const { error } = await signIn(email.trim(), password);
     setBusy(false);
-    if (error) return toast.error(errorMessage(error, "로그인에 실패했어요"));
+    if (error) return toast.error(authErrorMessage(error, "로그인에 실패했어요"));
     navigate({ to: "/workspaces" });
   }
 

@@ -182,3 +182,9 @@ export function errorMessage(error: unknown, fallback = "문제가 발생했어�
   const anyErr = error as { message?: string; details?: string; hint?: string };
   return anyErr.message || anyErr.details || anyErr.hint || fallback;
 }
+
+export function authErrorMessage(error: unknown, fallback = "문제가 발생했어요") {
+  const msg = errorMessage(error, fallback);
+  if (msg === "Invalid login credentials") return "이메일 또는 비밀번호가 올바르지 않아요";
+  return msg;
+}
