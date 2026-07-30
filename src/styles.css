@@ -1,0 +1,182 @@
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * Trackspec design system — professional internal B2B tooling.
+ * Palette: deep teal navigation, signal blue primary, green for published state.
+ * All colors are oklch tokens. Never hardcode colors in components.
+ */
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 3px);
+  --radius-md: calc(var(--radius) - 1px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-ring-offset-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-strong: var(--surface-strong);
+  --color-draft: var(--draft);
+  --color-draft-foreground: var(--draft-foreground);
+  --color-published: var(--published);
+  --color-published-foreground: var(--published-foreground);
+  --color-deprecated: var(--deprecated);
+  --color-deprecated-foreground: var(--deprecated-foreground);
+  --color-critical: var(--critical);
+  --color-warning: var(--warning);
+  --color-info: var(--info);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --shadow-panel: 0 1px 2px oklch(0.36 0.033 214 / 0.08), 0 1px 8px oklch(0.36 0.033 214 / 0.05);
+}
+
+:root {
+  --radius: 0.375rem;
+  --background: oklch(0.977 0.005 250);
+  --foreground: oklch(0.26 0.024 245);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.26 0.024 245);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.26 0.024 245);
+  --primary: oklch(0.53 0.148 251);
+  --primary-foreground: oklch(0.99 0.003 250);
+  --secondary: oklch(0.947 0.012 245);
+  --secondary-foreground: oklch(0.34 0.032 240);
+  --muted: oklch(0.955 0.006 248);
+  --muted-foreground: oklch(0.52 0.024 245);
+  --accent: oklch(0.947 0.012 245);
+  --accent-foreground: oklch(0.36 0.033 214);
+  --destructive: oklch(0.55 0.21 27);
+  --destructive-foreground: oklch(0.99 0.003 250);
+  --border: oklch(0.9 0.012 245);
+  --input: oklch(0.89 0.014 245);
+  --ring: oklch(0.53 0.148 251);
+  --surface: oklch(0.977 0.005 250);
+  --surface-strong: oklch(0.947 0.012 245);
+  --draft: oklch(0.93 0.03 90);
+  --draft-foreground: oklch(0.44 0.09 74);
+  --published: oklch(0.92 0.06 148);
+  --published-foreground: oklch(0.45 0.15 146);
+  --deprecated: oklch(0.93 0.006 250);
+  --deprecated-foreground: oklch(0.48 0.02 245);
+  --critical: oklch(0.55 0.21 27);
+  --warning: oklch(0.62 0.14 72);
+  --info: oklch(0.53 0.148 251);
+  --sidebar: oklch(0.36 0.033 214);
+  --sidebar-foreground: oklch(0.93 0.012 220);
+  --sidebar-primary: oklch(0.53 0.148 251);
+  --sidebar-primary-foreground: oklch(0.99 0.003 250);
+  --sidebar-accent: oklch(0.42 0.036 214);
+  --sidebar-accent-foreground: oklch(0.98 0.005 220);
+  --sidebar-border: oklch(0.44 0.033 214);
+  --sidebar-ring: oklch(0.69 0.072 240);
+}
+
+.dark {
+  --background: oklch(0.22 0.022 240);
+  --foreground: oklch(0.95 0.006 250);
+  --card: oklch(0.26 0.024 240);
+  --card-foreground: oklch(0.95 0.006 250);
+  --popover: oklch(0.26 0.024 240);
+  --popover-foreground: oklch(0.95 0.006 250);
+  --primary: oklch(0.66 0.13 250);
+  --primary-foreground: oklch(0.18 0.02 245);
+  --secondary: oklch(0.31 0.026 240);
+  --secondary-foreground: oklch(0.95 0.006 250);
+  --muted: oklch(0.31 0.026 240);
+  --muted-foreground: oklch(0.72 0.02 245);
+  --accent: oklch(0.33 0.03 240);
+  --accent-foreground: oklch(0.95 0.006 250);
+  --destructive: oklch(0.65 0.19 27);
+  --destructive-foreground: oklch(0.16 0.02 245);
+  --border: oklch(1 0 0 / 12%);
+  --input: oklch(1 0 0 / 16%);
+  --ring: oklch(0.66 0.13 250);
+  --surface: oklch(0.24 0.022 240);
+  --surface-strong: oklch(0.3 0.026 240);
+  --draft: oklch(0.38 0.06 80);
+  --draft-foreground: oklch(0.9 0.08 88);
+  --published: oklch(0.35 0.09 148);
+  --published-foreground: oklch(0.88 0.13 148);
+  --deprecated: oklch(0.33 0.01 245);
+  --deprecated-foreground: oklch(0.78 0.012 245);
+  --sidebar: oklch(0.24 0.026 214);
+  --sidebar-foreground: oklch(0.92 0.012 220);
+  --sidebar-primary: oklch(0.66 0.13 250);
+  --sidebar-primary-foreground: oklch(0.16 0.02 245);
+  --sidebar-accent: oklch(0.31 0.03 214);
+  --sidebar-accent-foreground: oklch(0.96 0.005 220);
+  --sidebar-border: oklch(1 0 0 / 12%);
+  --sidebar-ring: oklch(0.66 0.13 250);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-ring);
+    outline-offset: 2px;
+  }
+}
+
+@utility mono-token {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  letter-spacing: -0.01em;
+}
+
+@utility data-grid {
+  & th {
+    font-size: 0.6875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 600;
+    color: var(--color-muted-foreground);
+    background-color: var(--color-surface-strong);
+  }
+  & td,
+  & th {
+    padding: 0.5rem 0.75rem;
+  }
+  & tbody tr:hover {
+    background-color: var(--color-surface);
+  }
+}
