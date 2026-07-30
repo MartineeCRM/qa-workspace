@@ -142,12 +142,13 @@ function SettingsPage() {
 
   async function sendInvite(e: React.FormEvent) {
     e.preventDefault();
+    if (!user) return;
     setInviteBusy(true);
     const { error } = await db.from("workspace_invites").insert({
       workspace_id: wsId,
       email: inviteEmail.trim(),
       role: inviteRole,
-      invited_by: user!.id,
+      invited_by: user.id,
     });
     setInviteBusy(false);
     if (error) return toast.error(errorMessage(error));
@@ -303,7 +304,16 @@ function SettingsPage() {
               초대
             </h3>
             {isAdmin ? (
-              <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
+              <Dialog
+                open={inviteOpen}
+                onOpenChange={(open) => {
+                  setInviteOpen(open);
+                  if (!open) {
+                    setInviteEmail("");
+                    setInviteRole("viewer");
+                  }
+                }}
+              >
                 <DialogTrigger asChild>
                   <Button size="sm" variant="outline">
                     이메일로 초대
