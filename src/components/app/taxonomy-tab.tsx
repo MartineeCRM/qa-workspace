@@ -164,8 +164,8 @@ export function TaxonomyTab({
 
       {editable ? (
         <p className="rounded-md border border-dashed bg-surface px-3 py-2 text-xs text-muted-foreground">
-          하나씩 클릭해서 만들지 않아도 돼요. 예시 데이터셋(CSV·JSON·YAML)을 받아 내용을 채운 뒤 그대로
-          올리면 이벤트와 속성이 한 번에 등록돼요. 이미 있는 이름은 건너뛰어요.
+          하나씩 클릭해서 만들지 않아도 돼요. 예시 데이터셋(CSV·JSON·YAML)을 받아 내용을 채운 뒤
+          그대로 올리면 이벤트와 속성이 한 번에 등록돼요. 이미 있는 이름은 건너뛰어요.
         </p>
       ) : null}
 
@@ -189,19 +189,29 @@ export function TaxonomyTab({
                       className="mt-0.5 text-muted-foreground hover:text-foreground"
                       aria-label={expanded ? "접기" : "펼치기"}
                     >
-                      {expanded ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
+                      {expanded ? (
+                        <ChevronDown className="size-4" />
+                      ) : (
+                        <ChevronRight className="size-4" />
+                      )}
                     </button>
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="mono-token text-sm font-semibold">{event.technical_name}</span>
+                        <span className="mono-token text-sm font-semibold">
+                          {event.technical_name}
+                        </span>
                         {event.display_name ? (
-                          <span className="text-sm text-muted-foreground">{event.display_name}</span>
+                          <span className="text-sm text-muted-foreground">
+                            {event.display_name}
+                          </span>
                         ) : null}
                         <Pill>속성 {children.length}개</Pill>
                         {!event.is_active ? <Pill>비활성</Pill> : null}
                       </div>
                       {event.trigger_description ? (
-                        <p className="mt-1 text-xs text-muted-foreground">{event.trigger_description}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {event.trigger_description}
+                        </p>
                       ) : null}
                     </div>
                     {editable ? (
@@ -227,7 +237,10 @@ export function TaxonomyTab({
                         >
                           <Pencil className="size-4" />
                         </Button>
-                        <DeleteButton onConfirm={() => removeEvent(event)} label={event.technical_name} />
+                        <DeleteButton
+                          onConfirm={() => removeEvent(event)}
+                          label={event.technical_name}
+                        />
                       </div>
                     ) : null}
                   </div>
@@ -254,7 +267,10 @@ export function TaxonomyTab({
 
       <Panel title="사용자 속성" description="특정 이벤트에 묶이지 않는 속성이에요.">
         {customAttributes.length === 0 ? (
-          <EmptyState title="사용자 속성이 없어요" description="프로필 수준의 속성을 여기에 추가해요." />
+          <EmptyState
+            title="사용자 속성이 없어요"
+            description="프로필 수준의 속성을 여기에 추가해요."
+          />
         ) : (
           <ul className="divide-y">
             {customAttributes.map((attr) => (
@@ -324,7 +340,11 @@ function AttributeRow({
       </div>
       {editable ? (
         <div className="flex items-center gap-1">
-          <Switch checked={attribute.is_active} onCheckedChange={onToggle} aria-label="커버리지 포함 여부" />
+          <Switch
+            checked={attribute.is_active}
+            onCheckedChange={onToggle}
+            aria-label="커버리지 포함 여부"
+          />
           <Button size="icon" variant="ghost" onClick={onEdit} aria-label="속성 수정">
             <Pencil className="size-4" />
           </Button>
@@ -389,7 +409,9 @@ function EventDialog({
     };
     const { error } = event
       ? await db.from("taxonomy_events").update(payload).eq("id", event.id)
-      : await db.from("taxonomy_events").insert({ ...payload, project_id: projectId, created_by: userId });
+      : await db
+          .from("taxonomy_events")
+          .insert({ ...payload, project_id: projectId, created_by: userId });
     setSaving(false);
     if (error) return toast.error(errorMessage(error));
     toast.success(event ? "이벤트를 수정했어요" : "택소노미에 이벤트를 추가했어요");
@@ -427,7 +449,12 @@ function EventDialog({
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="ev-trigger">발생 시점</Label>
-            <Textarea id="ev-trigger" value={trigger} onChange={(e) => setTrigger(e.target.value)} rows={2} />
+            <Textarea
+              id="ev-trigger"
+              value={trigger}
+              onChange={(e) => setTrigger(e.target.value)}
+              rows={2}
+            />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="ev-desc">설명</Label>
@@ -478,7 +505,9 @@ function AttributeDialog({
   const [dataType, setDataType] = useState(attribute?.data_type ?? "string");
   const [required, setRequired] = useState(attribute?.is_required ?? false);
   const [allowed, setAllowed] = useState(
-    Array.isArray(attribute?.allowed_values) ? (attribute!.allowed_values as string[]).join(", ") : "",
+    Array.isArray(attribute?.allowed_values)
+      ? (attribute!.allowed_values as string[]).join(", ")
+      : "",
   );
   const [saving, setSaving] = useState(false);
 
@@ -499,7 +528,9 @@ function AttributeDialog({
       allowed_values: allowedValues.length ? allowedValues : null,
     };
     const table = isProperty ? "taxonomy_event_properties" : "taxonomy_custom_attributes";
-    const payload = isProperty ? { ...basePayload, event_id: parent } : { ...basePayload, project_id: projectId };
+    const payload = isProperty
+      ? { ...basePayload, event_id: parent }
+      : { ...basePayload, project_id: projectId };
     const { error } = attribute
       ? await db.from(table).update(payload).eq("id", attribute.id)
       : await db.from(table).insert({ ...payload, created_by: userId });
@@ -567,7 +598,11 @@ function AttributeDialog({
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="at-display">표시 이름</Label>
-            <Input id="at-display" value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
+            <Input
+              id="at-display"
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+            />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="at-allowed">허용 값 (쉼표로 구분)</Label>

@@ -97,7 +97,10 @@ function ProjectOverview() {
         }
       >
         {stages.length === 0 ? (
-          <EmptyState title="QA 환경이 없어요" description="프로젝트를 만들면 기본 환경이 함께 생겨요." />
+          <EmptyState
+            title="QA 환경이 없어요"
+            description="프로젝트를 만들면 기본 환경이 함께 생겨요."
+          />
         ) : (
           <ul className="divide-y">
             {stages.map((stage: QaEnvironment) => {
@@ -167,7 +170,9 @@ function ProjectOverview() {
                       {issue.notes ? (
                         <p className="mt-0.5 text-xs text-muted-foreground">{issue.notes}</p>
                       ) : null}
-                      <p className="text-xs text-muted-foreground">{formatDateTime(issue.updatedAt)}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {formatDateTime(issue.updatedAt)}
+                      </p>
                     </div>
                   </div>
                 </li>
@@ -189,7 +194,9 @@ function ProjectOverview() {
               {activity.map((entry) => (
                 <li key={entry.id} className="px-4 py-2 text-sm">
                   <p>{entry.summary}</p>
-                  <p className="text-xs text-muted-foreground">{formatDateTime(entry.created_at)}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {formatDateTime(entry.created_at)}
+                  </p>
                 </li>
               ))}
             </ul>
@@ -198,8 +205,9 @@ function ProjectOverview() {
       </div>
 
       <p className="text-xs text-muted-foreground">
-        택소노미에는 이벤트 {events.length}개, 속성 {eventProperties.length + customAttributes.length}개, 검증 규칙 {rules.length}개가
-        등록돼 있어요.
+        택소노미에는 이벤트 {events.length}개, 속성{" "}
+        {eventProperties.length + customAttributes.length}개, 검증 규칙 {rules.length}개가 등록돼
+        있어요.
       </p>
     </div>
   );

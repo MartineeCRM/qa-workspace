@@ -16,7 +16,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   buildCoverageItems,
@@ -34,7 +41,14 @@ import {
   type CoverageItem,
 } from "@/lib/queries";
 import { useWorkspaceContext } from "@/lib/workspace-context";
-import { canEdit, errorMessage, formatDateTime, ITEM_STATUSES, ITEM_STATUS_LABEL, type ItemStatus } from "@/lib/domain";
+import {
+  canEdit,
+  errorMessage,
+  formatDateTime,
+  ITEM_STATUSES,
+  ITEM_STATUS_LABEL,
+  type ItemStatus,
+} from "@/lib/domain";
 import { useAuth } from "@/lib/auth";
 
 export const Route = createFileRoute("/_authenticated/w/$wsId/p/$projectId/qa/$stageSlug")({
@@ -43,8 +57,7 @@ export const Route = createFileRoute("/_authenticated/w/$wsId/p/$projectId/qa/$s
       { title: "QA 환경 — 커버리지와 검증 결과" },
       {
         name: "description",
-        content:
-          "CSV 증적을 올리고 분석을 돌려서 현재 택소노미 기준의 검증 결과를 확인해요.",
+        content: "CSV 증적을 올리고 분석을 돌려서 현재 택소노미 기준의 검증 결과를 확인해요.",
       },
       { property: "og:title", content: "QA 환경 — 커버리지와 검증 결과" },
       {
@@ -121,14 +134,18 @@ function StagePage() {
   );
   const statusByKey = useMemo(() => {
     const map = new Map<string, ItemStatus>();
-    for (const s of statuses) if (s.qa_environment_id === stage?.id) map.set(statusKey(s), s.status);
+    for (const s of statuses)
+      if (s.qa_environment_id === stage?.id) map.set(statusKey(s), s.status);
     return map;
   }, [statuses, stage?.id]);
 
   if (stages.length > 0 && !stage) {
     return (
       <div className="p-6">
-        <EmptyState title="QA 환경을 찾을 수 없어요" description="이 프로젝트에는 없는 환경이에요." />
+        <EmptyState
+          title="QA 환경을 찾을 수 없어요"
+          description="이 프로젝트에는 없는 환경이에요."
+        />
       </div>
     );
   }
@@ -164,9 +181,9 @@ function StagePage() {
       last_run_id: runId ?? null,
       updated_by: user?.id ?? null,
     };
-    const { error } = await db
-      .from("qa_item_status")
-      .upsert(payload, { onConflict: "qa_environment_id,event_id,property_id,custom_attribute_id" });
+    const { error } = await db.from("qa_item_status").upsert(payload, {
+      onConflict: "qa_environment_id,event_id,property_id,custom_attribute_id",
+    });
     if (error) return toast.error(errorMessage(error));
     qc.invalidateQueries({ queryKey: ["item-status", projectId] });
   }
@@ -320,12 +337,17 @@ function StagePage() {
         </Panel>
         <Panel title="최근 분석" description="검증 증적이에요.">
           {runs.length === 0 ? (
-            <EmptyState icon={Play} title="아직 분석 기록이 없어요" description="CSV를 올리면 분석이 실행돼요." />
+            <EmptyState
+              icon={Play}
+              title="아직 분석 기록이 없어요"
+              description="CSV를 올리면 분석이 실행돼요."
+            />
           ) : (
             <div className="space-y-1 px-4 py-4 text-sm">
               <p className="font-medium">{formatDateTime(runs[0].created_at)}</p>
               <p className="text-xs text-muted-foreground">
-                {String(runs[0].summary?.rows ?? 0)}행 · 택소노미 {String(runs[0].summary?.taxonomy_items ?? 0)}개 중{" "}
+                {String(runs[0].summary?.rows ?? 0)}행 · 택소노미{" "}
+                {String(runs[0].summary?.taxonomy_items ?? 0)}개 중{" "}
                 {String(runs[0].summary?.verified ?? 0)}개 검증
               </p>
             </div>
@@ -389,7 +411,10 @@ function StagePage() {
                         </TableCell>
                         <TableCell className="text-right">
                           {editable ? (
-                            <Select value={st} onValueChange={(v) => setStatus(item, v as ItemStatus)}>
+                            <Select
+                              value={st}
+                              onValueChange={(v) => setStatus(item, v as ItemStatus)}
+                            >
                               <SelectTrigger className="ml-auto h-8 w-40">
                                 <SelectValue />
                               </SelectTrigger>
@@ -413,7 +438,10 @@ function StagePage() {
         </TabsContent>
 
         <TabsContent value="uploads" className="mt-4 space-y-4">
-          <Panel title="CSV 업로드" description="증적으로만 보관해요. 커버리지는 업로드로 고정되지 않아요.">
+          <Panel
+            title="CSV 업로드"
+            description="증적으로만 보관해요. 커버리지는 업로드로 고정되지 않아요."
+          >
             {uploads.length === 0 ? (
               <EmptyState icon={FileUp} title="아직 업로드한 파일이 없어요" />
             ) : (
@@ -456,8 +484,9 @@ function StagePage() {
                     <TableRow key={r.id}>
                       <TableCell className="text-xs">{formatDateTime(r.created_at)}</TableCell>
                       <TableCell className="text-xs text-muted-foreground">
-                        {String(r.summary?.rows ?? 0)}행 · 검증 {String(r.summary?.verified ?? 0)} · 실패{" "}
-                        {String(r.summary?.failed ?? 0)} · 규칙 {String(r.summary?.rules_applied ?? 0)}개 적용
+                        {String(r.summary?.rows ?? 0)}행 · 검증 {String(r.summary?.verified ?? 0)} ·
+                        실패 {String(r.summary?.failed ?? 0)} · 규칙{" "}
+                        {String(r.summary?.rules_applied ?? 0)}개 적용
                       </TableCell>
                     </TableRow>
                   ))}
@@ -467,7 +496,6 @@ function StagePage() {
           </Panel>
         </TabsContent>
       </Tabs>
-
     </div>
   );
 }

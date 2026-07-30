@@ -20,8 +20,7 @@ export const Route = createFileRoute("/_authenticated/w/$wsId/p/$projectId/taxon
       { title: "택소노미 — 단일 기준" },
       {
         name: "description",
-        content:
-          "전체 트래킹 커버리지를 정의하는 이벤트, 속성, 검증 규칙을 관리해요.",
+        content: "전체 트래킹 커버리지를 정의하는 이벤트, 속성, 검증 규칙을 관리해요.",
       },
       { property: "og:title", content: "택소노미 — 단일 기준" },
       {

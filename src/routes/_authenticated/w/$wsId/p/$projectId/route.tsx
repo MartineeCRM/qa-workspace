@@ -184,7 +184,9 @@ function RenameProjectDialog({
         <form onSubmit={submit}>
           <DialogHeader>
             <DialogTitle>프로젝트 정보 수정</DialogTitle>
-            <DialogDescription>이름과 설명을 바꿔도 택소노미와 QA 기록은 그대로예요.</DialogDescription>
+            <DialogDescription>
+              이름과 설명을 바꿔도 택소노미와 QA 기록은 그대로예요.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-1.5">

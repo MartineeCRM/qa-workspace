@@ -36,7 +36,14 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { db, useProjects, type Project } from "@/lib/queries";
 import { useWorkspaceContext } from "@/lib/workspace-context";
 import { canEdit, canAdmin, errorMessage, formatDate } from "@/lib/domain";
@@ -46,7 +53,10 @@ export const Route = createFileRoute("/_authenticated/w/$wsId/")({
   head: () => ({
     meta: [
       { title: "프로젝트 — Trackspec" },
-      { name: "description", content: "이 워크스페이스의 모든 고객 프로젝트와 실시간 택소노미 규모예요." },
+      {
+        name: "description",
+        content: "이 워크스페이스의 모든 고객 프로젝트와 실시간 택소노미 규모예요.",
+      },
       { property: "og:title", content: "프로젝트 — Trackspec" },
       { property: "og:description", content: "Trackspec 워크스페이스의 프로젝트 목록이에요." },
     ],
@@ -75,7 +85,11 @@ function ProjectsPage() {
         .select("is_active, taxonomy_events!inner(project_id)")
         .in("taxonomy_events.project_id", ids)
         .eq("is_active", true),
-      db.from("taxonomy_custom_attributes").select("project_id").in("project_id", ids).eq("is_active", true),
+      db
+        .from("taxonomy_custom_attributes")
+        .select("project_id")
+        .in("project_id", ids)
+        .eq("is_active", true),
     ]).then(([e, p, c]) => {
       const map: Record<string, { events: number; attributes: number }> = {};
       for (const id of ids) map[id] = { events: 0, attributes: 0 };
@@ -85,7 +99,6 @@ function ProjectsPage() {
       setCounts(map);
     });
   }, [projects]);
-
 
   const visible = (projects ?? []).filter((p) => {
     if (!showArchived && p.archived_at) return false;
@@ -112,7 +125,10 @@ function ProjectsPage() {
     <div className="p-6">
       <PageHeader
         title="프로젝트"
-        description={workspace.description || "프로젝트 하나가 고객 하나예요. 각 프로젝트는 택소노미 하나와 QA 환경들을 가져요."}
+        description={
+          workspace.description ||
+          "프로젝트 하나가 고객 하나예요. 각 프로젝트는 택소노미 하나와 QA 환경들을 가져요."
+        }
         actions={
           canEdit(role) ? (
             <Button size="sm" onClick={() => setCreating(true)}>
@@ -145,7 +161,11 @@ function ProjectsPage() {
         ) : visible.length === 0 ? (
           <EmptyState
             icon={FolderKanban}
-            title={projects && projects.length > 0 ? "조건에 맞는 프로젝트가 없어요" : "아직 프로젝트가 없어요"}
+            title={
+              projects && projects.length > 0
+                ? "조건에 맞는 프로젝트가 없어요"
+                : "아직 프로젝트가 없어요"
+            }
             description={
               projects && projects.length > 0
                 ? "검색어를 바꾸거나 보관된 항목도 함께 보여주세요."
@@ -199,7 +219,9 @@ function ProjectsPage() {
                     <TableCell className="text-right tabular-nums">
                       {counts[p.id]?.attributes ?? 0}
                     </TableCell>
-                    <TableCell className="text-muted-foreground">{formatDate(p.updated_at)}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {formatDate(p.updated_at)}
+                    </TableCell>
                     <TableCell>
                       {canEdit(role) ? (
                         <DropdownMenu>
@@ -209,7 +231,9 @@ function ProjectsPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem onSelect={() => setEditing(p)}>이름·설명 수정</DropdownMenuItem>
+                            <DropdownMenuItem onSelect={() => setEditing(p)}>
+                              이름·설명 수정
+                            </DropdownMenuItem>
                             {canAdmin(role) || !p.archived_at ? (
                               <ArchiveItem project={p} onConfirm={() => toggleArchive(p)} />
                             ) : null}
@@ -316,7 +340,9 @@ function ProjectDialog({
     };
     const { error } = project
       ? await db.from("projects").update(payload).eq("id", project.id)
-      : await db.from("projects").insert({ ...payload, workspace_id: workspaceId, created_by: user.id });
+      : await db
+          .from("projects")
+          .insert({ ...payload, workspace_id: workspaceId, created_by: user.id });
     setBusy(false);
     if (error) return toast.error(errorMessage(error));
     toast.success(project ? "프로젝트를 수정했어요" : "프로젝트를 만들었어요");

@@ -131,7 +131,12 @@ export function StagesManager({
                   <p className="truncate text-sm font-medium">{stage.name}</p>
                   <p className="mono-token truncate text-xs text-muted-foreground">{stage.slug}</p>
                 </div>
-                <Button size="icon" variant="ghost" aria-label="이름 수정" onClick={() => startEdit(stage)}>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  aria-label="이름 수정"
+                  onClick={() => startEdit(stage)}
+                >
                   <Pencil className="size-4" />
                 </Button>
                 <AlertDialog>
@@ -144,7 +149,8 @@ export function StagesManager({
                     <AlertDialogHeader>
                       <AlertDialogTitle>“{stage.name}” 환경을 삭제할까요?</AlertDialogTitle>
                       <AlertDialogDescription>
-                        이 환경에 쌓인 업로드와 검증 상태도 함께 사라져요. 택소노미는 그대로 유지돼요.
+                        이 환경에 쌓인 업로드와 검증 상태도 함께 사라져요. 택소노미는 그대로
+                        유지돼요.
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>

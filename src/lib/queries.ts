@@ -181,7 +181,9 @@ export function useWorkspace(workspaceId: string) {
   return useQuery({
     queryKey: ["workspace", workspaceId],
     queryFn: async () =>
-      unwrap<Workspace>(await db.from("workspaces").select("*").eq("id", workspaceId).maybeSingle()),
+      unwrap<Workspace>(
+        await db.from("workspaces").select("*").eq("id", workspaceId).maybeSingle(),
+      ),
   });
 }
 
@@ -330,7 +332,11 @@ export function useEnvironments(projectId: string) {
     queryKey: ["environments", projectId],
     queryFn: async () =>
       unwrap<QaEnvironment[]>(
-        await db.from("qa_environments").select("*").eq("project_id", projectId).order("sort_order"),
+        await db
+          .from("qa_environments")
+          .select("*")
+          .eq("project_id", projectId)
+          .order("sort_order"),
       ),
   });
 }
@@ -414,7 +420,13 @@ export function buildCoverageItems(
   const eventById = new Map(events.map((e) => [e.id, e]));
   const items: CoverageItem[] = [];
   for (const e of events.filter((e) => e.is_active)) {
-    items.push({ key: `event:${e.id}`, kind: "event", id: e.id, label: e.technical_name, eventName: null });
+    items.push({
+      key: `event:${e.id}`,
+      kind: "event",
+      id: e.id,
+      label: e.technical_name,
+      eventName: null,
+    });
   }
   for (const p of eventProperties.filter((p) => p.is_active)) {
     const parent = eventById.get(p.event_id);
@@ -463,7 +475,9 @@ export function environmentCoverage(
   environmentId: string,
 ): EnvironmentCoverage {
   const map = new Map(
-    statuses.filter((s) => s.qa_environment_id === environmentId).map((s) => [statusKey(s), s.status]),
+    statuses
+      .filter((s) => s.qa_environment_id === environmentId)
+      .map((s) => [statusKey(s), s.status]),
   );
   let verified = 0;
   let failed = 0;

@@ -35,7 +35,14 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import {
   db,
   type TaxonomyCustomAttribute,
@@ -148,7 +155,12 @@ export function RulesTab({
                             onCheckedChange={() => toggleEnabled(rule)}
                             aria-label="사용 여부"
                           />
-                          <Button size="icon" variant="ghost" onClick={() => setDialog({ rule })} aria-label="규칙 수정">
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => setDialog({ rule })}
+                            aria-label="규칙 수정"
+                          >
                             <Pencil className="size-4" />
                           </Button>
                           <AlertDialog>
@@ -159,14 +171,18 @@ export function RulesTab({
                             </AlertDialogTrigger>
                             <AlertDialogContent>
                               <AlertDialogHeader>
-                                <AlertDialogTitle>“{rule.name}” 규칙을 삭제할까요?</AlertDialogTitle>
+                                <AlertDialogTitle>
+                                  “{rule.name}” 규칙을 삭제할까요?
+                                </AlertDialogTitle>
                                 <AlertDialogDescription>
                                   삭제하면 모든 QA 라운드에서 이 규칙으로는 더 이상 검증하지 않아요.
                                 </AlertDialogDescription>
                               </AlertDialogHeader>
                               <AlertDialogFooter>
                                 <AlertDialogCancel>취소</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => remove(rule)}>삭제</AlertDialogAction>
+                                <AlertDialogAction onClick={() => remove(rule)}>
+                                  삭제
+                                </AlertDialogAction>
                               </AlertDialogFooter>
                             </AlertDialogContent>
                           </AlertDialog>
@@ -244,7 +260,9 @@ function RuleDialog({
     };
     const { error } = rule
       ? await db.from("validation_rules").update(payload).eq("id", rule.id)
-      : await db.from("validation_rules").insert({ ...payload, project_id: projectId, created_by: userId });
+      : await db
+          .from("validation_rules")
+          .insert({ ...payload, project_id: projectId, created_by: userId });
     setSaving(false);
     if (error) return toast.error(errorMessage(error));
     toast.success(rule ? "규칙을 수정했어요" : "규칙을 만들었어요");
@@ -258,8 +276,8 @@ function RuleDialog({
         <DialogHeader>
           <DialogTitle>{rule ? "규칙 수정" : "검증 규칙 추가"}</DialogTitle>
           <DialogDescription>
-            AI가 실제 값을 판단할 때 참고하는 설명을 적어주세요. 타입·필수여부·enum은 택소노미 정의로
-            자동 체크되니 여기엔 정성적인 기준만 적으면 돼요.
+            AI가 실제 값을 판단할 때 참고하는 설명을 적어주세요. 타입·필수여부·enum은 택소노미
+            정의로 자동 체크되니 여기엔 정성적인 기준만 적으면 돼요.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
