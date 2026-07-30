@@ -80,6 +80,7 @@ export type Database = {
           avatar_url: string | null
           created_at: string
           display_name: string
+          email: string | null
           id: string
           updated_at: string
         }
@@ -87,6 +88,7 @@ export type Database = {
           avatar_url?: string | null
           created_at?: string
           display_name?: string
+          email?: string | null
           id: string
           updated_at?: string
         }
@@ -94,10 +96,46 @@ export type Database = {
           avatar_url?: string | null
           created_at?: string
           display_name?: string
+          email?: string | null
           id?: string
           updated_at?: string
         }
         Relationships: []
+      }
+      project_attribute_api_settings: {
+        Row: {
+          auth_secret: string | null
+          base_url: string
+          project_id: string
+          updated_at: string
+          updated_by: string | null
+          user_id_param_name: string
+        }
+        Insert: {
+          auth_secret?: string | null
+          base_url: string
+          project_id: string
+          updated_at?: string
+          updated_by?: string | null
+          user_id_param_name?: string
+        }
+        Update: {
+          auth_secret?: string | null
+          base_url?: string
+          project_id?: string
+          updated_at?: string
+          updated_by?: string | null
+          user_id_param_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_attribute_api_settings_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: true
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       projects: {
         Row: {
@@ -157,7 +195,7 @@ export type Database = {
           created_by: string
           id: string
           project_id: string
-          stage_id: string
+          qa_environment_id: string
           started_at: string
           status: string
           summary: Json
@@ -169,7 +207,7 @@ export type Database = {
           created_by: string
           id?: string
           project_id: string
-          stage_id: string
+          qa_environment_id: string
           started_at?: string
           status?: string
           summary?: Json
@@ -181,7 +219,7 @@ export type Database = {
           created_by?: string
           id?: string
           project_id?: string
-          stage_id?: string
+          qa_environment_id?: string
           started_at?: string
           status?: string
           summary?: Json
@@ -197,9 +235,9 @@ export type Database = {
           },
           {
             foreignKeyName: "qa_analysis_runs_stage_id_fkey"
-            columns: ["stage_id"]
+            columns: ["qa_environment_id"]
             isOneToOne: false
-            referencedRelation: "qa_stages"
+            referencedRelation: "qa_environments"
             referencedColumns: ["id"]
           },
           {
@@ -211,85 +249,178 @@ export type Database = {
           },
         ]
       }
-      qa_item_status: {
+      qa_attribute_snapshots: {
         Row: {
-          attribute_id: string | null
-          created_at: string
-          event_id: string | null
+          captured_at: string | null
+          external_user_id: string
           id: string
-          last_run_id: string | null
-          notes: string | null
-          project_id: string
-          stage_id: string
+          payload: Json | null
+          previous_snapshot_id: string | null
+          qa_round_id: string
+          requested_at: string
+          snapshot_name: string
           status: string
-          updated_at: string
-          updated_by: string | null
         }
         Insert: {
-          attribute_id?: string | null
-          created_at?: string
-          event_id?: string | null
+          captured_at?: string | null
+          external_user_id: string
           id?: string
-          last_run_id?: string | null
-          notes?: string | null
-          project_id: string
-          stage_id: string
+          payload?: Json | null
+          previous_snapshot_id?: string | null
+          qa_round_id: string
+          requested_at?: string
+          snapshot_name: string
           status?: string
-          updated_at?: string
-          updated_by?: string | null
         }
         Update: {
-          attribute_id?: string | null
-          created_at?: string
-          event_id?: string | null
+          captured_at?: string | null
+          external_user_id?: string
           id?: string
-          last_run_id?: string | null
-          notes?: string | null
-          project_id?: string
-          stage_id?: string
+          payload?: Json | null
+          previous_snapshot_id?: string | null
+          qa_round_id?: string
+          requested_at?: string
+          snapshot_name?: string
           status?: string
-          updated_at?: string
-          updated_by?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "qa_item_status_attribute_id_fkey"
-            columns: ["attribute_id"]
+            foreignKeyName: "qa_attribute_snapshots_previous_snapshot_id_fkey"
+            columns: ["previous_snapshot_id"]
             isOneToOne: false
-            referencedRelation: "taxonomy_attributes"
+            referencedRelation: "qa_attribute_snapshots"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "qa_item_status_event_id_fkey"
-            columns: ["event_id"]
+            foreignKeyName: "qa_attribute_snapshots_qa_round_id_fkey"
+            columns: ["qa_round_id"]
             isOneToOne: false
-            referencedRelation: "taxonomy_events"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "qa_item_status_last_run_id_fkey"
-            columns: ["last_run_id"]
-            isOneToOne: false
-            referencedRelation: "qa_analysis_runs"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "qa_item_status_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "projects"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "qa_item_status_stage_id_fkey"
-            columns: ["stage_id"]
-            isOneToOne: false
-            referencedRelation: "qa_stages"
+            referencedRelation: "qa_rounds"
             referencedColumns: ["id"]
           },
         ]
       }
-      qa_stages: {
+      qa_checklist_item_results: {
+        Row: {
+          ai_evidence: Json | null
+          ai_reasoning: string | null
+          ai_verdict: string | null
+          checklist_item_id: string
+          created_at: string
+          failed_layer: string | null
+          final_status: string
+          id: string
+          overridden_at: string | null
+          overridden_by: string | null
+          override_reason: string | null
+          updated_at: string
+        }
+        Insert: {
+          ai_evidence?: Json | null
+          ai_reasoning?: string | null
+          ai_verdict?: string | null
+          checklist_item_id: string
+          created_at?: string
+          failed_layer?: string | null
+          final_status?: string
+          id?: string
+          overridden_at?: string | null
+          overridden_by?: string | null
+          override_reason?: string | null
+          updated_at?: string
+        }
+        Update: {
+          ai_evidence?: Json | null
+          ai_reasoning?: string | null
+          ai_verdict?: string | null
+          checklist_item_id?: string
+          created_at?: string
+          failed_layer?: string | null
+          final_status?: string
+          id?: string
+          overridden_at?: string | null
+          overridden_by?: string | null
+          override_reason?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "qa_checklist_item_results_checklist_item_id_fkey"
+            columns: ["checklist_item_id"]
+            isOneToOne: false
+            referencedRelation: "qa_round_checklist_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      qa_discussion_comments: {
+        Row: {
+          author_id: string
+          body: string
+          created_at: string
+          discussion_id: string
+          id: string
+          is_resolution: boolean
+        }
+        Insert: {
+          author_id: string
+          body: string
+          created_at?: string
+          discussion_id: string
+          id?: string
+          is_resolution?: boolean
+        }
+        Update: {
+          author_id?: string
+          body?: string
+          created_at?: string
+          discussion_id?: string
+          id?: string
+          is_resolution?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "qa_discussion_comments_discussion_id_fkey"
+            columns: ["discussion_id"]
+            isOneToOne: false
+            referencedRelation: "qa_discussions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      qa_discussions: {
+        Row: {
+          checklist_item_result_id: string
+          created_at: string
+          created_by: string
+          id: string
+          status: string
+        }
+        Insert: {
+          checklist_item_result_id: string
+          created_at?: string
+          created_by: string
+          id?: string
+          status?: string
+        }
+        Update: {
+          checklist_item_result_id?: string
+          created_at?: string
+          created_by?: string
+          id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "qa_discussions_checklist_item_result_id_fkey"
+            columns: ["checklist_item_result_id"]
+            isOneToOne: false
+            referencedRelation: "qa_checklist_item_results"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      qa_environments: {
         Row: {
           created_at: string
           description: string | null
@@ -330,6 +461,229 @@ export type Database = {
           },
         ]
       }
+      qa_item_status: {
+        Row: {
+          created_at: string
+          custom_attribute_id: string | null
+          event_id: string | null
+          id: string
+          last_run_id: string | null
+          notes: string | null
+          project_id: string
+          property_id: string | null
+          qa_environment_id: string
+          status: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          custom_attribute_id?: string | null
+          event_id?: string | null
+          id?: string
+          last_run_id?: string | null
+          notes?: string | null
+          project_id: string
+          property_id?: string | null
+          qa_environment_id: string
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          custom_attribute_id?: string | null
+          event_id?: string | null
+          id?: string
+          last_run_id?: string | null
+          notes?: string | null
+          project_id?: string
+          property_id?: string | null
+          qa_environment_id?: string
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "qa_item_status_custom_attribute_id_fkey"
+            columns: ["custom_attribute_id"]
+            isOneToOne: false
+            referencedRelation: "taxonomy_custom_attributes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "qa_item_status_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "taxonomy_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "qa_item_status_last_run_id_fkey"
+            columns: ["last_run_id"]
+            isOneToOne: false
+            referencedRelation: "qa_analysis_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "qa_item_status_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "qa_item_status_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "taxonomy_event_properties"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "qa_item_status_stage_id_fkey"
+            columns: ["qa_environment_id"]
+            isOneToOne: false
+            referencedRelation: "qa_environments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      qa_round_checklist_items: {
+        Row: {
+          created_at: string
+          id: string
+          qa_round_id: string
+          target_id: string
+          target_type: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          qa_round_id: string
+          target_id: string
+          target_type: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          qa_round_id?: string
+          target_id?: string
+          target_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "qa_round_checklist_items_qa_round_id_fkey"
+            columns: ["qa_round_id"]
+            isOneToOne: false
+            referencedRelation: "qa_rounds"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      qa_rounds: {
+        Row: {
+          ended_at: string | null
+          id: string
+          previous_round_id: string | null
+          project_id: string
+          qa_environment_id: string
+          round_number: number
+          started_at: string
+          started_by: string
+        }
+        Insert: {
+          ended_at?: string | null
+          id?: string
+          previous_round_id?: string | null
+          project_id: string
+          qa_environment_id: string
+          round_number: number
+          started_at?: string
+          started_by: string
+        }
+        Update: {
+          ended_at?: string | null
+          id?: string
+          previous_round_id?: string | null
+          project_id?: string
+          qa_environment_id?: string
+          round_number?: number
+          started_at?: string
+          started_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "qa_rounds_previous_round_id_fkey"
+            columns: ["previous_round_id"]
+            isOneToOne: false
+            referencedRelation: "qa_rounds"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "qa_rounds_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "qa_rounds_qa_environment_id_fkey"
+            columns: ["qa_environment_id"]
+            isOneToOne: false
+            referencedRelation: "qa_environments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      qa_run_events: {
+        Row: {
+          created_at: string
+          event_id: string | null
+          external_user_id: string
+          id: string
+          occurred_at: string
+          qa_round_id: string
+          raw_event_name: string
+          raw_properties: Json
+        }
+        Insert: {
+          created_at?: string
+          event_id?: string | null
+          external_user_id: string
+          id?: string
+          occurred_at: string
+          qa_round_id: string
+          raw_event_name: string
+          raw_properties?: Json
+        }
+        Update: {
+          created_at?: string
+          event_id?: string | null
+          external_user_id?: string
+          id?: string
+          occurred_at?: string
+          qa_round_id?: string
+          raw_event_name?: string
+          raw_properties?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "qa_run_events_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "taxonomy_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "qa_run_events_qa_round_id_fkey"
+            columns: ["qa_round_id"]
+            isOneToOne: false
+            referencedRelation: "qa_rounds"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       qa_uploads: {
         Row: {
           created_at: string
@@ -337,8 +691,8 @@ export type Database = {
           id: string
           notes: string | null
           project_id: string
+          qa_environment_id: string
           row_count: number
-          stage_id: string
           uploaded_by: string
         }
         Insert: {
@@ -347,8 +701,8 @@ export type Database = {
           id?: string
           notes?: string | null
           project_id: string
+          qa_environment_id: string
           row_count?: number
-          stage_id: string
           uploaded_by: string
         }
         Update: {
@@ -357,8 +711,8 @@ export type Database = {
           id?: string
           notes?: string | null
           project_id?: string
+          qa_environment_id?: string
           row_count?: number
-          stage_id?: string
           uploaded_by?: string
         }
         Relationships: [
@@ -371,14 +725,55 @@ export type Database = {
           },
           {
             foreignKeyName: "qa_uploads_stage_id_fkey"
-            columns: ["stage_id"]
+            columns: ["qa_environment_id"]
             isOneToOne: false
-            referencedRelation: "qa_stages"
+            referencedRelation: "qa_environments"
             referencedColumns: ["id"]
           },
         ]
       }
-      taxonomy_attributes: {
+      taxonomy_categories: {
+        Row: {
+          created_at: string
+          created_by: string
+          description: string | null
+          id: string
+          name: string
+          project_id: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          description?: string | null
+          id?: string
+          name: string
+          project_id: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          id?: string
+          name?: string
+          project_id?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "taxonomy_categories_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      taxonomy_custom_attributes: {
         Row: {
           allowed_values: Json | null
           created_at: string
@@ -386,7 +781,6 @@ export type Database = {
           data_type: string
           description: string | null
           display_name: string | null
-          event_id: string | null
           example_value: Json | null
           id: string
           is_active: boolean
@@ -403,7 +797,6 @@ export type Database = {
           data_type?: string
           description?: string | null
           display_name?: string | null
-          event_id?: string | null
           example_value?: Json | null
           id?: string
           is_active?: boolean
@@ -420,7 +813,6 @@ export type Database = {
           data_type?: string
           description?: string | null
           display_name?: string | null
-          event_id?: string | null
           example_value?: Json | null
           id?: string
           is_active?: boolean
@@ -432,14 +824,7 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "taxonomy_attributes_event_id_fkey"
-            columns: ["event_id"]
-            isOneToOne: false
-            referencedRelation: "taxonomy_events"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "taxonomy_attributes_project_id_fkey"
+            foreignKeyName: "taxonomy_custom_attributes_project_id_fkey"
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
@@ -447,8 +832,68 @@ export type Database = {
           },
         ]
       }
+      taxonomy_event_properties: {
+        Row: {
+          allowed_values: Json | null
+          created_at: string
+          created_by: string
+          data_type: string
+          description: string | null
+          display_name: string | null
+          event_id: string
+          example_value: Json | null
+          id: string
+          is_active: boolean
+          is_required: boolean
+          sort_order: number
+          technical_name: string
+          updated_at: string
+        }
+        Insert: {
+          allowed_values?: Json | null
+          created_at?: string
+          created_by: string
+          data_type?: string
+          description?: string | null
+          display_name?: string | null
+          event_id: string
+          example_value?: Json | null
+          id?: string
+          is_active?: boolean
+          is_required?: boolean
+          sort_order?: number
+          technical_name: string
+          updated_at?: string
+        }
+        Update: {
+          allowed_values?: Json | null
+          created_at?: string
+          created_by?: string
+          data_type?: string
+          description?: string | null
+          display_name?: string | null
+          event_id?: string
+          example_value?: Json | null
+          id?: string
+          is_active?: boolean
+          is_required?: boolean
+          sort_order?: number
+          technical_name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "taxonomy_event_properties_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "taxonomy_events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       taxonomy_events: {
         Row: {
+          category_id: string | null
           created_at: string
           created_by: string
           description: string | null
@@ -462,6 +907,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          category_id?: string | null
           created_at?: string
           created_by: string
           description?: string | null
@@ -475,6 +921,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          category_id?: string | null
           created_at?: string
           created_by?: string
           description?: string | null
@@ -489,6 +936,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "taxonomy_events_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "taxonomy_categories"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "taxonomy_events_project_id_fkey"
             columns: ["project_id"]
             isOneToOne: false
@@ -499,65 +953,50 @@ export type Database = {
       }
       validation_rules: {
         Row: {
-          attribute_id: string | null
           created_at: string
           created_by: string
+          custom_attribute_id: string | null
           description: string | null
           event_id: string | null
           id: string
           is_enabled: boolean
-          maximum_failure_count: number | null
-          minimum_pass_rate: number | null
           name: string
-          pass_condition_type: string
           project_id: string
-          rule_config: Json
-          rule_type: string
-          severity: string
+          property_id: string | null
           updated_at: string
         }
         Insert: {
-          attribute_id?: string | null
           created_at?: string
           created_by: string
+          custom_attribute_id?: string | null
           description?: string | null
           event_id?: string | null
           id?: string
           is_enabled?: boolean
-          maximum_failure_count?: number | null
-          minimum_pass_rate?: number | null
           name: string
-          pass_condition_type?: string
           project_id: string
-          rule_config?: Json
-          rule_type: string
-          severity?: string
+          property_id?: string | null
           updated_at?: string
         }
         Update: {
-          attribute_id?: string | null
           created_at?: string
           created_by?: string
+          custom_attribute_id?: string | null
           description?: string | null
           event_id?: string | null
           id?: string
           is_enabled?: boolean
-          maximum_failure_count?: number | null
-          minimum_pass_rate?: number | null
           name?: string
-          pass_condition_type?: string
           project_id?: string
-          rule_config?: Json
-          rule_type?: string
-          severity?: string
+          property_id?: string | null
           updated_at?: string
         }
         Relationships: [
           {
-            foreignKeyName: "validation_rules_attribute_id_fkey"
-            columns: ["attribute_id"]
+            foreignKeyName: "validation_rules_custom_attribute_id_fkey"
+            columns: ["custom_attribute_id"]
             isOneToOne: false
-            referencedRelation: "taxonomy_attributes"
+            referencedRelation: "taxonomy_custom_attributes"
             referencedColumns: ["id"]
           },
           {
@@ -572,6 +1011,55 @@ export type Database = {
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "validation_rules_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "taxonomy_event_properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workspace_invites: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          invited_by: string
+          role: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          invited_by: string
+          role: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          invited_by?: string
+          role?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_invites_invited_by_fkey"
+            columns: ["invited_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workspace_invites_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
             referencedColumns: ["id"]
           },
         ]
@@ -666,6 +1154,7 @@ export type Database = {
           avatar_url: string | null
           created_at: string
           display_name: string
+          email: string | null
           id: string
           updated_at: string
         }
