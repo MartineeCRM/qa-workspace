@@ -6,6 +6,9 @@
 # Supabase CLI local cache
 supabase/.temp
 
+# Git worktrees for isolated feature work
+.worktrees/
+
 # Logs
 logs
 *.log
