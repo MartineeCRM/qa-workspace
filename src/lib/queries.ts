@@ -168,7 +168,9 @@ export function useWorkspace(workspaceId: string) {
   return useQuery({
     queryKey: ["workspace", workspaceId],
     queryFn: async () =>
-      unwrap<Workspace>(await db.from("workspaces").select("*").eq("id", workspaceId).maybeSingle()),
+      unwrap<Workspace>(
+        await db.from("workspaces").select("*").eq("id", workspaceId).maybeSingle(),
+      ),
   });
 }
 
@@ -201,7 +203,11 @@ export function useMembers(workspaceId: string) {
           role: WorkspaceRole;
           user_id: string;
           created_at: string;
-          profiles: { display_name: string; avatar_url: string | null; email: string | null } | null;
+          profiles: {
+            display_name: string;
+            avatar_url: string | null;
+            email: string | null;
+          } | null;
         }>
       >(
         await db
@@ -385,7 +391,13 @@ export function buildCoverageItems(
   const eventById = new Map(events.map((e) => [e.id, e]));
   const items: CoverageItem[] = [];
   for (const e of events.filter((e) => e.is_active)) {
-    items.push({ key: `event:${e.id}`, kind: "event", id: e.id, label: e.technical_name, eventName: null });
+    items.push({
+      key: `event:${e.id}`,
+      kind: "event",
+      id: e.id,
+      label: e.technical_name,
+      eventName: null,
+    });
   }
   for (const a of attributes.filter((a) => a.is_active)) {
     const parent = a.event_id ? eventById.get(a.event_id) : undefined;
