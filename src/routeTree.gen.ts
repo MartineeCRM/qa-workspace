@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as SignupRouteImport } from './routes/signup'
 import { Route as AuthenticatedAccountRouteImport } from './routes/_authenticated/account'
 import { Route as AuthenticatedWorkspacesRouteImport } from './routes/_authenticated/workspaces'
 import { Route as AuthenticatedWWsIdRouteRouteImport } from './routes/_authenticated/w/$wsId/route'
@@ -34,6 +35,11 @@ const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SignupRoute = SignupRouteImport.update({
+  id: '/signup',
+  path: '/signup',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedAccountRoute = AuthenticatedAccountRouteImport.update({
@@ -90,6 +96,7 @@ const AuthenticatedWWsIdPProjectIdQaStageSlugRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/signup': typeof SignupRoute
   '/account': typeof AuthenticatedAccountRoute
   '/workspaces': typeof AuthenticatedWorkspacesRoute
   '/w/$wsId': typeof AuthenticatedWWsIdRouteRouteWithChildren
@@ -103,6 +110,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/signup': typeof SignupRoute
   '/account': typeof AuthenticatedAccountRoute
   '/workspaces': typeof AuthenticatedWorkspacesRoute
   '/w/$wsId/settings': typeof AuthenticatedWWsIdSettingsRoute
@@ -116,6 +124,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/login': typeof LoginRoute
+  '/signup': typeof SignupRoute
   '/_authenticated/account': typeof AuthenticatedAccountRoute
   '/_authenticated/workspaces': typeof AuthenticatedWorkspacesRoute
   '/_authenticated/w/$wsId': typeof AuthenticatedWWsIdRouteRouteWithChildren
@@ -131,6 +140,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/login'
+    | '/signup'
     | '/account'
     | '/workspaces'
     | '/w/$wsId'
@@ -144,6 +154,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/login'
+    | '/signup'
     | '/account'
     | '/workspaces'
     | '/w/$wsId/settings'
@@ -156,6 +167,7 @@ export interface FileRouteTypes {
     | '/'
     | '/_authenticated'
     | '/login'
+    | '/signup'
     | '/_authenticated/account'
     | '/_authenticated/workspaces'
     | '/_authenticated/w/$wsId'
@@ -171,6 +183,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   LoginRoute: typeof LoginRoute
+  SignupRoute: typeof SignupRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -194,6 +207,13 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/signup': {
+      id: '/signup'
+      path: '/signup'
+      fullPath: '/signup'
+      preLoaderRoute: typeof SignupRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/account': {
@@ -321,6 +341,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   LoginRoute: LoginRoute,
+  SignupRoute: SignupRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
