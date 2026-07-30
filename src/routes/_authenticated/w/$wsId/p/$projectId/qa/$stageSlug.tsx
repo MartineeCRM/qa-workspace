@@ -21,13 +21,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   buildCoverageItems,
   db,
-  stageCoverage,
+  environmentCoverage,
   statusKey,
+  useEnvironments,
   useProjectItemStatuses,
   useRules,
   useRuns,
-  useStages,
-  useTaxonomyAttributes,
+  useTaxonomyCustomAttributes,
+  useTaxonomyEventProperties,
   useTaxonomyEvents,
   useUploads,
   type CoverageItem,
@@ -103,9 +104,10 @@ function StagePage() {
   const [busy, setBusy] = useState(false);
   const [filter, setFilter] = useState<string>("all");
 
-  const { data: stages = [] } = useStages(projectId);
+  const { data: stages = [] } = useEnvironments(projectId);
   const { data: events = [] } = useTaxonomyEvents(projectId);
-  const { data: attributes = [] } = useTaxonomyAttributes(projectId);
+  const { data: eventProperties = [] } = useTaxonomyEventProperties(projectId);
+  const { data: customAttributes = [] } = useTaxonomyCustomAttributes(projectId);
   const { data: rules = [] } = useRules(projectId);
   const { data: statuses = [] } = useProjectItemStatuses(projectId);
 
@@ -113,10 +115,13 @@ function StagePage() {
   const { data: uploads = [] } = useUploads(stage?.id ?? "");
   const { data: runs = [] } = useRuns(stage?.id ?? "");
 
-  const items = useMemo(() => buildCoverageItems(events, attributes), [events, attributes]);
+  const items = useMemo(
+    () => buildCoverageItems(events, eventProperties, customAttributes),
+    [events, eventProperties, customAttributes],
+  );
   const statusByKey = useMemo(() => {
     const map = new Map<string, ItemStatus>();
-    for (const s of statuses) if (s.stage_id === stage?.id) map.set(statusKey(s), s.status);
+    for (const s of statuses) if (s.qa_environment_id === stage?.id) map.set(statusKey(s), s.status);
     return map;
   }, [statuses, stage?.id]);
 
@@ -129,14 +134,14 @@ function StagePage() {
   }
   if (!stage) return <div className="p-6" />;
 
-  const cov = stageCoverage(items, statuses, stage.id);
+  const cov = environmentCoverage(items, statuses, stage.id);
   const eventById = new Map(events.map((e) => [e.id, e]));
-  const attrById = new Map(attributes.map((a) => [a.id, a]));
+  const propertyById = new Map(eventProperties.map((p) => [p.id, p]));
 
   function itemLabel(item: CoverageItem) {
-    if (item.kind === "event") return item.label;
-    const attr = attrById.get(item.id);
-    const parent = attr?.event_id ? eventById.get(attr.event_id) : null;
+    if (item.kind !== "property") return item.label;
+    const prop = propertyById.get(item.id);
+    const parent = prop ? eventById.get(prop.event_id) : null;
     return `${parent ? `${parent.technical_name}.` : ""}${item.label}`;
   }
 
@@ -151,16 +156,17 @@ function StagePage() {
     if (!stage) return;
     const payload = {
       project_id: projectId,
-      stage_id: stage.id,
+      qa_environment_id: stage.id,
       event_id: item.kind === "event" ? item.id : null,
-      attribute_id: item.kind === "attribute" ? item.id : null,
+      property_id: item.kind === "property" ? item.id : null,
+      custom_attribute_id: item.kind === "attribute" ? item.id : null,
       status,
       last_run_id: runId ?? null,
       updated_by: user?.id ?? null,
     };
     const { error } = await db
       .from("qa_item_status")
-      .upsert(payload, { onConflict: "stage_id,event_id,attribute_id" });
+      .upsert(payload, { onConflict: "qa_environment_id,event_id,property_id,custom_attribute_id" });
     if (error) return toast.error(errorMessage(error));
     qc.invalidateQueries({ queryKey: ["item-status", projectId] });
   }
@@ -179,7 +185,7 @@ function StagePage() {
         .from("qa_uploads")
         .insert({
           project_id: projectId,
-          stage_id: stage.id,
+          qa_environment_id: stage.id,
           file_name: file.name,
           row_count: parsed.rows.length,
           uploaded_by: user?.id ?? null,
@@ -218,19 +224,23 @@ function StagePage() {
       let status: ItemStatus = "not_started";
       if (item.kind === "event") {
         status = seenEvents.has(item.label) ? "verified" : "failed";
-      } else {
-        const attr = attrById.get(item.id);
-        const parent = attr?.event_id ? eventById.get(attr.event_id) : null;
+      } else if (item.kind === "property") {
+        const prop = propertyById.get(item.id);
+        const parent = prop ? eventById.get(prop.event_id) : null;
         const key = parent ? `${parent.technical_name}::${item.label}` : `::${item.label}`;
         if (seenAttributes.has(key)) status = "verified";
         else if (parent && !seenEvents.has(parent.technical_name)) status = "not_started";
         else status = "failed";
+      } else {
+        const key = `::${item.label}`;
+        status = seenAttributes.has(key) ? "verified" : "failed";
       }
       return {
         project_id: projectId,
-        stage_id: stage.id,
+        qa_environment_id: stage.id,
         event_id: item.kind === "event" ? item.id : null,
-        attribute_id: item.kind === "attribute" ? item.id : null,
+        property_id: item.kind === "property" ? item.id : null,
+        custom_attribute_id: item.kind === "attribute" ? item.id : null,
         status,
         updated_by: user?.id ?? null,
       };
@@ -239,14 +249,14 @@ function StagePage() {
     if (rows.length) {
       const { error } = await db
         .from("qa_item_status")
-        .upsert(rows, { onConflict: "stage_id,event_id,attribute_id" });
+        .upsert(rows, { onConflict: "qa_environment_id,event_id,property_id,custom_attribute_id" });
       if (error) throw error;
     }
 
     const verified = rows.filter((r) => r.status === "verified").length;
     const { error: runError } = await db.from("qa_analysis_runs").insert({
       project_id: projectId,
-      stage_id: stage.id,
+      qa_environment_id: stage.id,
       upload_id: uploadId,
       status: "completed",
       completed_at: new Date().toISOString(),

@@ -4,7 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Pencil, SlidersHorizontal } from "lucide-react";
 
-import { db, useProject, useStages } from "@/lib/queries";
+import { db, useEnvironments, useProject, type QaEnvironment } from "@/lib/queries";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,7 +31,7 @@ export const Route = createFileRoute("/_authenticated/w/$wsId/p/$projectId")({
 function ProjectShell() {
   const { wsId, projectId } = useParams({ from: "/_authenticated/w/$wsId/p/$projectId" });
   const { data: project, isLoading } = useProject(projectId);
-  const { data: stages } = useStages(projectId);
+  const { data: stages } = useEnvironments(projectId);
   const { role } = useWorkspaceContext();
   const editable = canEdit(role);
   const [stagesOpen, setStagesOpen] = useState(false);
@@ -96,7 +96,7 @@ function ProjectShell() {
           <TabLink to="/w/$wsId/p/$projectId/taxonomy" params={{ wsId, projectId }}>
             택소노미
           </TabLink>
-          {(stages ?? []).map((stage) => (
+          {(stages ?? []).map((stage: QaEnvironment) => (
             <TabLink
               key={stage.id}
               to="/w/$wsId/p/$projectId/qa/$stageSlug"

@@ -12,7 +12,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { db, type TaxonomyAttribute, type TaxonomyEvent } from "@/lib/queries";
+import {
+  db,
+  type TaxonomyCustomAttribute,
+  type TaxonomyEvent,
+  type TaxonomyEventProperty,
+} from "@/lib/queries";
 import { errorMessage } from "@/lib/domain";
 import { useAuth } from "@/lib/auth";
 import {
@@ -27,11 +32,13 @@ import {
 export function TaxonomyImport({
   projectId,
   events,
-  attributes,
+  eventProperties,
+  customAttributes,
 }: {
   projectId: string;
   events: TaxonomyEvent[];
-  attributes: TaxonomyAttribute[];
+  eventProperties: TaxonomyEventProperty[];
+  customAttributes: TaxonomyCustomAttribute[];
 }) {
   const qc = useQueryClient();
   const { user } = useAuth();
@@ -43,8 +50,10 @@ export function TaxonomyImport({
     try {
       const parsed = parseTaxonomyFile(file.name, await file.text());
       const eventByName = new Map(events.map((e) => [e.technical_name, e]));
-      const attrKey = (eventId: string | null, name: string) => `${eventId ?? "user"}::${name}`;
-      const existingAttrs = new Set(attributes.map((a) => attrKey(a.event_id, a.technical_name)));
+      const existingProps = new Set(
+        eventProperties.map((p) => `${p.event_id}::${p.technical_name}`),
+      );
+      const existingCustom = new Set(customAttributes.map((a) => a.technical_name));
 
       let createdEvents = 0;
       let createdAttrs = 0;
@@ -69,32 +78,33 @@ export function TaxonomyImport({
           eventByName.set(ev.technical_name, { id: eventId } as TaxonomyEvent);
           createdEvents += 1;
         }
-        const newAttrs = ev.attributes.filter(
-          (a) => !existingAttrs.has(attrKey(eventId, a.technical_name)),
+        const newProps = ev.attributes.filter(
+          (a) => !existingProps.has(`${eventId}::${a.technical_name}`),
         );
-        if (newAttrs.length) {
-          const { error } = await db.from("taxonomy_attributes").insert(
-            newAttrs.map((a, i) => attrPayload(a, projectId, eventId, user?.id, i)),
-          );
+        if (newProps.length) {
+          const { error } = await db
+            .from("taxonomy_event_properties")
+            .insert(newProps.map((a, i) => propertyPayload(a, eventId as string, user?.id, i)));
           if (error) throw error;
-          newAttrs.forEach((a) => existingAttrs.add(attrKey(eventId, a.technical_name)));
-          createdAttrs += newAttrs.length;
+          newProps.forEach((a) => existingProps.add(`${eventId}::${a.technical_name}`));
+          createdAttrs += newProps.length;
         }
       }
 
-      const newUserAttrs = parsed.userAttributes.filter(
-        (a) => !existingAttrs.has(attrKey(null, a.technical_name)),
+      const newCustomAttrs = parsed.userAttributes.filter(
+        (a) => !existingCustom.has(a.technical_name),
       );
-      if (newUserAttrs.length) {
+      if (newCustomAttrs.length) {
         const { error } = await db
-          .from("taxonomy_attributes")
-          .insert(newUserAttrs.map((a, i) => attrPayload(a, projectId, null, user?.id, i)));
+          .from("taxonomy_custom_attributes")
+          .insert(newCustomAttrs.map((a, i) => customAttributePayload(a, projectId, user?.id, i)));
         if (error) throw error;
-        createdAttrs += newUserAttrs.length;
+        createdAttrs += newCustomAttrs.length;
       }
 
       qc.invalidateQueries({ queryKey: ["events", projectId] });
-      qc.invalidateQueries({ queryKey: ["attributes", projectId] });
+      qc.invalidateQueries({ queryKey: ["taxonomy-event-properties", projectId] });
+      qc.invalidateQueries({ queryKey: ["taxonomy-custom-attributes", projectId] });
 
       if (createdEvents === 0 && createdAttrs === 0) {
         toast.info("이미 등록된 항목이라 새로 추가된 내용은 없어요");
@@ -156,16 +166,33 @@ export function TaxonomyImport({
   );
 }
 
-function attrPayload(
+function propertyPayload(
+  a: ImportedAttribute,
+  eventId: string,
+  userId: string | undefined,
+  sort: number,
+) {
+  return {
+    event_id: eventId,
+    technical_name: a.technical_name,
+    display_name: a.display_name,
+    description: a.description,
+    data_type: a.data_type,
+    is_required: a.is_required,
+    allowed_values: a.allowed_values,
+    sort_order: sort,
+    created_by: userId,
+  };
+}
+
+function customAttributePayload(
   a: ImportedAttribute,
   projectId: string,
-  eventId: string | null,
   userId: string | undefined,
   sort: number,
 ) {
   return {
     project_id: projectId,
-    event_id: eventId,
     technical_name: a.technical_name,
     display_name: a.display_name,
     description: a.description,

@@ -70,12 +70,18 @@ function ProjectsPage() {
     const ids = projects.map((p) => p.id);
     Promise.all([
       db.from("taxonomy_events").select("project_id").in("project_id", ids).eq("is_active", true),
-      db.from("taxonomy_attributes").select("project_id").in("project_id", ids).eq("is_active", true),
-    ]).then(([e, a]) => {
+      db
+        .from("taxonomy_event_properties")
+        .select("is_active, taxonomy_events!inner(project_id)")
+        .in("taxonomy_events.project_id", ids)
+        .eq("is_active", true),
+      db.from("taxonomy_custom_attributes").select("project_id").in("project_id", ids).eq("is_active", true),
+    ]).then(([e, p, c]) => {
       const map: Record<string, { events: number; attributes: number }> = {};
       for (const id of ids) map[id] = { events: 0, attributes: 0 };
       for (const row of e.data ?? []) map[row.project_id].events += 1;
-      for (const row of a.data ?? []) map[row.project_id].attributes += 1;
+      for (const row of p.data ?? []) map[row.taxonomy_events.project_id].attributes += 1;
+      for (const row of c.data ?? []) map[row.project_id].attributes += 1;
       setCounts(map);
     });
   }, [projects]);

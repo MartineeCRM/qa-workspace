@@ -26,6 +26,7 @@ export type Project = {
 export type TaxonomyEvent = {
   id: string;
   project_id: string;
+  category_id: string | null;
   technical_name: string;
   display_name: string | null;
   description: string | null;
@@ -36,10 +37,35 @@ export type TaxonomyEvent = {
   updated_at: string;
 };
 
-export type TaxonomyAttribute = {
+export type TaxonomyCategory = {
   id: string;
   project_id: string;
-  event_id: string | null;
+  name: string;
+  description: string | null;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type TaxonomyEventProperty = {
+  id: string;
+  event_id: string;
+  technical_name: string;
+  display_name: string | null;
+  description: string | null;
+  data_type: string;
+  is_required: boolean;
+  is_active: boolean;
+  example_value: unknown;
+  allowed_values: unknown;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type TaxonomyCustomAttribute = {
+  id: string;
+  project_id: string;
   technical_name: string;
   display_name: string | null;
   description: string | null;
@@ -57,21 +83,16 @@ export type ValidationRule = {
   id: string;
   project_id: string;
   event_id: string | null;
-  attribute_id: string | null;
+  property_id: string | null;
+  custom_attribute_id: string | null;
   name: string;
   description: string | null;
-  rule_type: string;
-  severity: "critical" | "warning" | "info";
-  pass_condition_type: "all_records" | "minimum_pass_rate" | "maximum_failure_count";
-  minimum_pass_rate: number | null;
-  maximum_failure_count: number | null;
-  rule_config: Record<string, unknown>;
   is_enabled: boolean;
   created_at: string;
   updated_at: string;
 };
 
-export type QaStage = {
+export type QaEnvironment = {
   id: string;
   project_id: string;
   slug: string;
@@ -85,7 +106,7 @@ export type QaStage = {
 export type QaUpload = {
   id: string;
   project_id: string;
-  stage_id: string;
+  qa_environment_id: string;
   file_name: string;
   row_count: number;
   notes: string | null;
@@ -96,7 +117,7 @@ export type QaUpload = {
 export type QaAnalysisRun = {
   id: string;
   project_id: string;
-  stage_id: string;
+  qa_environment_id: string;
   upload_id: string | null;
   status: string;
   summary: Record<string, unknown>;
@@ -108,9 +129,10 @@ export type QaAnalysisRun = {
 export type QaItemStatus = {
   id: string;
   project_id: string;
-  stage_id: string;
+  qa_environment_id: string;
   event_id: string | null;
-  attribute_id: string | null;
+  property_id: string | null;
+  custom_attribute_id: string | null;
   status: ItemStatus;
   notes: string | null;
   last_run_id: string | null;
@@ -228,6 +250,20 @@ export function useProject(projectId: string) {
 
 /* ---------------- Taxonomy (single source of truth) ---------------- */
 
+export function useTaxonomyCategories(projectId: string) {
+  return useQuery({
+    queryKey: ["taxonomy-categories", projectId],
+    queryFn: async () =>
+      unwrap<TaxonomyCategory[]>(
+        await db
+          .from("taxonomy_categories")
+          .select("*")
+          .eq("project_id", projectId)
+          .order("sort_order"),
+      ),
+  });
+}
+
 export function useTaxonomyEvents(projectId: string) {
   return useQuery({
     queryKey: ["events", projectId],
@@ -243,13 +279,28 @@ export function useTaxonomyEvents(projectId: string) {
   });
 }
 
-export function useTaxonomyAttributes(projectId: string) {
+export function useTaxonomyEventProperties(projectId: string) {
   return useQuery({
-    queryKey: ["attributes", projectId],
+    queryKey: ["taxonomy-event-properties", projectId],
     queryFn: async () =>
-      unwrap<TaxonomyAttribute[]>(
+      unwrap<TaxonomyEventProperty[]>(
         await db
-          .from("taxonomy_attributes")
+          .from("taxonomy_event_properties")
+          .select("*, taxonomy_events!inner(project_id)")
+          .eq("taxonomy_events.project_id", projectId)
+          .order("sort_order")
+          .order("created_at"),
+      ),
+  });
+}
+
+export function useTaxonomyCustomAttributes(projectId: string) {
+  return useQuery({
+    queryKey: ["taxonomy-custom-attributes", projectId],
+    queryFn: async () =>
+      unwrap<TaxonomyCustomAttribute[]>(
+        await db
+          .from("taxonomy_custom_attributes")
           .select("*")
           .eq("project_id", projectId)
           .order("sort_order")
@@ -272,14 +323,14 @@ export function useRules(projectId: string) {
   });
 }
 
-/* ---------------- QA stages ---------------- */
+/* ---------------- QA environments ---------------- */
 
-export function useStages(projectId: string) {
+export function useEnvironments(projectId: string) {
   return useQuery({
-    queryKey: ["stages", projectId],
+    queryKey: ["environments", projectId],
     queryFn: async () =>
-      unwrap<QaStage[]>(
-        await db.from("qa_stages").select("*").eq("project_id", projectId).order("sort_order"),
+      unwrap<QaEnvironment[]>(
+        await db.from("qa_environments").select("*").eq("project_id", projectId).order("sort_order"),
       ),
   });
 }
@@ -294,31 +345,31 @@ export function useProjectItemStatuses(projectId: string) {
   });
 }
 
-export function useUploads(stageId: string) {
+export function useUploads(environmentId: string) {
   return useQuery({
-    queryKey: ["uploads", stageId],
-    enabled: Boolean(stageId),
+    queryKey: ["uploads", environmentId],
+    enabled: Boolean(environmentId),
     queryFn: async () =>
       unwrap<QaUpload[]>(
         await db
           .from("qa_uploads")
           .select("*")
-          .eq("stage_id", stageId)
+          .eq("qa_environment_id", environmentId)
           .order("created_at", { ascending: false }),
       ),
   });
 }
 
-export function useRuns(stageId: string) {
+export function useRuns(environmentId: string) {
   return useQuery({
-    queryKey: ["runs", stageId],
-    enabled: Boolean(stageId),
+    queryKey: ["runs", environmentId],
+    enabled: Boolean(environmentId),
     queryFn: async () =>
       unwrap<QaAnalysisRun[]>(
         await db
           .from("qa_analysis_runs")
           .select("*")
-          .eq("stage_id", stageId)
+          .eq("qa_environment_id", environmentId)
           .order("created_at", { ascending: false }),
       ),
   });
@@ -344,12 +395,12 @@ export function useActivity(params: { workspaceId?: string; projectId?: string; 
 
 /* ---------------- Live coverage ----------------
  * Coverage is ALWAYS computed against the current taxonomy.
- * Nothing is snapshotted: growing the taxonomy lowers coverage on every stage.
+ * Nothing is snapshotted: growing the taxonomy lowers coverage on every environment.
  */
 
 export type CoverageItem = {
   key: string;
-  kind: "event" | "attribute";
+  kind: "event" | "property" | "attribute";
   id: string;
   label: string;
   eventName: string | null;
@@ -357,32 +408,48 @@ export type CoverageItem = {
 
 export function buildCoverageItems(
   events: TaxonomyEvent[],
-  attributes: TaxonomyAttribute[],
+  eventProperties: TaxonomyEventProperty[],
+  customAttributes: TaxonomyCustomAttribute[],
 ): CoverageItem[] {
   const eventById = new Map(events.map((e) => [e.id, e]));
   const items: CoverageItem[] = [];
   for (const e of events.filter((e) => e.is_active)) {
     items.push({ key: `event:${e.id}`, kind: "event", id: e.id, label: e.technical_name, eventName: null });
   }
-  for (const a of attributes.filter((a) => a.is_active)) {
-    const parent = a.event_id ? eventById.get(a.event_id) : undefined;
-    if (a.event_id && (!parent || !parent.is_active)) continue;
+  for (const p of eventProperties.filter((p) => p.is_active)) {
+    const parent = eventById.get(p.event_id);
+    if (!parent || !parent.is_active) continue;
+    items.push({
+      key: `property:${p.id}`,
+      kind: "property",
+      id: p.id,
+      label: p.technical_name,
+      eventName: parent.technical_name,
+    });
+  }
+  for (const a of customAttributes.filter((a) => a.is_active)) {
     items.push({
       key: `attribute:${a.id}`,
       kind: "attribute",
       id: a.id,
       label: a.technical_name,
-      eventName: parent?.technical_name ?? null,
+      eventName: null,
     });
   }
   return items;
 }
 
-export function statusKey(row: { event_id: string | null; attribute_id: string | null }) {
-  return row.event_id ? `event:${row.event_id}` : `attribute:${row.attribute_id}`;
+export function statusKey(row: {
+  event_id: string | null;
+  property_id: string | null;
+  custom_attribute_id: string | null;
+}) {
+  if (row.event_id) return `event:${row.event_id}`;
+  if (row.property_id) return `property:${row.property_id}`;
+  return `attribute:${row.custom_attribute_id}`;
 }
 
-export type StageCoverage = {
+export type EnvironmentCoverage = {
   total: number;
   verified: number;
   failed: number;
@@ -390,13 +457,13 @@ export type StageCoverage = {
   ratio: number;
 };
 
-export function stageCoverage(
+export function environmentCoverage(
   items: CoverageItem[],
   statuses: QaItemStatus[],
-  stageId: string,
-): StageCoverage {
+  environmentId: string,
+): EnvironmentCoverage {
   const map = new Map(
-    statuses.filter((s) => s.stage_id === stageId).map((s) => [statusKey(s), s.status]),
+    statuses.filter((s) => s.qa_environment_id === environmentId).map((s) => [statusKey(s), s.status]),
   );
   let verified = 0;
   let failed = 0;

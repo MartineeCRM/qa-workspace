@@ -7,7 +7,8 @@ import { CoverageBar } from "@/components/app/coverage";
 import {
   buildCoverageItems,
   useRules,
-  useTaxonomyAttributes,
+  useTaxonomyCustomAttributes,
+  useTaxonomyEventProperties,
   useTaxonomyEvents,
 } from "@/lib/queries";
 import { useWorkspaceContext } from "@/lib/workspace-context";
@@ -38,10 +39,11 @@ function TaxonomyPage() {
   const editable = canEdit(role);
 
   const { data: events = [] } = useTaxonomyEvents(projectId);
-  const { data: attributes = [] } = useTaxonomyAttributes(projectId);
+  const { data: eventProperties = [] } = useTaxonomyEventProperties(projectId);
+  const { data: customAttributes = [] } = useTaxonomyCustomAttributes(projectId);
   const { data: rules = [] } = useRules(projectId);
 
-  const items = buildCoverageItems(events, attributes);
+  const items = buildCoverageItems(events, eventProperties, customAttributes);
 
   return (
     <div className="space-y-5 p-6">
@@ -67,7 +69,8 @@ function TaxonomyPage() {
           <TaxonomyTab
             projectId={projectId}
             events={events}
-            attributes={attributes}
+            eventProperties={eventProperties}
+            customAttributes={customAttributes}
             editable={editable}
           />
         </TabsContent>
@@ -76,7 +79,8 @@ function TaxonomyPage() {
             projectId={projectId}
             rules={rules}
             events={events}
-            attributes={attributes}
+            eventProperties={eventProperties}
+            customAttributes={customAttributes}
             editable={editable}
           />
         </TabsContent>

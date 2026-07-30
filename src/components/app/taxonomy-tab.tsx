@@ -37,19 +37,28 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { db, type TaxonomyAttribute, type TaxonomyEvent } from "@/lib/queries";
+import {
+  db,
+  type TaxonomyCustomAttribute,
+  type TaxonomyEvent,
+  type TaxonomyEventProperty,
+} from "@/lib/queries";
 import { DATA_TYPES, errorMessage } from "@/lib/domain";
 import { useAuth } from "@/lib/auth";
+
+type AnyAttribute = TaxonomyEventProperty | TaxonomyCustomAttribute;
 
 export function TaxonomyTab({
   projectId,
   events,
-  attributes,
+  eventProperties,
+  customAttributes,
   editable,
 }: {
   projectId: string;
   events: TaxonomyEvent[];
-  attributes: TaxonomyAttribute[];
+  eventProperties: TaxonomyEventProperty[];
+  customAttributes: TaxonomyCustomAttribute[];
   editable: boolean;
 }) {
   const qc = useQueryClient();
@@ -58,28 +67,26 @@ export function TaxonomyTab({
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const [eventDialog, setEventDialog] = useState<{ event: TaxonomyEvent | null } | null>(null);
   const [attrDialog, setAttrDialog] = useState<{
-    attribute: TaxonomyAttribute | null;
+    attribute: AnyAttribute | null;
     eventId: string | null;
   } | null>(null);
 
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ["events", projectId] });
-    qc.invalidateQueries({ queryKey: ["attributes", projectId] });
+    qc.invalidateQueries({ queryKey: ["taxonomy-event-properties", projectId] });
+    qc.invalidateQueries({ queryKey: ["taxonomy-custom-attributes", projectId] });
   };
 
   const term = search.trim().toLowerCase();
   const attrsByEvent = useMemo(() => {
-    const map = new Map<string, TaxonomyAttribute[]>();
-    for (const a of attributes) {
-      if (!a.event_id) continue;
-      const list = map.get(a.event_id) ?? [];
-      list.push(a);
-      map.set(a.event_id, list);
+    const map = new Map<string, TaxonomyEventProperty[]>();
+    for (const p of eventProperties) {
+      const list = map.get(p.event_id) ?? [];
+      list.push(p);
+      map.set(p.event_id, list);
     }
     return map;
-  }, [attributes]);
-
-  const userAttributes = attributes.filter((a) => !a.event_id);
+  }, [eventProperties]);
 
   const visibleEvents = events.filter((e) => {
     if (!term) return true;
@@ -98,15 +105,22 @@ export function TaxonomyTab({
     refresh();
   }
 
-  async function removeAttribute(attribute: TaxonomyAttribute) {
-    const { error } = await db.from("taxonomy_attributes").delete().eq("id", attribute.id);
+  async function removeEventProperty(property: TaxonomyEventProperty) {
+    const { error } = await db.from("taxonomy_event_properties").delete().eq("id", property.id);
+    if (error) return toast.error(errorMessage(error));
+    toast.success("택소노미에서 속성을 삭제했어요");
+    refresh();
+  }
+
+  async function removeCustomAttribute(attribute: TaxonomyCustomAttribute) {
+    const { error } = await db.from("taxonomy_custom_attributes").delete().eq("id", attribute.id);
     if (error) return toast.error(errorMessage(error));
     toast.success("택소노미에서 속성을 삭제했어요");
     refresh();
   }
 
   async function toggleActive(
-    table: "taxonomy_events" | "taxonomy_attributes",
+    table: "taxonomy_events" | "taxonomy_event_properties" | "taxonomy_custom_attributes",
     id: string,
     value: boolean,
   ) {
@@ -127,7 +141,12 @@ export function TaxonomyTab({
         <div className="ml-auto flex flex-wrap gap-2">
           {editable ? (
             <>
-              <TaxonomyImport projectId={projectId} events={events} attributes={attributes} />
+              <TaxonomyImport
+                projectId={projectId}
+                events={events}
+                eventProperties={eventProperties}
+                customAttributes={customAttributes}
+              />
               <Button
                 size="sm"
                 variant="outline"
@@ -220,8 +239,8 @@ export function TaxonomyTab({
                           attribute={attr}
                           editable={editable}
                           onEdit={() => setAttrDialog({ attribute: attr, eventId: attr.event_id })}
-                          onDelete={() => removeAttribute(attr)}
-                          onToggle={(v) => toggleActive("taxonomy_attributes", attr.id, v)}
+                          onDelete={() => removeEventProperty(attr)}
+                          onToggle={(v) => toggleActive("taxonomy_event_properties", attr.id, v)}
                         />
                       ))}
                     </ul>
@@ -234,18 +253,18 @@ export function TaxonomyTab({
       </Panel>
 
       <Panel title="사용자 속성" description="특정 이벤트에 묶이지 않는 속성이에요.">
-        {userAttributes.length === 0 ? (
+        {customAttributes.length === 0 ? (
           <EmptyState title="사용자 속성이 없어요" description="프로필 수준의 속성을 여기에 추가해요." />
         ) : (
           <ul className="divide-y">
-            {userAttributes.map((attr) => (
+            {customAttributes.map((attr) => (
               <AttributeRow
                 key={attr.id}
                 attribute={attr}
                 editable={editable}
                 onEdit={() => setAttrDialog({ attribute: attr, eventId: null })}
-                onDelete={() => removeAttribute(attr)}
-                onToggle={(v) => toggleActive("taxonomy_attributes", attr.id, v)}
+                onDelete={() => removeCustomAttribute(attr)}
+                onToggle={(v) => toggleActive("taxonomy_custom_attributes", attr.id, v)}
               />
             ))}
           </ul>
@@ -284,7 +303,7 @@ function AttributeRow({
   onDelete,
   onToggle,
 }: {
-  attribute: TaxonomyAttribute;
+  attribute: AnyAttribute;
   editable: boolean;
   onEdit: () => void;
   onDelete: () => void;
@@ -445,12 +464,14 @@ function AttributeDialog({
   projectId: string;
   userId: string;
   events: TaxonomyEvent[];
-  attribute: TaxonomyAttribute | null;
+  attribute: AnyAttribute | null;
   eventId: string | null;
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const [parent, setParent] = useState(attribute?.event_id ?? eventId ?? "none");
+  const [parent, setParent] = useState(
+    attribute && "event_id" in attribute ? attribute.event_id : (eventId ?? "none"),
+  );
   const [technicalName, setTechnicalName] = useState(attribute?.technical_name ?? "");
   const [displayName, setDisplayName] = useState(attribute?.display_name ?? "");
   const [description, setDescription] = useState(attribute?.description ?? "");
@@ -468,8 +489,8 @@ function AttributeDialog({
       .split(",")
       .map((v) => v.trim())
       .filter(Boolean);
-    const payload = {
-      event_id: parent === "none" ? null : parent,
+    const isProperty = parent !== "none";
+    const basePayload = {
       technical_name: technicalName.trim(),
       display_name: displayName.trim() || null,
       description: description.trim() || null,
@@ -477,11 +498,11 @@ function AttributeDialog({
       is_required: required,
       allowed_values: allowedValues.length ? allowedValues : null,
     };
+    const table = isProperty ? "taxonomy_event_properties" : "taxonomy_custom_attributes";
+    const payload = isProperty ? { ...basePayload, event_id: parent } : { ...basePayload, project_id: projectId };
     const { error } = attribute
-      ? await db.from("taxonomy_attributes").update(payload).eq("id", attribute.id)
-      : await db
-          .from("taxonomy_attributes")
-          .insert({ ...payload, project_id: projectId, created_by: userId });
+      ? await db.from(table).update(payload).eq("id", attribute.id)
+      : await db.from(table).insert({ ...payload, created_by: userId });
     setSaving(false);
     if (error) return toast.error(errorMessage(error));
     toast.success(attribute ? "속성을 수정했어요" : "택소노미에 속성을 추가했어요");
@@ -499,7 +520,7 @@ function AttributeDialog({
         <div className="space-y-3">
           <div className="space-y-1.5">
             <Label>소속</Label>
-            <Select value={parent} onValueChange={setParent}>
+            <Select value={parent} onValueChange={setParent} disabled={!!attribute}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
@@ -512,6 +533,11 @@ function AttributeDialog({
                 ))}
               </SelectContent>
             </Select>
+            {attribute ? (
+              <p className="text-xs text-muted-foreground">
+                기존 속성의 소속은 바꿀 수 없어요. 다른 곳으로 옮기려면 삭제 후 다시 추가해 주세요.
+              </p>
+            ) : null}
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
