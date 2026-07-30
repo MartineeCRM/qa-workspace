@@ -5,7 +5,6 @@ import {
   CardDescription,
   CardFooter,
   CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
 
 export function AuthCard({
@@ -23,7 +22,7 @@ export function AuthCard({
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <Card className="w-full max-w-sm">
         <CardHeader>
-          <CardTitle className="text-xl">{title}</CardTitle>
+          <h1 className="text-xl font-semibold leading-none tracking-tight">{title}</h1>
           <CardDescription>{description}</CardDescription>
         </CardHeader>
         <CardContent>{children}</CardContent>
