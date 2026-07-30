@@ -1,13 +1,12 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import type { Session, User } from "@supabase/supabase-js";
+import type { AuthError, Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
-import { ensureSession } from "@/lib/auto-session";
-
 
 export type Profile = {
   id: string;
   display_name: string;
   avatar_url: string | null;
+  email: string | null;
 };
 
 type AuthContextValue = {
@@ -16,6 +15,8 @@ type AuthContextValue = {
   profile: Profile | null;
   loading: boolean;
   refreshProfile: () => Promise<void>;
+  signIn: (email: string, password: string) => Promise<{ error: AuthError | null }>;
+  signUp: (email: string, password: string) => Promise<{ error: AuthError | null }>;
   signOut: () => Promise<void>;
 };
 
@@ -31,12 +32,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(next);
       if (!next) setProfile(null);
     });
-    ensureSession()
-      .then(() => supabase.auth.getSession())
+    supabase.auth
+      .getSession()
       .then(({ data: d }) => setSession(d.session))
       .finally(() => setLoading(false));
     return () => data.subscription.unsubscribe();
-
   }, []);
 
   const userId = session?.user.id;
@@ -62,10 +62,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!userId) return;
     const { data } = await supabase
       .from("profiles")
-      .select("id, display_name, avatar_url")
+      .select("id, display_name, avatar_url, email")
       .eq("id", userId)
       .maybeSingle();
     if (data) setProfile(data);
+  }
+
+  async function signIn(email: string, password: string) {
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    return { error };
+  }
+
+  async function signUp(email: string, password: string) {
+    const { error } = await supabase.auth.signUp({ email, password });
+    return { error };
   }
 
   async function signOut() {
@@ -82,6 +92,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         profile,
         loading,
         refreshProfile,
+        signIn,
+        signUp,
         signOut,
       }}
     >
