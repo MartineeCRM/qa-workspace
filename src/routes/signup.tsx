@@ -40,9 +40,13 @@ function SignupPage() {
       return;
     }
     setBusy(true);
-    const { error } = await signUp(email.trim(), password);
+    const { data, error } = await signUp(email.trim(), password);
     setBusy(false);
     if (error) return toast.error(authErrorMessage(error, "가입에 실패했어요"));
+    if (!data.session) {
+      toast.error("가입은 됐지만 로그인이 안 됐어요. 관리자에게 문의해주세요.");
+      return;
+    }
     navigate({ to: "/workspaces" });
   }
 
