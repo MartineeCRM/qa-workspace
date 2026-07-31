@@ -256,7 +256,7 @@ export type Database = {
           id: string
           payload: Json | null
           previous_snapshot_id: string | null
-          qa_round_id: string
+          qa_session_id: string
           requested_at: string
           snapshot_name: string
           status: string
@@ -267,7 +267,7 @@ export type Database = {
           id?: string
           payload?: Json | null
           previous_snapshot_id?: string | null
-          qa_round_id: string
+          qa_session_id: string
           requested_at?: string
           snapshot_name: string
           status?: string
@@ -278,7 +278,7 @@ export type Database = {
           id?: string
           payload?: Json | null
           previous_snapshot_id?: string | null
-          qa_round_id?: string
+          qa_session_id?: string
           requested_at?: string
           snapshot_name?: string
           status?: string
@@ -292,10 +292,10 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "qa_attribute_snapshots_qa_round_id_fkey"
-            columns: ["qa_round_id"]
+            foreignKeyName: "qa_attribute_snapshots_qa_session_id_fkey"
+            columns: ["qa_session_id"]
             isOneToOne: false
-            referencedRelation: "qa_rounds"
+            referencedRelation: "qa_sessions"
             referencedColumns: ["id"]
           },
         ]
@@ -643,7 +643,7 @@ export type Database = {
           external_user_id: string
           id: string
           occurred_at: string
-          qa_round_id: string
+          qa_session_id: string
           raw_event_name: string
           raw_properties: Json
         }
@@ -653,7 +653,7 @@ export type Database = {
           external_user_id: string
           id?: string
           occurred_at: string
-          qa_round_id: string
+          qa_session_id: string
           raw_event_name: string
           raw_properties?: Json
         }
@@ -663,7 +663,7 @@ export type Database = {
           external_user_id?: string
           id?: string
           occurred_at?: string
-          qa_round_id?: string
+          qa_session_id?: string
           raw_event_name?: string
           raw_properties?: Json
         }
@@ -676,7 +676,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "qa_run_events_qa_round_id_fkey"
+            foreignKeyName: "qa_run_events_qa_session_id_fkey"
+            columns: ["qa_session_id"]
+            isOneToOne: false
+            referencedRelation: "qa_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      qa_sessions: {
+        Row: {
+          ended_at: string | null
+          id: string
+          name: string
+          qa_round_id: string
+          started_at: string
+          started_by: string
+        }
+        Insert: {
+          ended_at?: string | null
+          id?: string
+          name: string
+          qa_round_id: string
+          started_at?: string
+          started_by: string
+        }
+        Update: {
+          ended_at?: string | null
+          id?: string
+          name?: string
+          qa_round_id?: string
+          started_at?: string
+          started_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "qa_sessions_qa_round_id_fkey"
             columns: ["qa_round_id"]
             isOneToOne: false
             referencedRelation: "qa_rounds"
