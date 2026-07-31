@@ -760,6 +760,27 @@ function AttributeDialog({
     attribute && "event_id" in attribute ? attribute.event_id : (eventId ?? "none"),
   );
   const isProperty = parent !== "none";
+
+  const siblings = useMemo(() => {
+    if (!attribute || !isProperty) return [];
+    return eventProperties.filter(
+      (p) => p.technical_name === attribute.technical_name && p.id !== attribute.id,
+    );
+  }, [attribute, isProperty, eventProperties]);
+
+  const eventNameById = useMemo(
+    () => new Map(events.map((e) => [e.id, e.technical_name])),
+    [events],
+  );
+
+  const [checkedSiblings, setCheckedSiblings] = useState<Record<string, boolean>>(() =>
+    Object.fromEntries(siblings.map((s) => [s.id, true])),
+  );
+
+  function toggleAllSiblings(value: boolean) {
+    setCheckedSiblings(Object.fromEntries(siblings.map((s) => [s.id, value])));
+  }
+
   const [technicalName, setTechnicalName] = useState(attribute?.technical_name ?? "");
   const [displayName, setDisplayName] = useState(attribute?.display_name ?? "");
   const [description, setDescription] = useState(attribute?.description ?? "");
