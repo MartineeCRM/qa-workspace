@@ -162,11 +162,29 @@ git commit -m "feat: add workspace_invites table, profiles.email, invite auto-jo
 
 ### Task 2: Remove auto-login, add a real session guard
 
+**Discovered during execution:** Task 1's schema changes (`profiles.email`, `workspace_invites`) were never reflected in the generated `src/integrations/supabase/types.ts`, so the typed `supabase` client rejects `email` as an unknown column the moment `auth.tsx` selects it. Regenerate that file as a prerequisite of this task (see Step 0 below) — the plan didn't originally call this out.
+
 **Files:**
+- Modify: `src/integrations/supabase/types.ts` (regenerate, prerequisite fix)
 - Delete: `src/lib/auto-login.functions.ts`
 - Delete: `src/lib/auto-session.ts`
 - Modify: `src/lib/auth.tsx` (full rewrite)
 - Modify: `src/routes/_authenticated/route.tsx` (full rewrite)
+
+- [ ] **Step 0: Regenerate Supabase types (prerequisite)**
+
+```bash
+cd ~/Projects/qa-workspace
+PWFILE=/tmp/qa_workspace_db_pass.txt
+DB_PASS=$(cat "$PWFILE")
+DB_URL="postgresql://postgres.ilciucbaonbzikghfebk:${DB_PASS}@aws-0-ap-southeast-2.pooler.supabase.com:5432/postgres"
+supabase gen types typescript --db-url "$DB_URL" --schema public > src/integrations/supabase/types.ts
+unset DB_PASS
+git add src/integrations/supabase/types.ts
+git commit -m "chore: regenerate Supabase types for Task 1 schema changes"
+```
+
+Expected: `grep -A5 '"profiles": {' src/integrations/supabase/types.ts` (or similar) shows `email` in the Row/Insert/Update shapes; `grep workspace_invites src/integrations/supabase/types.ts` finds that table.
 
 - [ ] **Step 1: Delete the auto-login files**
 
@@ -198,7 +216,10 @@ type AuthContextValue = {
   loading: boolean;
   refreshProfile: () => Promise<void>;
   signIn: (email: string, password: string) => Promise<{ error: AuthError | null }>;
-  signUp: (email: string, password: string) => Promise<{ error: AuthError | null }>;
+  signUp: (
+    email: string,
+    password: string,
+  ) => Promise<{ data: { session: Session | null }; error: AuthError | null }>;
   signOut: () => Promise<void>;
 };
 
@@ -256,8 +277,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function signUp(email: string, password: string) {
-    const { error } = await supabase.auth.signUp({ email, password });
-    return { error };
+    const { data, error } = await supabase.auth.signUp({ email, password });
+    return { data, error };
   }
 
   async function signOut() {
@@ -528,7 +549,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
-import { errorMessage } from "@/lib/domain";
+import { authErrorMessage } from "@/lib/domain";
 import { useAuth } from "@/lib/auth";
 
 export const Route = createFileRoute("/signup")({
@@ -561,9 +582,13 @@ function SignupPage() {
       return;
     }
     setBusy(true);
-    const { error } = await signUp(email.trim(), password);
+    const { data, error } = await signUp(email.trim(), password);
     setBusy(false);
-    if (error) return toast.error(errorMessage(error, "가입에 실패했어요"));
+    if (error) return toast.error(authErrorMessage(error, "가입에 실패했어요"));
+    if (!data.session) {
+      toast.error("가입은 됐지만 로그인이 안 됐어요. 관리자에게 문의해주세요.");
+      return;
+    }
     navigate({ to: "/workspaces" });
   }
 
@@ -631,6 +656,8 @@ function SignupPage() {
 ```
 
 Note: there is no password-reset flow in this app (out of scope per the design doc), so the confirm-password field is the only safeguard against a typo locking someone out — do not remove it.
+
+Note on `authErrorMessage` (added in Task 4's fix, in `src/lib/domain.ts`): it currently only remaps Supabase's `"Invalid login credentials"` string. Supabase's duplicate-signup error text may differ (e.g. something like `"User already registered"` or a similar variant) and isn't yet mapped to a Korean message. During this task, if you can observe the actual error text (e.g. by attempting a duplicate signup once the feature is testable), add that exact string as another branch in `authErrorMessage` with an appropriate Korean message (e.g. "이미 가입된 이메일이에요"). If you can't observe the real string during this task, leave a note for Task 9's manual verification pass to check and note it as a follow-up rather than guessing at the exact string.
 
 - [ ] **Step 2: Type-check**
 
@@ -921,12 +948,13 @@ Right after the existing `removeMember` function, add:
 ```tsx
   async function sendInvite(e: React.FormEvent) {
     e.preventDefault();
+    if (!user) return;
     setInviteBusy(true);
     const { error } = await db.from("workspace_invites").insert({
       workspace_id: wsId,
       email: inviteEmail.trim(),
       role: inviteRole,
-      invited_by: user!.id,
+      invited_by: user.id,
     });
     setInviteBusy(false);
     if (error) return toast.error(errorMessage(error));
@@ -978,7 +1006,16 @@ Replace it with:
               초대
             </h3>
             {isAdmin ? (
-              <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
+              <Dialog
+                open={inviteOpen}
+                onOpenChange={(open) => {
+                  setInviteOpen(open);
+                  if (!open) {
+                    setInviteEmail("");
+                    setInviteRole("viewer");
+                  }
+                }}
+              >
                 <DialogTrigger asChild>
                   <Button size="sm" variant="outline">
                     이메일로 초대
@@ -1093,15 +1130,17 @@ npx tsc --noEmit -p tsconfig.json
 
 Expected: no errors in `src/routes/_authenticated/w/$wsId/settings.tsx`.
 
-- [ ] **Step 6: Lint and build**
+- [ ] **Step 6: Lint the touched file and build**
+
+The pre-existing codebase has ~760 unrelated Prettier formatting errors (Lovable-generated code was never run through this repo's Prettier config), so running `npm run lint` repo-wide always "fails" regardless of what this task changes. Lint only the file this task touched instead:
 
 ```bash
 cd ~/Projects/qa-workspace
-npm run lint
+npx eslint "src/routes/_authenticated/w/\$wsId/settings.tsx"
 npm run build
 ```
 
-Expected: both succeed with no errors. (These are this repo's only automated gates — there is no test script.)
+Expected: the `eslint` call reports no errors introduced by this task's own edits (pre-existing errors in *other* files are not your concern — do not run `--fix` repo-wide, that would be an unrelated, unrequested mass reformat). `npm run build` succeeds.
 
 - [ ] **Step 7: Commit**
 
@@ -1136,7 +1175,15 @@ Expected: redirected to `/login`.
 - [ ] **Step 3: Sign up with no invite**
 
 On `/signup`, create an account with a throwaway email (e.g. `test1+<random>@yourcompany.com`) and a password of 6+ characters, matching confirm field.
-Expected: no email-confirmation screen appears (Confirm email is off) — you land directly on `/workspaces` with an empty state ("아직 워크스페이스가 없어요").
+Expected: no email-confirmation screen appears (Confirm email is off) — you land directly on `/workspaces` with an empty state ("아직 워크스페이스가 없어요"). If instead you see the toast "가입은 됐지만 로그인이 안 됐어요" and get bounced to `/login`, the Supabase dashboard's Confirm-email toggle is back on (or was never actually off) — go re-check Project Settings → Authentication → Providers → Email before continuing.
+
+- [ ] **Step 3b: Confirm password minimum length matches the client-side check**
+
+Try signing up with a 6-character password. Expected: succeeds (assuming Step 3 didn't already fail). If Supabase's project-level minimum password length is set higher than 6, this fails with a raw (non-Korean) Supabase error string surfaced via `authErrorMessage`'s fallback path — if that happens, either lower the Supabase project's minimum to 6 to match `minLength={6}` in `login.tsx`/`signup.tsx`, or raise the client-side `minLength` (and the design's stated minimum) to match. Don't leave the two silently mismatched.
+
+- [ ] **Step 3c: Duplicate-signup error message**
+
+Sign up again with the exact same email used in Step 3 (don't sign out first — just navigate back to `/signup` in a new private window and try). Note the exact error text shown. If it's the raw Supabase string (not Korean), add a mapping for it to `authErrorMessage` in `src/lib/domain.ts` (candidate string per the SDK's own docs: `"User already registered"` — confirm the actual text you see matches or differs before hardcoding it).
 
 - [ ] **Step 4: Create a workspace and invite a second address**
 
