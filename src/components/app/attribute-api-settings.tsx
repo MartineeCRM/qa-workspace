@@ -19,7 +19,6 @@ import { errorMessage } from "@/lib/domain";
 type ApiSettings = {
   project_id: string;
   base_url: string;
-  user_id_param_name: string;
   updated_at: string;
 };
 
@@ -38,7 +37,7 @@ export function AttributeApiSettings({
     queryFn: async () => {
       const { data, error } = await db
         .from("project_attribute_api_settings")
-        .select("project_id, base_url, user_id_param_name, updated_at")
+        .select("project_id, base_url, updated_at")
         .eq("project_id", projectId)
         .maybeSingle();
       if (error) throw error;
@@ -47,13 +46,11 @@ export function AttributeApiSettings({
     enabled: open,
   });
   const [baseUrl, setBaseUrl] = useState("");
-  const [paramName, setParamName] = useState("user_id");
   const [secretInput, setSecretInput] = useState("");
 
   useEffect(() => {
     if (data) {
       setBaseUrl(data.base_url);
-      setParamName(data.user_id_param_name);
     }
   }, [data]);
 
@@ -62,7 +59,6 @@ export function AttributeApiSettings({
       const payload: Record<string, unknown> = {
         project_id: projectId,
         base_url: baseUrl,
-        user_id_param_name: paramName,
         updated_at: new Date().toISOString(),
       };
       if (secretInput) payload.auth_secret = secretInput;
@@ -90,25 +86,20 @@ export function AttributeApiSettings({
         </DialogHeader>
         <div className="space-y-3">
           <div className="space-y-1.5">
-            <Label htmlFor="api-base-url">API 서버 주소</Label>
+            <Label htmlFor="api-base-url">Braze REST API 엔드포인트</Label>
             <Input
               id="api-base-url"
               value={baseUrl}
               onChange={(e) => setBaseUrl(e.target.value)}
-              placeholder="https://api.client.com/attributes"
+              placeholder="https://rest.iad-01.braze.com"
             />
+            <p className="text-xs text-muted-foreground">
+              Braze 대시보드 → Settings → APIs and Identifiers → REST API Key 페이지에서 확인할 수
+              있어요. 경로(/users/export/ids)는 자동으로 붙어요.
+            </p>
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="api-param-name">user_id 파라미터명</Label>
-            <Input
-              id="api-param-name"
-              value={paramName}
-              onChange={(e) => setParamName(e.target.value)}
-              placeholder="user_id"
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="api-secret">인증 토큰</Label>
+            <Label htmlFor="api-secret">API Key</Label>
             <Input
               id="api-secret"
               type="password"

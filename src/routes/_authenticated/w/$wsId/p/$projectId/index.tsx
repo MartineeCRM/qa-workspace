@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useParams } from "@tanstack/react-router";
 import { Activity, AlertTriangle, Layers, ListTree, ShieldCheck } from "lucide-react";
 
-import { EmptyState, Panel } from "@/components/app/layout-parts";
+import { EmptyState, Panel, Stat } from "@/components/app/layout-parts";
 import { CoverageBar } from "@/components/app/coverage";
 import { Pill } from "@/components/app/badges";
 import {
@@ -209,26 +209,6 @@ function ProjectOverview() {
         {eventProperties.length + customAttributes.length}개, 검증 규칙 {rules.length}개가 등록돼
         있어요.
       </p>
-    </div>
-  );
-}
-
-function Stat({
-  icon: Icon,
-  label,
-  value,
-}: {
-  icon: React.ComponentType<{ className?: string }>;
-  label: string;
-  value: number;
-}) {
-  return (
-    <div className="rounded-md border bg-card px-4 py-3 shadow-panel">
-      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-        <Icon className="size-4" />
-        {label}
-      </div>
-      <p className="mt-1 text-2xl font-semibold tabular-nums">{value}</p>
     </div>
   );
 }

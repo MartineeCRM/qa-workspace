@@ -84,6 +84,26 @@ export function Panel({
   );
 }
 
+export function Stat({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  value: number;
+}) {
+  return (
+    <div className="rounded-md border bg-card px-4 py-3 shadow-panel">
+      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        <Icon className="size-4" />
+        {label}
+      </div>
+      <p className="mt-1 text-2xl font-semibold tabular-nums">{value}</p>
+    </div>
+  );
+}
+
 export function FieldRow({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="grid grid-cols-[minmax(9rem,auto)_1fr] gap-3 border-b px-4 py-2.5 text-sm last:border-b-0">

@@ -25,7 +25,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { QaRoundsPanel } from "@/components/app/qa-rounds-panel";
+import { QaRoundsPanel, SnapshotPanel } from "@/components/app/qa-rounds-panel";
 import {
   buildCoverageItems,
   db,
@@ -117,6 +117,7 @@ function StagePage() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [filter, setFilter] = useState<string>("all");
+  const [activeSessionId, setActiveSessionId] = useState("");
 
   const { data: stages = [] } = useEnvironments(projectId);
   const { data: events = [] } = useTaxonomyEvents(projectId);
@@ -324,44 +325,102 @@ function StagePage() {
         }
       />
 
-      <div className="grid gap-4 lg:grid-cols-[2fr_1fr]">
-        <Panel title="커버리지" description="현재 택소노미를 기준으로 실시간 계산돼요.">
-          <div className="space-y-3 px-4 py-4">
-            <CoverageBar verified={cov.verified} failed={cov.failed} total={cov.total} />
-            <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
-              <Pill>검증 완료 {cov.verified}</Pill>
-              <Pill>실패 {cov.failed}</Pill>
-              <Pill>미시작 {cov.notStarted}</Pill>
-              <Pill>택소노미 규칙 {rules.filter((r) => r.is_enabled).length}개</Pill>
-            </div>
+      <Panel title="커버리지" description="현재 택소노미를 기준으로 실시간 계산돼요.">
+        <div className="space-y-3 px-4 py-4">
+          <CoverageBar verified={cov.verified} failed={cov.failed} total={cov.total} />
+          <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+            <Pill>검증 완료 {cov.verified}</Pill>
+            <Pill>실패 {cov.failed}</Pill>
+            <Pill>미시작 {cov.notStarted}</Pill>
+            <Pill>택소노미 규칙 {rules.filter((r) => r.is_enabled).length}개</Pill>
           </div>
-        </Panel>
-        <Panel title="최근 분석" description="검증 증적이에요.">
-          {runs.length === 0 ? (
-            <EmptyState
-              icon={Play}
-              title="아직 분석 기록이 없어요"
-              description="CSV를 올리면 분석이 실행돼요."
-            />
-          ) : (
-            <div className="space-y-1 px-4 py-4 text-sm">
-              <p className="font-medium">{formatDateTime(runs[0].created_at)}</p>
-              <p className="text-xs text-muted-foreground">
-                {String(runs[0].summary?.rows ?? 0)}행 · 택소노미{" "}
-                {String(runs[0].summary?.taxonomy_items ?? 0)}개 중{" "}
-                {String(runs[0].summary?.verified ?? 0)}개 검증
-              </p>
-            </div>
-          )}
-        </Panel>
-      </div>
+        </div>
+      </Panel>
 
-      <Tabs defaultValue="results">
+      <Tabs defaultValue="rounds">
         <TabsList>
-          <TabsTrigger value="results">검증 결과</TabsTrigger>
-          <TabsTrigger value="uploads">업로드·분석 기록</TabsTrigger>
           <TabsTrigger value="rounds">라운드</TabsTrigger>
+          <TabsTrigger value="uploads">업로드·분석 기록</TabsTrigger>
+          <TabsTrigger value="results">검증 결과</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="rounds" className="mt-4">
+          <QaRoundsPanel
+            projectId={projectId}
+            environmentId={stage.id}
+            onActiveSessionChange={setActiveSessionId}
+          />
+        </TabsContent>
+
+        <TabsContent value="uploads" className="mt-4 space-y-4">
+          <Panel
+            title="CSV 업로드"
+            description="증적으로만 보관해요. 커버리지는 업로드로 고정되지 않아요."
+          >
+            {uploads.length === 0 ? (
+              <EmptyState icon={FileUp} title="아직 업로드한 파일이 없어요" />
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>파일</TableHead>
+                    <TableHead className="w-28">행 수</TableHead>
+                    <TableHead className="w-56">업로드 시각</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {uploads.map((u) => (
+                    <TableRow key={u.id}>
+                      <TableCell className="mono-token text-xs">{u.file_name}</TableCell>
+                      <TableCell className="tabular-nums">{u.row_count}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {formatDateTime(u.created_at)}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </Panel>
+
+          <Panel title="분석 기록" description="지난 검증 증적이에요.">
+            {runs.length === 0 ? (
+              <EmptyState icon={Play} title="아직 분석 기록이 없어요" />
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-56">실행 시각</TableHead>
+                    <TableHead>요약</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {runs.map((r) => (
+                    <TableRow key={r.id}>
+                      <TableCell className="text-xs">{formatDateTime(r.created_at)}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {String(r.summary?.rows ?? 0)}행 · 검증 {String(r.summary?.verified ?? 0)} ·
+                        실패 {String(r.summary?.failed ?? 0)} · 규칙{" "}
+                        {String(r.summary?.rules_applied ?? 0)}개 적용
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </Panel>
+
+          {activeSessionId ? (
+            <SnapshotPanel sessionId={activeSessionId} projectId={projectId} />
+          ) : (
+            <Panel title="어트리뷰트 스냅샷" description="라운드 탭에서 세션을 먼저 골라주세요.">
+              <EmptyState
+                title="선택된 세션이 없어요"
+                description="라운드 탭에서 세션을 만들거나 고르면 여기서 스냅샷을 찍을 수 있어요."
+              />
+            </Panel>
+          )}
+        </TabsContent>
 
         <TabsContent value="results" className="mt-4 space-y-3">
           <div className="flex items-center gap-2">
@@ -437,69 +496,6 @@ function StagePage() {
               </Table>
             )}
           </Panel>
-        </TabsContent>
-
-        <TabsContent value="uploads" className="mt-4 space-y-4">
-          <Panel
-            title="CSV 업로드"
-            description="증적으로만 보관해요. 커버리지는 업로드로 고정되지 않아요."
-          >
-            {uploads.length === 0 ? (
-              <EmptyState icon={FileUp} title="아직 업로드한 파일이 없어요" />
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>파일</TableHead>
-                    <TableHead className="w-28">행 수</TableHead>
-                    <TableHead className="w-56">업로드 시각</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {uploads.map((u) => (
-                    <TableRow key={u.id}>
-                      <TableCell className="mono-token text-xs">{u.file_name}</TableCell>
-                      <TableCell className="tabular-nums">{u.row_count}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground">
-                        {formatDateTime(u.created_at)}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </Panel>
-
-          <Panel title="분석 기록" description="지난 검증 증적이에요.">
-            {runs.length === 0 ? (
-              <EmptyState icon={Play} title="아직 분석 기록이 없어요" />
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-56">실행 시각</TableHead>
-                    <TableHead>요약</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {runs.map((r) => (
-                    <TableRow key={r.id}>
-                      <TableCell className="text-xs">{formatDateTime(r.created_at)}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground">
-                        {String(r.summary?.rows ?? 0)}행 · 검증 {String(r.summary?.verified ?? 0)} ·
-                        실패 {String(r.summary?.failed ?? 0)} · 규칙{" "}
-                        {String(r.summary?.rules_applied ?? 0)}개 적용
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </Panel>
-        </TabsContent>
-
-        <TabsContent value="rounds" className="mt-4">
-          <QaRoundsPanel projectId={projectId} environmentId={stage.id} />
         </TabsContent>
       </Tabs>
     </div>

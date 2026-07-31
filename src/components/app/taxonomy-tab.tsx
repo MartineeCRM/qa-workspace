@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { ChevronDown, ChevronRight, Pencil, Plus, Trash2, Users } from "lucide-react";
@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select,
   SelectContent,
@@ -40,42 +41,63 @@ import {
 import {
   db,
   type TaxonomyCustomAttribute,
+  type TaxonomyCustomAttributeProperty,
   type TaxonomyEvent,
   type TaxonomyEventProperty,
 } from "@/lib/queries";
 import { DATA_TYPES, errorMessage } from "@/lib/domain";
 import { useAuth } from "@/lib/auth";
 
-type AnyAttribute = TaxonomyEventProperty | TaxonomyCustomAttribute;
+type AnyAttribute =
+  TaxonomyEventProperty | TaxonomyCustomAttribute | TaxonomyCustomAttributeProperty;
 
 export function TaxonomyTab({
   projectId,
   events,
   eventProperties,
   customAttributes,
+  customAttributeProperties,
   editable,
 }: {
   projectId: string;
   events: TaxonomyEvent[];
   eventProperties: TaxonomyEventProperty[];
   customAttributes: TaxonomyCustomAttribute[];
+  customAttributeProperties: TaxonomyCustomAttributeProperty[];
   editable: boolean;
 }) {
   const qc = useQueryClient();
   const { user } = useAuth();
   const [search, setSearch] = useState("");
+  const [activeTab, setActiveTab] = useState<"events" | "attributes">("events");
   const [open, setOpen] = useState<Record<string, boolean>>({});
+  const [openAttr, setOpenAttr] = useState<Record<string, boolean>>({});
   const [eventDialog, setEventDialog] = useState<{ event: TaxonomyEvent | null } | null>(null);
   const [attrDialog, setAttrDialog] = useState<{
     attribute: AnyAttribute | null;
     eventId: string | null;
+  } | null>(null);
+  const [subPropDialog, setSubPropDialog] = useState<{
+    property: TaxonomyCustomAttributeProperty | null;
+    customAttributeId: string;
   } | null>(null);
 
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ["events", projectId] });
     qc.invalidateQueries({ queryKey: ["taxonomy-event-properties", projectId] });
     qc.invalidateQueries({ queryKey: ["taxonomy-custom-attributes", projectId] });
+    qc.invalidateQueries({ queryKey: ["taxonomy-custom-attribute-properties", projectId] });
   };
+
+  const subPropsByAttribute = useMemo(() => {
+    const map = new Map<string, TaxonomyCustomAttributeProperty[]>();
+    for (const p of customAttributeProperties) {
+      const list = map.get(p.custom_attribute_id) ?? [];
+      list.push(p);
+      map.set(p.custom_attribute_id, list);
+    }
+    return map;
+  }, [customAttributeProperties]);
 
   const term = search.trim().toLowerCase();
   const attrsByEvent = useMemo(() => {
@@ -98,6 +120,38 @@ export function TaxonomyTab({
     );
   });
 
+  function propertyMatches(p: TaxonomyEventProperty) {
+    return (
+      p.technical_name.toLowerCase().includes(term) ||
+      (p.display_name ?? "").toLowerCase().includes(term)
+    );
+  }
+
+  function childrenFor(eventId: string) {
+    const children = attrsByEvent.get(eventId) ?? [];
+    if (!term) return children;
+    const matches = children.filter(propertyMatches);
+    return matches.length > 0 ? matches : children;
+  }
+
+  const visibleCustomAttributes = customAttributes.filter((a) => {
+    if (!term) return true;
+    return (
+      a.technical_name.toLowerCase().includes(term) ||
+      (a.display_name ?? "").toLowerCase().includes(term)
+    );
+  });
+
+  // 검색 결과가 한쪽 탭에만 있으면 그쪽으로 자동으로 옮겨줘요.
+  useEffect(() => {
+    if (!term) return;
+    if (visibleEvents.length === 0 && visibleCustomAttributes.length > 0) {
+      setActiveTab("attributes");
+    } else if (visibleCustomAttributes.length === 0 && visibleEvents.length > 0) {
+      setActiveTab("events");
+    }
+  }, [term, visibleEvents.length, visibleCustomAttributes.length]);
+
   async function removeEvent(event: TaxonomyEvent) {
     const { error } = await db.from("taxonomy_events").delete().eq("id", event.id);
     if (error) return toast.error(errorMessage(error));
@@ -119,8 +173,22 @@ export function TaxonomyTab({
     refresh();
   }
 
+  async function removeCustomAttributeProperty(property: TaxonomyCustomAttributeProperty) {
+    const { error } = await db
+      .from("taxonomy_custom_attribute_properties")
+      .delete()
+      .eq("id", property.id);
+    if (error) return toast.error(errorMessage(error));
+    toast.success("택소노미에서 필드를 삭제했어요");
+    refresh();
+  }
+
   async function toggleActive(
-    table: "taxonomy_events" | "taxonomy_event_properties" | "taxonomy_custom_attributes",
+    table:
+      | "taxonomy_events"
+      | "taxonomy_event_properties"
+      | "taxonomy_custom_attributes"
+      | "taxonomy_custom_attribute_properties",
     id: string,
     value: boolean,
   ) {
@@ -133,7 +201,7 @@ export function TaxonomyTab({
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
         <Input
-          placeholder="이벤트·속성 검색…"
+          placeholder="이벤트·Property·어트리뷰트 검색…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="h-9 max-w-xs"
@@ -169,123 +237,165 @@ export function TaxonomyTab({
         </p>
       ) : null}
 
-      <Panel title="이벤트" description="모든 QA 환경이 이 정의를 기준으로 측정돼요.">
-        {visibleEvents.length === 0 ? (
-          <EmptyState
-            title="아직 이벤트가 없어요"
-            description="이 고객이 구현해야 할 이벤트를 등록해 주세요. 속성은 이벤트 아래에 붙어요."
-          />
-        ) : (
-          <ul className="divide-y">
-            {visibleEvents.map((event) => {
-              const children = attrsByEvent.get(event.id) ?? [];
-              const expanded = open[event.id] ?? true;
-              return (
-                <li key={event.id}>
-                  <div className="flex items-start gap-2 px-4 py-3">
-                    <button
-                      type="button"
-                      onClick={() => setOpen((s) => ({ ...s, [event.id]: !expanded }))}
-                      className="mt-0.5 text-muted-foreground hover:text-foreground"
-                      aria-label={expanded ? "접기" : "펼치기"}
-                    >
-                      {expanded ? (
-                        <ChevronDown className="size-4" />
-                      ) : (
-                        <ChevronRight className="size-4" />
-                      )}
-                    </button>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="mono-token text-sm font-semibold">
-                          {event.technical_name}
-                        </span>
-                        {event.display_name ? (
-                          <span className="text-sm text-muted-foreground">
-                            {event.display_name}
-                          </span>
-                        ) : null}
-                        <Pill>속성 {children.length}개</Pill>
-                        {!event.is_active ? <Pill>비활성</Pill> : null}
-                      </div>
-                      {event.trigger_description ? (
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          {event.trigger_description}
-                        </p>
-                      ) : null}
-                    </div>
-                    {editable ? (
-                      <div className="flex items-center gap-1">
-                        <Switch
-                          checked={event.is_active}
-                          onCheckedChange={(v) => toggleActive("taxonomy_events", event.id, v)}
-                          aria-label="커버리지 포함 여부"
-                        />
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => setAttrDialog({ attribute: null, eventId: event.id })}
-                          aria-label="속성 추가"
-                        >
-                          <Plus className="size-4" />
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => setEventDialog({ event })}
-                          aria-label="이벤트 수정"
-                        >
-                          <Pencil className="size-4" />
-                        </Button>
-                        <DeleteButton
-                          onConfirm={() => removeEvent(event)}
-                          label={event.technical_name}
-                        />
-                      </div>
-                    ) : null}
-                  </div>
-                  {expanded && children.length > 0 ? (
-                    <ul className="border-t bg-surface-strong/40">
-                      {children.map((attr) => (
-                        <AttributeRow
-                          key={attr.id}
-                          attribute={attr}
-                          editable={editable}
-                          onEdit={() => setAttrDialog({ attribute: attr, eventId: attr.event_id })}
-                          onDelete={() => removeEventProperty(attr)}
-                          onToggle={(v) => toggleActive("taxonomy_event_properties", attr.id, v)}
-                        />
-                      ))}
-                    </ul>
-                  ) : null}
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </Panel>
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "events" | "attributes")}>
+        <TabsList>
+          <TabsTrigger value="events">이벤트 {events.length}개</TabsTrigger>
+          <TabsTrigger value="attributes">어트리뷰트 {customAttributes.length}개</TabsTrigger>
+        </TabsList>
 
-      <Panel title="사용자 속성" description="특정 이벤트에 묶이지 않는 속성이에요.">
-        {customAttributes.length === 0 ? (
-          <EmptyState
-            title="사용자 속성이 없어요"
-            description="프로필 수준의 속성을 여기에 추가해요."
-          />
-        ) : (
-          <ul className="divide-y">
-            {customAttributes.map((attr) => (
-              <AttributeRow
-                key={attr.id}
-                attribute={attr}
-                editable={editable}
-                onEdit={() => setAttrDialog({ attribute: attr, eventId: null })}
-                onDelete={() => removeCustomAttribute(attr)}
-                onToggle={(v) => toggleActive("taxonomy_custom_attributes", attr.id, v)}
+        <TabsContent value="events" className="mt-4">
+          <Panel title="이벤트" description="모든 QA 환경이 이 정의를 기준으로 측정돼요.">
+            {visibleEvents.length === 0 ? (
+              <EmptyState
+                title="아직 이벤트가 없어요"
+                description="이 고객이 구현해야 할 이벤트를 등록해 주세요. 속성은 이벤트 아래에 붙어요."
               />
-            ))}
-          </ul>
-        )}
-      </Panel>
+            ) : (
+              <ul className="divide-y">
+                {visibleEvents.map((event) => {
+                  const children = childrenFor(event.id);
+                  const expanded = open[event.id] ?? true;
+                  return (
+                    <li key={event.id}>
+                      <div className="flex items-start gap-2 px-4 py-3">
+                        <button
+                          type="button"
+                          onClick={() => setOpen((s) => ({ ...s, [event.id]: !expanded }))}
+                          className="mt-0.5 text-muted-foreground hover:text-foreground"
+                          aria-label={expanded ? "접기" : "펼치기"}
+                        >
+                          {expanded ? (
+                            <ChevronDown className="size-4" />
+                          ) : (
+                            <ChevronRight className="size-4" />
+                          )}
+                        </button>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="mono-token text-sm font-semibold">
+                              {event.technical_name}
+                            </span>
+                            {event.display_name ? (
+                              <span className="text-sm text-muted-foreground">
+                                {event.display_name}
+                              </span>
+                            ) : null}
+                            <Pill>property {children.length}개</Pill>
+                            {!event.is_active ? <Pill>비활성</Pill> : null}
+                          </div>
+                          {event.description ? (
+                            <p className="mt-0.5 text-xs text-muted-foreground">
+                              {event.description}
+                            </p>
+                          ) : null}
+                        </div>
+                        {editable ? (
+                          <div className="flex items-center gap-1">
+                            <Switch
+                              checked={event.is_active}
+                              onCheckedChange={(v) => toggleActive("taxonomy_events", event.id, v)}
+                              aria-label="커버리지 포함 여부"
+                            />
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => setAttrDialog({ attribute: null, eventId: event.id })}
+                              aria-label="Property 추가"
+                            >
+                              <Plus className="size-4" />
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => setEventDialog({ event })}
+                              aria-label="이벤트 수정"
+                            >
+                              <Pencil className="size-4" />
+                            </Button>
+                            <DeleteButton
+                              onConfirm={() => removeEvent(event)}
+                              label={event.technical_name}
+                            />
+                          </div>
+                        ) : null}
+                      </div>
+                      {expanded && children.length > 0 ? (
+                        <ul className="border-t bg-surface-strong/40">
+                          {children.map((attr) => (
+                            <AttributeRow
+                              key={attr.id}
+                              attribute={attr}
+                              editable={editable}
+                              onEdit={() =>
+                                setAttrDialog({ attribute: attr, eventId: attr.event_id })
+                              }
+                              onDelete={() => removeEventProperty(attr)}
+                              onToggle={(v) =>
+                                toggleActive("taxonomy_event_properties", attr.id, v)
+                              }
+                            />
+                          ))}
+                        </ul>
+                      ) : null}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </Panel>
+        </TabsContent>
+
+        <TabsContent value="attributes" className="mt-4">
+          <Panel title="어트리뷰트" description="특정 이벤트에 묶이지 않는 사용자 속성이에요.">
+            {visibleCustomAttributes.length === 0 ? (
+              <EmptyState
+                title={customAttributes.length === 0 ? "어트리뷰트가 없어요" : "검색 결과가 없어요"}
+                description="프로필 수준의 속성을 여기에 추가해요."
+              />
+            ) : (
+              <ul className="divide-y">
+                {visibleCustomAttributes.map((attr) =>
+                  attr.data_type === "array of object" ? (
+                    <ExpandableCustomAttributeRow
+                      key={attr.id}
+                      attribute={attr}
+                      editable={editable}
+                      expanded={openAttr[attr.id] ?? true}
+                      onToggleExpand={() =>
+                        setOpenAttr((s) => ({ ...s, [attr.id]: !(s[attr.id] ?? true) }))
+                      }
+                      subProperties={subPropsByAttribute.get(attr.id) ?? []}
+                      onEdit={() => setAttrDialog({ attribute: attr, eventId: null })}
+                      onDelete={() => removeCustomAttribute(attr)}
+                      onToggle={(v) => toggleActive("taxonomy_custom_attributes", attr.id, v)}
+                      onAddProperty={() =>
+                        setSubPropDialog({ property: null, customAttributeId: attr.id })
+                      }
+                      onEditProperty={(p) =>
+                        setSubPropDialog({ property: p, customAttributeId: attr.id })
+                      }
+                      onDeleteProperty={removeCustomAttributeProperty}
+                      onTogglePropertyActive={(p, v) =>
+                        toggleActive("taxonomy_custom_attribute_properties", p.id, v)
+                      }
+                    />
+                  ) : (
+                    <AttributeRow
+                      key={attr.id}
+                      attribute={attr}
+                      editable={editable}
+                      noun="어트리뷰트"
+                      onEdit={() => setAttrDialog({ attribute: attr, eventId: null })}
+                      onDelete={() => removeCustomAttribute(attr)}
+                      onToggle={(v) => toggleActive("taxonomy_custom_attributes", attr.id, v)}
+                    />
+                  ),
+                )}
+              </ul>
+            )}
+          </Panel>
+        </TabsContent>
+      </Tabs>
 
       {eventDialog ? (
         <EventDialog
@@ -308,7 +418,102 @@ export function TaxonomyTab({
           onSaved={refresh}
         />
       ) : null}
+
+      {subPropDialog ? (
+        <CustomAttributePropertyDialog
+          userId={user?.id ?? ""}
+          customAttributeId={subPropDialog.customAttributeId}
+          property={subPropDialog.property}
+          onClose={() => setSubPropDialog(null)}
+          onSaved={refresh}
+        />
+      ) : null}
     </div>
+  );
+}
+
+function ExpandableCustomAttributeRow({
+  attribute,
+  editable,
+  expanded,
+  onToggleExpand,
+  subProperties,
+  onEdit,
+  onDelete,
+  onToggle,
+  onAddProperty,
+  onEditProperty,
+  onDeleteProperty,
+  onTogglePropertyActive,
+}: {
+  attribute: TaxonomyCustomAttribute;
+  editable: boolean;
+  expanded: boolean;
+  onToggleExpand: () => void;
+  subProperties: TaxonomyCustomAttributeProperty[];
+  onEdit: () => void;
+  onDelete: () => void;
+  onToggle: (value: boolean) => void;
+  onAddProperty: () => void;
+  onEditProperty: (property: TaxonomyCustomAttributeProperty) => void;
+  onDeleteProperty: (property: TaxonomyCustomAttributeProperty) => void;
+  onTogglePropertyActive: (property: TaxonomyCustomAttributeProperty, value: boolean) => void;
+}) {
+  return (
+    <li>
+      <div className="flex items-start gap-2 px-4 py-3">
+        <button
+          type="button"
+          onClick={onToggleExpand}
+          className="mt-0.5 text-muted-foreground hover:text-foreground"
+          aria-label={expanded ? "접기" : "펼치기"}
+        >
+          {expanded ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
+        </button>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="mono-token text-sm">{attribute.technical_name}</span>
+            <Pill>{attribute.data_type}</Pill>
+            <Pill>Property {subProperties.length}개</Pill>
+            {!attribute.is_active ? <Pill>비활성</Pill> : null}
+          </div>
+          {attribute.display_name ? (
+            <p className="mt-0.5 text-xs text-muted-foreground">{attribute.display_name}</p>
+          ) : null}
+        </div>
+        {editable ? (
+          <div className="flex items-center gap-1">
+            <Switch
+              checked={attribute.is_active}
+              onCheckedChange={onToggle}
+              aria-label="커버리지 포함 여부"
+            />
+            <Button size="icon" variant="ghost" onClick={onAddProperty} aria-label="필드 추가">
+              <Plus className="size-4" />
+            </Button>
+            <Button size="icon" variant="ghost" onClick={onEdit} aria-label="어트리뷰트 수정">
+              <Pencil className="size-4" />
+            </Button>
+            <DeleteButton onConfirm={onDelete} label={attribute.technical_name} />
+          </div>
+        ) : null}
+      </div>
+      {expanded && subProperties.length > 0 ? (
+        <ul className="border-t bg-surface-strong/40 pl-6">
+          {subProperties.map((p) => (
+            <AttributeRow
+              key={p.id}
+              attribute={p}
+              editable={editable}
+              noun="필드"
+              onEdit={() => onEditProperty(p)}
+              onDelete={() => onDeleteProperty(p)}
+              onToggle={(v) => onTogglePropertyActive(p, v)}
+            />
+          ))}
+        </ul>
+      ) : null}
+    </li>
   );
 }
 
@@ -318,12 +523,14 @@ function AttributeRow({
   onEdit,
   onDelete,
   onToggle,
+  noun = "Property",
 }: {
   attribute: AnyAttribute;
   editable: boolean;
   onEdit: () => void;
   onDelete: () => void;
   onToggle: (value: boolean) => void;
+  noun?: string;
 }) {
   return (
     <li className="flex items-center gap-2 px-4 py-2 pl-10">
@@ -334,8 +541,8 @@ function AttributeRow({
           {attribute.is_required ? <Pill>필수</Pill> : null}
           {!attribute.is_active ? <Pill>비활성</Pill> : null}
         </div>
-        {attribute.description ? (
-          <p className="mt-0.5 text-xs text-muted-foreground">{attribute.description}</p>
+        {attribute.display_name ? (
+          <p className="mt-0.5 text-xs text-muted-foreground">{attribute.display_name}</p>
         ) : null}
       </div>
       {editable ? (
@@ -345,7 +552,7 @@ function AttributeRow({
             onCheckedChange={onToggle}
             aria-label="커버리지 포함 여부"
           />
-          <Button size="icon" variant="ghost" onClick={onEdit} aria-label="속성 수정">
+          <Button size="icon" variant="ghost" onClick={onEdit} aria-label={`${noun} 수정`}>
             <Pencil className="size-4" />
           </Button>
           <DeleteButton onConfirm={onDelete} label={attribute.technical_name} />
@@ -395,7 +602,6 @@ function EventDialog({
   const [technicalName, setTechnicalName] = useState(event?.technical_name ?? "");
   const [displayName, setDisplayName] = useState(event?.display_name ?? "");
   const [description, setDescription] = useState(event?.description ?? "");
-  const [trigger, setTrigger] = useState(event?.trigger_description ?? "");
   const [saving, setSaving] = useState(false);
 
   async function submit() {
@@ -405,7 +611,6 @@ function EventDialog({
       technical_name: technicalName.trim(),
       display_name: displayName.trim() || null,
       description: description.trim() || null,
-      trigger_description: trigger.trim() || null,
     };
     const { error } = event
       ? await db.from("taxonomy_events").update(payload).eq("id", event.id)
@@ -445,15 +650,6 @@ function EventDialog({
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
               placeholder="구매 완료"
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="ev-trigger">발생 시점</Label>
-            <Textarea
-              id="ev-trigger"
-              value={trigger}
-              onChange={(e) => setTrigger(e.target.value)}
-              rows={2}
             />
           </div>
           <div className="space-y-1.5">
@@ -499,6 +695,7 @@ function AttributeDialog({
   const [parent, setParent] = useState(
     attribute && "event_id" in attribute ? attribute.event_id : (eventId ?? "none"),
   );
+  const isProperty = parent !== "none";
   const [technicalName, setTechnicalName] = useState(attribute?.technical_name ?? "");
   const [displayName, setDisplayName] = useState(attribute?.display_name ?? "");
   const [description, setDescription] = useState(attribute?.description ?? "");
@@ -518,7 +715,6 @@ function AttributeDialog({
       .split(",")
       .map((v) => v.trim())
       .filter(Boolean);
-    const isProperty = parent !== "none";
     const basePayload = {
       technical_name: technicalName.trim(),
       display_name: displayName.trim() || null,
@@ -545,12 +741,19 @@ function AttributeDialog({
     <Dialog open onOpenChange={(v) => (v ? null : onClose())}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{attribute ? "속성 수정" : "속성 추가"}</DialogTitle>
-          <DialogDescription>속성도 이 프로젝트의 전체 커버리지에 포함돼요.</DialogDescription>
+          <DialogTitle>
+            {isProperty
+              ? attribute
+                ? "Property 수정"
+                : "Property 추가"
+              : attribute
+                ? "어트리뷰트 수정"
+                : "어트리뷰트 추가"}
+          </DialogTitle>
         </DialogHeader>
         <div className="space-y-3">
           <div className="space-y-1.5">
-            <Label>소속</Label>
+            <Label>포함 이벤트</Label>
             <Select value={parent} onValueChange={setParent} disabled={!!attribute}>
               <SelectTrigger>
                 <SelectValue />
@@ -566,7 +769,8 @@ function AttributeDialog({
             </Select>
             {attribute ? (
               <p className="text-xs text-muted-foreground">
-                기존 속성의 소속은 바꿀 수 없어요. 다른 곳으로 옮기려면 삭제 후 다시 추가해 주세요.
+                이 Property가 어느 이벤트에 포함되는지는 여기서 바꿀 수 없어요. 다른 이벤트로
+                옮기려면 삭제한 뒤 원하는 이벤트에 다시 추가해 주세요.
               </p>
             ) : null}
           </div>
@@ -581,37 +785,36 @@ function AttributeDialog({
               />
             </div>
             <div className="space-y-1.5">
-              <Label>데이터 타입</Label>
-              <Select value={dataType} onValueChange={setDataType}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {DATA_TYPES.map((t) => (
-                    <SelectItem key={t} value={t}>
-                      {t}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label htmlFor="at-display">표시 이름</Label>
+              <Input
+                id="at-display"
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+              />
             </div>
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="at-display">표시 이름</Label>
-            <Input
-              id="at-display"
-              value={displayName}
-              onChange={(e) => setDisplayName(e.target.value)}
-            />
+            <Label>데이터 타입</Label>
+            <Select value={dataType} onValueChange={setDataType}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {DATA_TYPES.map((t) => (
+                  <SelectItem key={t} value={t}>
+                    {t}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="at-allowed">허용 값 (쉼표로 구분)</Label>
-            <Input
-              id="at-allowed"
-              value={allowed}
-              onChange={(e) => setAllowed(e.target.value)}
-              placeholder="card, bank_transfer"
-            />
+            <Input id="at-allowed" value={allowed} onChange={(e) => setAllowed(e.target.value)} />
+            <p className="text-xs text-muted-foreground">
+              여기 적은 값 외의 것이 들어오면 검증 시 오류로 처리돼요. 비워두면 값 자체는 제한하지
+              않아요.
+            </p>
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="at-desc">설명</Label>
@@ -635,7 +838,138 @@ function AttributeDialog({
             취소
           </Button>
           <Button onClick={submit} disabled={saving}>
-            {attribute ? "변경 저장" : "속성 추가"}
+            {attribute ? "변경 저장" : isProperty ? "Property 추가" : "어트리뷰트 추가"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function CustomAttributePropertyDialog({
+  userId,
+  customAttributeId,
+  property,
+  onClose,
+  onSaved,
+}: {
+  userId: string;
+  customAttributeId: string;
+  property: TaxonomyCustomAttributeProperty | null;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [technicalName, setTechnicalName] = useState(property?.technical_name ?? "");
+  const [displayName, setDisplayName] = useState(property?.display_name ?? "");
+  const [description, setDescription] = useState(property?.description ?? "");
+  const [dataType, setDataType] = useState(property?.data_type ?? "string");
+  const [required, setRequired] = useState(property?.is_required ?? false);
+  const [allowed, setAllowed] = useState(
+    Array.isArray(property?.allowed_values)
+      ? (property!.allowed_values as string[]).join(", ")
+      : "",
+  );
+  const [saving, setSaving] = useState(false);
+
+  async function submit() {
+    if (!technicalName.trim()) return toast.error("기술 이름은 필수예요");
+    setSaving(true);
+    const allowedValues = allowed
+      .split(",")
+      .map((v) => v.trim())
+      .filter(Boolean);
+    const payload = {
+      technical_name: technicalName.trim(),
+      display_name: displayName.trim() || null,
+      description: description.trim() || null,
+      data_type: dataType,
+      is_required: required,
+      allowed_values: allowedValues.length ? allowedValues : null,
+    };
+    const { error } = property
+      ? await db.from("taxonomy_custom_attribute_properties").update(payload).eq("id", property.id)
+      : await db
+          .from("taxonomy_custom_attribute_properties")
+          .insert({ ...payload, custom_attribute_id: customAttributeId, created_by: userId });
+    setSaving(false);
+    if (error) return toast.error(errorMessage(error));
+    toast.success(property ? "필드를 수정했어요" : "필드를 추가했어요");
+    onSaved();
+    onClose();
+  }
+
+  return (
+    <Dialog open onOpenChange={(v) => (v ? null : onClose())}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{property ? "필드 수정" : "필드 추가"}</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="cap-name">기술 이름</Label>
+              <Input
+                id="cap-name"
+                value={technicalName}
+                onChange={(e) => setTechnicalName(e.target.value)}
+                placeholder="offer_id"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="cap-display">표시 이름</Label>
+              <Input
+                id="cap-display"
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+              />
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label>데이터 타입</Label>
+            <Select value={dataType} onValueChange={setDataType}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {DATA_TYPES.map((t) => (
+                  <SelectItem key={t} value={t}>
+                    {t}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="cap-allowed">허용 값 (쉼표로 구분)</Label>
+            <Input id="cap-allowed" value={allowed} onChange={(e) => setAllowed(e.target.value)} />
+            <p className="text-xs text-muted-foreground">
+              여기 적은 값 외의 것이 들어오면 검증 시 오류로 처리돼요. 비워두면 값 자체는 제한하지
+              않아요.
+            </p>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="cap-desc">설명</Label>
+            <Textarea
+              id="cap-desc"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={2}
+            />
+          </div>
+          <div className="flex items-center justify-between rounded-md border px-3 py-2">
+            <div>
+              <p className="text-sm font-medium">필수</p>
+              <p className="text-xs text-muted-foreground">항상 수집돼야 하는 필드예요.</p>
+            </div>
+            <Switch checked={required} onCheckedChange={setRequired} />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            취소
+          </Button>
+          <Button onClick={submit} disabled={saving}>
+            {property ? "변경 저장" : "필드 추가"}
           </Button>
         </DialogFooter>
       </DialogContent>

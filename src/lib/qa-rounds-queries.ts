@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchBrazeAttributeSnapshot } from "@/lib/attribute-snapshot.functions";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as any;
@@ -26,7 +27,7 @@ export type QaSession = {
 
 export type QaChecklistItem = {
   id: string;
-  qa_round_id: string;
+  qa_session_id: string;
   target_type: "event" | "custom_attribute";
   target_id: string;
 };
@@ -94,17 +95,132 @@ export function useCreateQaSession(roundId: string) {
   });
 }
 
-export function useQaChecklistItems(roundId: string) {
+export function useQaChecklistItems(sessionId: string) {
   return useQuery({
-    queryKey: ["qa-checklist-items", roundId],
-    enabled: Boolean(roundId),
+    queryKey: ["qa-checklist-items", sessionId],
+    enabled: Boolean(sessionId),
     queryFn: async () => {
       const { data, error } = await db
         .from("qa_round_checklist_items")
         .select("*, qa_checklist_item_results(*)")
-        .eq("qa_round_id", roundId);
+        .eq("qa_session_id", sessionId);
       if (error) throw error;
       return data as (QaChecklistItem & { qa_checklist_item_results: QaChecklistItemResult[] })[];
+    },
+  });
+}
+
+export function useAddChecklistItems(sessionId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      eventIds,
+      customAttributeIds,
+    }: {
+      eventIds: string[];
+      customAttributeIds: string[];
+    }) => {
+      const items = [
+        ...eventIds.map((id) => ({
+          qa_session_id: sessionId,
+          target_type: "event",
+          target_id: id,
+        })),
+        ...customAttributeIds.map((id) => ({
+          qa_session_id: sessionId,
+          target_type: "custom_attribute",
+          target_id: id,
+        })),
+      ];
+      if (items.length === 0) return;
+      const { error } = await db.from("qa_round_checklist_items").upsert(items, {
+        onConflict: "qa_session_id,target_type,target_id",
+        ignoreDuplicates: true,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["qa-checklist-items", sessionId] });
+    },
+  });
+}
+
+export function useRemoveChecklistItem(sessionId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (itemId: string) => {
+      const { error } = await db.from("qa_round_checklist_items").delete().eq("id", itemId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["qa-checklist-items", sessionId] });
+    },
+  });
+}
+
+export type QaAttributeSnapshot = {
+  id: string;
+  qa_session_id: string;
+  external_user_id: string;
+  snapshot_name: string;
+  status: "requesting" | "captured" | "failed";
+  payload: Record<string, unknown> | null;
+  previous_snapshot_id: string | null;
+  requested_at: string;
+  captured_at: string | null;
+};
+
+export function useQaAttributeSnapshots(sessionId: string) {
+  return useQuery({
+    queryKey: ["qa-attribute-snapshots", sessionId],
+    enabled: Boolean(sessionId),
+    queryFn: async () => {
+      const { data, error } = await db
+        .from("qa_attribute_snapshots")
+        .select("*")
+        .eq("qa_session_id", sessionId)
+        .order("requested_at", { ascending: false });
+      if (error) throw error;
+      return data as QaAttributeSnapshot[];
+    },
+  });
+}
+
+export function useCaptureAttributeSnapshot(sessionId: string, projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ brazeId, snapshotName }: { brazeId: string; snapshotName: string }) => {
+      const { data: row, error: insertError } = await db
+        .from("qa_attribute_snapshots")
+        .insert({
+          qa_session_id: sessionId,
+          external_user_id: brazeId,
+          snapshot_name: snapshotName,
+          status: "requesting",
+        })
+        .select()
+        .single();
+      if (insertError) throw insertError;
+
+      const result = await fetchBrazeAttributeSnapshot({ data: { projectId, brazeId } });
+
+      if (!result.ok) {
+        await db.from("qa_attribute_snapshots").update({ status: "failed" }).eq("id", row.id);
+        throw new Error(result.error);
+      }
+
+      const { error: updateError } = await db
+        .from("qa_attribute_snapshots")
+        .update({
+          status: "captured",
+          payload: result.attributes,
+          captured_at: new Date().toISOString(),
+        })
+        .eq("id", row.id);
+      if (updateError) throw updateError;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["qa-attribute-snapshots", sessionId] });
     },
   });
 }
@@ -115,13 +231,9 @@ export function useCreateQaRound(projectId: string, environmentId: string) {
     mutationFn: async ({
       userId,
       previousRoundId,
-      eventIds,
-      customAttributeIds,
     }: {
       userId: string;
       previousRoundId: string | null;
-      eventIds: string[];
-      customAttributeIds: string[];
     }) => {
       const { data: prevRounds, error: countError } = await db
         .from("qa_rounds")
@@ -144,19 +256,6 @@ export function useCreateQaRound(projectId: string, environmentId: string) {
         .select()
         .single();
       if (roundError) throw roundError;
-
-      const items = [
-        ...eventIds.map((id) => ({ qa_round_id: round.id, target_type: "event", target_id: id })),
-        ...customAttributeIds.map((id) => ({
-          qa_round_id: round.id,
-          target_type: "custom_attribute",
-          target_id: id,
-        })),
-      ];
-      if (items.length > 0) {
-        const { error: itemsError } = await db.from("qa_round_checklist_items").insert(items);
-        if (itemsError) throw itemsError;
-      }
       return round as QaRound;
     },
     onSuccess: () => {

@@ -1,21 +1,15 @@
-import { useState } from "react";
+import { useMemo, useState, type KeyboardEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Pencil, Plus, ShieldCheck, Trash2 } from "lucide-react";
+import { Pencil, Plus, ShieldCheck, Trash2, X } from "lucide-react";
 
 import { EmptyState, Panel } from "@/components/app/layout-parts";
+import { Pill } from "@/components/app/badges";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -49,9 +43,16 @@ import {
   type TaxonomyEvent,
   type TaxonomyEventProperty,
   type ValidationRule,
+  type ValidationRuleTarget,
 } from "@/lib/queries";
 import { errorMessage } from "@/lib/domain";
 import { useAuth } from "@/lib/auth";
+
+type RuleTarget = {
+  kind: "event" | "property" | "custom_attribute";
+  id: string;
+  label: string;
+};
 
 export function RulesTab({
   projectId,
@@ -94,17 +95,16 @@ export function RulesTab({
     refresh();
   }
 
-  function target(rule: ValidationRule) {
-    if (rule.property_id) {
-      const prop = propertyById.get(rule.property_id);
+  function targetLabel(t: ValidationRuleTarget) {
+    if (t.target_type === "property") {
+      const prop = propertyById.get(t.target_id);
       const parent = prop ? eventById.get(prop.event_id) : null;
       return `${parent ? `${parent.technical_name}.` : ""}${prop?.technical_name ?? "—"}`;
     }
-    if (rule.custom_attribute_id) {
-      return customById.get(rule.custom_attribute_id)?.technical_name ?? "—";
+    if (t.target_type === "custom_attribute") {
+      return customById.get(t.target_id)?.technical_name ?? "—";
     }
-    if (rule.event_id) return eventById.get(rule.event_id)?.technical_name ?? "—";
-    return "프로젝트 전체";
+    return eventById.get(t.target_id)?.technical_name ?? "—";
   }
 
   return (
@@ -131,21 +131,30 @@ export function RulesTab({
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>규칙</TableHead>
+                <TableHead>규칙명</TableHead>
                 <TableHead>대상</TableHead>
+                <TableHead>설명</TableHead>
                 <TableHead className="w-32 text-right">작업</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {rules.map((rule) => (
                 <TableRow key={rule.id}>
+                  <TableCell className="font-medium">{rule.name}</TableCell>
                   <TableCell>
-                    <p className="font-medium">{rule.name}</p>
-                    {rule.description ? (
-                      <p className="text-xs text-muted-foreground">{rule.description}</p>
-                    ) : null}
+                    {rule.validation_rule_targets.length === 0 ? (
+                      <span className="mono-token text-xs">프로젝트 전체</span>
+                    ) : (
+                      <div className="flex flex-wrap gap-1">
+                        {rule.validation_rule_targets.map((t) => (
+                          <Pill key={t.id}>{targetLabel(t)}</Pill>
+                        ))}
+                      </div>
+                    )}
                   </TableCell>
-                  <TableCell className="mono-token text-xs">{target(rule)}</TableCell>
+                  <TableCell className="text-xs text-muted-foreground">
+                    {rule.description ?? "—"}
+                  </TableCell>
                   <TableCell>
                     <div className="flex items-center justify-end gap-1">
                       {editable ? (
@@ -232,39 +241,120 @@ function RuleDialog({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const eventById = useMemo(() => new Map(events.map((e) => [e.id, e])), [events]);
+
   const [name, setName] = useState(rule?.name ?? "");
   const [description, setDescription] = useState(rule?.description ?? "");
-  const [targetKey, setTargetKey] = useState(
-    rule?.property_id
-      ? `property:${rule.property_id}`
-      : rule?.custom_attribute_id
-        ? `attribute:${rule.custom_attribute_id}`
-        : rule?.event_id
-          ? `event:${rule.event_id}`
-          : "none",
+  const [search, setSearch] = useState("");
+  const [staged, setStaged] = useState<RuleTarget[]>(() =>
+    (rule?.validation_rule_targets ?? []).map((t) => {
+      if (t.target_type === "property") {
+        const prop = eventProperties.find((p) => p.id === t.target_id);
+        const parent = prop ? eventById.get(prop.event_id) : null;
+        return {
+          kind: "property" as const,
+          id: t.target_id,
+          label: `${parent ? `${parent.technical_name}.` : ""}${prop?.technical_name ?? "—"}`,
+        };
+      }
+      if (t.target_type === "custom_attribute") {
+        const attr = customAttributes.find((a) => a.id === t.target_id);
+        return {
+          kind: "custom_attribute" as const,
+          id: t.target_id,
+          label: attr?.technical_name ?? "—",
+        };
+      }
+      const event = events.find((e) => e.id === t.target_id);
+      return { kind: "event" as const, id: t.target_id, label: event?.technical_name ?? "—" };
+    }),
   );
   const [saving, setSaving] = useState(false);
 
-  const eventById = new Map(events.map((e) => [e.id, e]));
+  const stagedKeys = useMemo(() => new Set(staged.map((t) => `${t.kind}:${t.id}`)), [staged]);
+
+  const searchCandidates: RuleTarget[] = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const eventTargets: RuleTarget[] = events.map((e) => ({
+      kind: "event",
+      id: e.id,
+      label: e.technical_name,
+    }));
+    const propTargets: RuleTarget[] = eventProperties.map((p) => ({
+      kind: "property",
+      id: p.id,
+      label: `${eventById.get(p.event_id)?.technical_name ?? "?"}.${p.technical_name}`,
+    }));
+    const attrTargets: RuleTarget[] = customAttributes.map((a) => ({
+      kind: "custom_attribute",
+      id: a.id,
+      label: a.technical_name,
+    }));
+    const all = [...eventTargets, ...propTargets, ...attrTargets].filter(
+      (t) => !stagedKeys.has(`${t.kind}:${t.id}`),
+    );
+    if (!q) return all;
+    return all.filter((t) => t.label.toLowerCase().includes(q));
+  }, [search, events, eventProperties, customAttributes, stagedKeys, eventById]);
+
+  function stageTarget(target: RuleTarget) {
+    setStaged((prev) => [...prev, target]);
+    setSearch("");
+  }
+
+  function unstage(key: string) {
+    setStaged((prev) => prev.filter((t) => `${t.kind}:${t.id}` !== key));
+  }
+
+  function handleSearchKeyDown(e: KeyboardEvent<HTMLInputElement>) {
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    if (searchCandidates.length === 0) return;
+    stageTarget(searchCandidates[0]);
+  }
 
   async function submit() {
     if (!name.trim()) return toast.error("규칙 이름은 필수예요");
     setSaving(true);
-    const [kind, id] = targetKey.split(":");
-    const payload = {
-      name: name.trim(),
-      description: description.trim() || null,
-      event_id: kind === "event" ? id : null,
-      property_id: kind === "property" ? id : null,
-      custom_attribute_id: kind === "attribute" ? id : null,
-    };
-    const { error } = rule
-      ? await db.from("validation_rules").update(payload).eq("id", rule.id)
+    const payload = { name: name.trim(), description: description.trim() || null };
+
+    const { data: savedRule, error } = rule
+      ? await db.from("validation_rules").update(payload).eq("id", rule.id).select().single()
       : await db
           .from("validation_rules")
-          .insert({ ...payload, project_id: projectId, created_by: userId });
+          .insert({ ...payload, project_id: projectId, created_by: userId })
+          .select()
+          .single();
+    if (error) {
+      setSaving(false);
+      return toast.error(errorMessage(error));
+    }
+
+    if (rule) {
+      const { error: deleteError } = await db
+        .from("validation_rule_targets")
+        .delete()
+        .eq("rule_id", rule.id);
+      if (deleteError) {
+        setSaving(false);
+        return toast.error(errorMessage(deleteError));
+      }
+    }
+    if (staged.length > 0) {
+      const { error: targetError } = await db.from("validation_rule_targets").insert(
+        staged.map((t) => ({
+          rule_id: savedRule.id,
+          target_type: t.kind,
+          target_id: t.id,
+        })),
+      );
+      if (targetError) {
+        setSaving(false);
+        return toast.error(errorMessage(targetError));
+      }
+    }
+
     setSaving(false);
-    if (error) return toast.error(errorMessage(error));
     toast.success(rule ? "규칙을 수정했어요" : "규칙을 만들었어요");
     onSaved();
     onClose();
@@ -284,35 +374,69 @@ function RuleDialog({
           <div className="space-y-1.5">
             <Label htmlFor="rule-name">이름</Label>
             <Input id="rule-name" value={name} onChange={(e) => setName(e.target.value)} />
+            <p className="text-xs text-muted-foreground">
+              대상이 여러 개일 수 있어서, 목록에서 이 규칙을 한눈에 알아볼 이름이 필요해요.
+            </p>
           </div>
           <div className="space-y-1.5">
-            <Label>적용 대상</Label>
-            <Select value={targetKey} onValueChange={setTargetKey}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">프로젝트 전체</SelectItem>
-                {events.map((e) => (
-                  <SelectItem key={e.id} value={`event:${e.id}`}>
-                    이벤트 · {e.technical_name}
-                  </SelectItem>
-                ))}
-                {eventProperties.map((p) => (
-                  <SelectItem key={p.id} value={`property:${p.id}`}>
-                    속성 · {eventById.get(p.event_id)?.technical_name ?? "?"}.{p.technical_name}
-                  </SelectItem>
-                ))}
-                {customAttributes.map((a) => (
-                  <SelectItem key={a.id} value={`attribute:${a.id}`}>
-                    사용자 속성 · {a.technical_name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Label>적용 대상 (비워두면 프로젝트 전체)</Label>
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={handleSearchKeyDown}
+              placeholder="이벤트·속성 이름을 입력하고 엔터"
+            />
+            {search.trim() && searchCandidates.length > 0 ? (
+              <ul className="max-h-40 divide-y overflow-y-auto rounded-md border">
+                {searchCandidates.slice(0, 20).map((t) => {
+                  const key = `${t.kind}:${t.id}`;
+                  return (
+                    <li key={key}>
+                      <button
+                        type="button"
+                        onClick={() => stageTarget(t)}
+                        className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm hover:bg-muted"
+                      >
+                        <span className="text-xs text-muted-foreground">
+                          {t.kind === "event"
+                            ? "이벤트"
+                            : t.kind === "property"
+                              ? "속성"
+                              : "사용자 속성"}
+                        </span>
+                        <span className="mono-token text-xs">{t.label}</span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : null}
+            {staged.length > 0 ? (
+              <ul className="flex flex-wrap gap-1.5">
+                {staged.map((t) => {
+                  const key = `${t.kind}:${t.id}`;
+                  return (
+                    <li
+                      key={key}
+                      className="flex items-center gap-1 rounded-full border bg-surface px-2 py-1 text-xs"
+                    >
+                      <span className="mono-token">{t.label}</span>
+                      <button
+                        type="button"
+                        onClick={() => unstage(key)}
+                        aria-label={`${t.label} 빼기`}
+                        className="text-muted-foreground hover:text-foreground"
+                      >
+                        <X className="size-3" />
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : null}
             <p className="text-xs text-muted-foreground">
-              이벤트를 고르면 그 이벤트가 유저 attribute에 미치는 인과관계도 이 규칙으로 표현할 수
-              있어요(설명에 "이 이벤트 이후 이 attribute가 이렇게 바뀌어야 한다"처럼 적어주세요).
+              여러 이벤트·속성을 함께 골라서 서로 간의 관계(예: "이 값이 다른 이벤트의 값과 같아야
+              한다")도 이 규칙 하나로 표현할 수 있어요.
             </p>
           </div>
           <div className="space-y-1.5">

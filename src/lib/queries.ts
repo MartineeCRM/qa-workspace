@@ -79,17 +79,39 @@ export type TaxonomyCustomAttribute = {
   updated_at: string;
 };
 
+export type TaxonomyCustomAttributeProperty = {
+  id: string;
+  custom_attribute_id: string;
+  technical_name: string;
+  display_name: string | null;
+  description: string | null;
+  data_type: string;
+  is_required: boolean;
+  is_active: boolean;
+  example_value: unknown;
+  allowed_values: unknown;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ValidationRuleTarget = {
+  id: string;
+  rule_id: string;
+  target_type: "event" | "property" | "custom_attribute";
+  target_id: string;
+  created_at: string;
+};
+
 export type ValidationRule = {
   id: string;
   project_id: string;
-  event_id: string | null;
-  property_id: string | null;
-  custom_attribute_id: string | null;
   name: string;
   description: string | null;
   is_enabled: boolean;
   created_at: string;
   updated_at: string;
+  validation_rule_targets: ValidationRuleTarget[];
 };
 
 export type QaEnvironment = {
@@ -338,6 +360,21 @@ export function useTaxonomyCustomAttributes(projectId: string) {
   });
 }
 
+export function useTaxonomyCustomAttributeProperties(projectId: string) {
+  return useQuery({
+    queryKey: ["taxonomy-custom-attribute-properties", projectId],
+    queryFn: async () =>
+      unwrap<TaxonomyCustomAttributeProperty[]>(
+        await db
+          .from("taxonomy_custom_attribute_properties")
+          .select("*, taxonomy_custom_attributes!inner(project_id)")
+          .eq("taxonomy_custom_attributes.project_id", projectId)
+          .order("sort_order")
+          .order("created_at"),
+      ),
+  });
+}
+
 export function useRules(projectId: string) {
   return useQuery({
     queryKey: ["rules", projectId],
@@ -345,7 +382,7 @@ export function useRules(projectId: string) {
       unwrap<ValidationRule[]>(
         await db
           .from("validation_rules")
-          .select("*")
+          .select("*, validation_rule_targets(*)")
           .eq("project_id", projectId)
           .order("created_at", { ascending: false }),
       ),

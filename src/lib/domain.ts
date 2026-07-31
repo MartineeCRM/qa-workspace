@@ -22,15 +22,7 @@ export function canAdmin(role: WorkspaceRole | null | undefined) {
   return role === "owner" || role === "admin";
 }
 
-export const DATA_TYPES = [
-  "string",
-  "number",
-  "integer",
-  "boolean",
-  "datetime",
-  "array",
-  "object",
-] as const;
+export const DATA_TYPES = ["string", "number", "boolean", "array", "array of object"] as const;
 export type DataType = (typeof DATA_TYPES)[number];
 
 export const RULE_TYPES = [
