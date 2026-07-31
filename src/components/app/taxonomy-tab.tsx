@@ -905,6 +905,25 @@ function AttributeDialog({
       allowed_values: allowedValues.length ? allowedValues : null,
     };
     const table = isProperty ? "taxonomy_event_properties" : "taxonomy_custom_attributes";
+
+    if (attribute && isProperty) {
+      const checkedSiblingIds = siblings
+        .filter((s) => checkedSiblings[s.id] ?? true)
+        .map((s) => s.id);
+      const targetIds = [attribute.id, ...checkedSiblingIds];
+      const { error } = await db.from(table).update(basePayload).in("id", targetIds);
+      setSaving(false);
+      if (error) return toast.error(errorMessage(error));
+      toast.success(
+        checkedSiblingIds.length > 0
+          ? `속성을 수정했어요 (이벤트 ${1 + checkedSiblingIds.length}개에 적용)`
+          : "속성을 수정했어요",
+      );
+      onSaved();
+      onClose();
+      return;
+    }
+
     const payload = isProperty
       ? { ...basePayload, event_id: parent }
       : { ...basePayload, project_id: projectId };
