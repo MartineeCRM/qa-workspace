@@ -1,0 +1,113 @@
+# 핸드오프 — Trackspec 디자인 작업 (2026-07-31)
+
+작업 위치: `/Users/aimed/Projects/qa-workspace/.worktrees/taxonomy-qa-redesign`
+브랜치: `feature/taxonomy-qa-redesign` (원격 `origin` = `https://github.com/MartineeCRM/qa-workspace.git`)
+로컬 dev 서버: `npm run dev` → `http://localhost:8081`
+
+---
+
+## ⚠️ 지금 커밋 안 된 변경사항 (먼저 확인 필요)
+
+아래 파일들이 **아직 커밋되지 않은 상태**로 워킹 디렉토리에 남아 있어요. 다른 곳에서 작업 이어가기 전에 리뷰 후 커밋하는 걸 추천해요 (사용자 명시 요청 없이는 커밋하지 않았어요):
+
+```
+M  src/components/app/layout-parts.tsx        (+71/-)
+M  src/components/app/taxonomy-import.tsx     (+34/-)
+M  src/components/app/taxonomy-tab.tsx        (+521/-, 대부분 재작성)
+M  src/routes/.../taxonomy.tsx                (+92/-)
+M  src/styles.css                             (+36/-)
+?? src/components/ui/segmented-control.tsx    (신규 파일)
+```
+
+`npx tsc --noEmit`, `npm run build` 둘 다 클린 상태로 확인됨.
+
+---
+
+## 배경 — 이 작업이 왜 시작됐나
+
+사용자가 최종 디자인 레퍼런스로 **"Trackspec Taxonomy.html"**이라는 Bundler 포맷 HTML 목업을 채팅에 직접 붙여넣었음 (파일로 저장되지 않고 대화 안에만 존재 — 원본이 필요하면 사용자에게 다시 요청해야 함). 지시사항: "agent-browser로 localhost:8081(실제 앱)을 열어서 현재 모습을 스크린샷 찍고, 이 html과 나란히 비교해서 뭐가 다른지 정리한 다음, 실제 앱 코드를 이 html의 스타일(여백/타이포/색/정렬)에 맞게 고쳐줘."
+
+아래 "레퍼런스 스타일 값"은 그 목업에서 뽑아낸 정확한 수치들 — 원본 파일이 없어도 이 문서만으로 계속 맞춰나갈 수 있게 정리해둠.
+
+---
+
+## 완료된 것
+
+### 1) 디자인 토큰 (`src/styles.css`)
+- `:root`/`.dark`의 `--foreground`/`--muted-foreground`/`--sidebar-*` 등을 기존 인디고 계열(hue ~245)에서 레퍼런스의 틸 계열(hue ~213–218)로 미세 조정. 배경/보더/카드 색은 이미 레퍼런스와 거의 일치했었음 (교체가 아니라 미세 조정이었다는 걸 스크린샷 비교로 확인 후 진행).
+- `--radius: 0.375rem`로 통일 (카드 `rounded-xl` → `rounded-lg`).
+- Pretendard 폰트 로드 (`src/routes/__root.tsx`에 CDN 링크 추가, `--font-sans`에 포함).
+
+### 2) 타이포/프리미티브 (`src/components/app/layout-parts.tsx`)
+- `PageHeader` h1: `26px/700/-0.02em`.
+- 신규 `SectionHeader` (페이지 내 섹션 타이틀용, `22px/700/-0.02em`).
+- `Stat` 컴포넌트 재작성: `icon` optional, `hint`/`delta`/`progress` prop 추가. `delta.tone==="up"`은 하드코딩 색 대신 기존 `--published-foreground` 토큰 재사용.
+
+### 3) `SegmentedControl` 신규 컴포넌트 (`src/components/ui/segmented-control.tsx`)
+- `bg-muted` 트랙 + 흰 배경 활성 pill. `taxonomy.tsx`의 "이벤트·속성 / 검증 규칙" 뷰 전환에 적용 (기존 Radix Tabs 대체).
+
+### 4) 택소노미 화면 (`taxonomy.tsx` 라우트)
+- 커버리지 Stat을 **실제 데이터**로 계산: `totalSlots = items.length * environments.length`, `verifiedSlots = qa_item_status에서 verified 개수`. `delta`는 히스토리 데이터가 없어서 **의도적으로 안 넣음** (조작된 수치를 보여주지 않기 위해).
+- 나머지 3개 타일(이벤트/프로퍼티/어트리뷰트)은 아이콘 제거, 숫자만.
+- 바깥 wrapper: `mx-auto max-w-[1240px] p-6 space-y-5` (합의된 "화면 골격 규칙").
+
+### 5) 툴바/리스트 카드 (`taxonomy-tab.tsx`, `taxonomy-import.tsx`) — 이번 세션 핵심 작업
+- **툴바 2개 드롭다운으로 통합**: `TaxonomyImport` = "가져오기 ▾" 하나로 (파일 업로드 + CSV/JSON/YAML 예시가 메뉴 항목), "이벤트 추가"/"사용자 속성 추가" = "+ 추가 ▾" 프라이머리 버튼 하나로. 화면당 primary 버튼 1개 규칙 준수.
+- 상시 노출 안내 배너 제거.
+- **검색 + 서브탭을 리스트 카드 헤더 안으로 이동**: "이벤트 N"/"어트리뷰트 N"은 밑줄(`shadow-[inset_0_-2px_0_...]`) 스타일 서브탭, 오른쪽에 검색창.
+- **행 액션**: 연필/추가 아이콘 각각 노출 대신 `RowActions`라는 케밥(⋯) 드롭다운 하나로 통합, `opacity-0 group-hover:opacity-100 group-focus-within:opacity-100`으로 hover(+키보드 focus)에서만 노출. 삭제는 메뉴 안 destructive 항목 → 클릭 시 controlled `AlertDialog`로 확인.
+- 토글 스위치 옆에 "측정 중"/"미측정" 텍스트 라벨 추가.
+
+agent-browser로 실제 로그인 세션에서 스크린샷 확인 완료 (드롭다운 내용물, 케밥 메뉴 동작, hover reveal 전부 정상). 스크린샷은 세션 스크래치패드에 있었지만 세션 종료 시 사라짐 — 필요하면 재캡처.
+
+---
+
+## 레퍼런스 스타일 값 (원본 HTML 대체 참고용)
+
+레퍼런스가 실제로 쓴 색/치수 (hex → 나중에 oklch로 변환해서 토큰에 반영함):
+
+| 요소 | 값 |
+|---|---|
+| 사이드바 배경 | `#2A5159` |
+| 사이드바 비활성 텍스트 | `#75A5C7` / 활성 `#fff` |
+| accent (primary) | `#2E6C92`, hover `#24587A` |
+| 페이지 배경 | `#F5F9FD` |
+| 카드 보더 | `#DCE6EE` |
+| 제목 텍스트 | `#1F3F46` |
+| 본문/muted 텍스트 | `#6E8A91` |
+| 콘텐츠 wrapper | `max-width:1240px; padding:28px 32px 80px` |
+| 카드 라운드 | `10px` |
+| 카드 헤더 padding | `14px 16px 14px 20px` |
+| 행 padding | `16px 20px`, 구분선 `#EAF1F7` (카드 보더보다 옅음) |
+| 프로퍼티 개수 배지 | 작은 사각 태그 (`border-radius:4px`), pill 아님 |
+| 토글 pill | `34×20`, on 시 `#2E6C92` |
+
+---
+
+## 아직 안 한 것 (다음 순서)
+
+1. **다른 화면으로 디자인 규칙 확산** (사용자 컨펌 대기 중이었음) — 개요(`index.tsx`), QA 환경별 탭(`qa/$stageSlug.tsx`), 설정·멤버 화면에 동일하게: `SegmentedControl` 사용, 카드 헤더 검색 패턴, hover 전용 행 액션 + 케밥, 드롭다운 툴바 통합, `mx-auto max-w-[1240px] p-6 space-y-5` 골격.
+2. **레퍼런스엔 있지만 아직 구현 안 한 기능 격차**:
+   - 리스트 카드 헤더의 "상태/정렬" 네이티브 select 2개 (지금은 검색창만 있음)
+   - 리스트 하단 페이지네이션 푸터 ("81개 중 6개 표시" + "더 보기") — 지금은 전체 행을 한번에 다 보여줌
+   - (의도적 보류) 커버리지 delta, "마지막 수정" 메타 라인 — 실제 데이터 없어서 안 넣음. 나중에 실제 히스토리 트래킹이 생기면 추가 검토.
+
+---
+
+## 별도 트랙 — 승인된 설계, 구현 대기 중 (디자인 작업과 무관, 참고용)
+
+`docs/superpowers/specs/2026-07-31-bulk-edit-shared-event-properties-design.md`에 **사용자 승인 완료**된 스펙이 있음: 이벤트 프로퍼티 수정 시 같은 기술 이름을 가진 다른 이벤트의 프로퍼티에도 선택적으로 일괄 적용하는 기능. 다음 단계는 `writing-plans` 스킬로 구현 계획 작성 → 구현. 디자인 작업과는 독립적인 트랙이라 순서 상관없이 나중에 이어가도 됨.
+
+---
+
+## 재개 체크리스트
+
+```bash
+cd /Users/aimed/Projects/qa-workspace/.worktrees/taxonomy-qa-redesign
+git status                    # 위 커밋 안 된 diff 확인
+npm run dev                   # localhost:8081
+npx tsc --noEmit && npm run build   # 변경 후 항상 확인
+```
+
+로그인: `yoomin.jeong@martinee.io` (비밀번호는 이 문서에 남기지 않음 — 필요하면 사용자에게 재확인).
+실 고객 프로젝트: 신세계 DF (SSG_DF), workspace `38bbad58-...`, project `59a62862-...`.
