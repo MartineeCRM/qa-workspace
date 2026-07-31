@@ -1064,48 +1064,6 @@ export type Database = {
           },
         ]
       }
-      workspace_invites: {
-        Row: {
-          created_at: string
-          email: string
-          id: string
-          invited_by: string
-          role: string
-          workspace_id: string
-        }
-        Insert: {
-          created_at?: string
-          email: string
-          id?: string
-          invited_by: string
-          role: string
-          workspace_id: string
-        }
-        Update: {
-          created_at?: string
-          email?: string
-          id?: string
-          invited_by?: string
-          role?: string
-          workspace_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "workspace_invites_invited_by_fkey"
-            columns: ["invited_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "workspace_invites_workspace_id_fkey"
-            columns: ["workspace_id"]
-            isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       workspace_members: {
         Row: {
           created_at: string
