@@ -26,7 +26,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { db, type QaStage } from "@/lib/queries";
+import { db, type QaEnvironment } from "@/lib/queries";
 import { errorMessage, slugify } from "@/lib/domain";
 
 export function StagesManager({
@@ -36,22 +36,22 @@ export function StagesManager({
   onOpenChange,
 }: {
   projectId: string;
-  stages: QaStage[];
+  stages: QaEnvironment[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
   const qc = useQueryClient();
-  const [editing, setEditing] = useState<QaStage | null>(null);
+  const [editing, setEditing] = useState<QaEnvironment | null>(null);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [busy, setBusy] = useState(false);
 
   const refresh = () => {
-    qc.invalidateQueries({ queryKey: ["stages", projectId] });
+    qc.invalidateQueries({ queryKey: ["environments", projectId] });
     qc.invalidateQueries({ queryKey: ["item-status", projectId] });
   };
 
-  function startEdit(stage: QaStage) {
+  function startEdit(stage: QaEnvironment) {
     setEditing(stage);
     setName(stage.name);
     setDescription(stage.description ?? "");
@@ -81,7 +81,7 @@ export function StagesManager({
       let slug = slugify(trimmed);
       let i = 2;
       while (existing.has(slug)) slug = `${slugify(trimmed)}-${i++}`;
-      const { error } = await db.from("qa_stages").insert({
+      const { error } = await db.from("qa_environments").insert({
         project_id: projectId,
         slug,
         name: trimmed,
@@ -96,8 +96,8 @@ export function StagesManager({
     refresh();
   }
 
-  async function remove(stage: QaStage) {
-    const { error } = await db.from("qa_stages").delete().eq("id", stage.id);
+  async function remove(stage: QaEnvironment) {
+    const { error } = await db.from("qa_environments").delete().eq("id", stage.id);
     if (error) return toast.error(errorMessage(error));
     toast.success("QA 환경을 삭제했어요");
     if (editing?.id === stage.id) reset();
@@ -131,7 +131,12 @@ export function StagesManager({
                   <p className="truncate text-sm font-medium">{stage.name}</p>
                   <p className="mono-token truncate text-xs text-muted-foreground">{stage.slug}</p>
                 </div>
-                <Button size="icon" variant="ghost" aria-label="이름 수정" onClick={() => startEdit(stage)}>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  aria-label="이름 수정"
+                  onClick={() => startEdit(stage)}
+                >
                   <Pencil className="size-4" />
                 </Button>
                 <AlertDialog>
@@ -144,7 +149,8 @@ export function StagesManager({
                     <AlertDialogHeader>
                       <AlertDialogTitle>“{stage.name}” 환경을 삭제할까요?</AlertDialogTitle>
                       <AlertDialogDescription>
-                        이 환경에 쌓인 업로드와 검증 상태도 함께 사라져요. 택소노미는 그대로 유지돼요.
+                        이 환경에 쌓인 업로드와 검증 상태도 함께 사라져요. 택소노미는 그대로
+                        유지돼요.
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>

@@ -4,7 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Pencil, SlidersHorizontal } from "lucide-react";
 
-import { db, useProject, useStages } from "@/lib/queries";
+import { db, useEnvironments, useProject, type QaEnvironment } from "@/lib/queries";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/dialog";
 import { Pill } from "@/components/app/badges";
 import { StagesManager } from "@/components/app/stages-manager";
+import { AttributeApiSettings } from "@/components/app/attribute-api-settings";
 import { useWorkspaceContext } from "@/lib/workspace-context";
 import { canEdit, errorMessage } from "@/lib/domain";
 import { cn } from "@/lib/utils";
@@ -31,11 +32,12 @@ export const Route = createFileRoute("/_authenticated/w/$wsId/p/$projectId")({
 function ProjectShell() {
   const { wsId, projectId } = useParams({ from: "/_authenticated/w/$wsId/p/$projectId" });
   const { data: project, isLoading } = useProject(projectId);
-  const { data: stages } = useStages(projectId);
+  const { data: stages } = useEnvironments(projectId);
   const { role } = useWorkspaceContext();
   const editable = canEdit(role);
   const [stagesOpen, setStagesOpen] = useState(false);
   const [renameOpen, setRenameOpen] = useState(false);
+  const [apiSettingsOpen, setApiSettingsOpen] = useState(false);
 
   if (isLoading)
     return (
@@ -86,6 +88,9 @@ function ProjectShell() {
               <Button size="sm" variant="outline" onClick={() => setStagesOpen(true)}>
                 <SlidersHorizontal className="size-4" /> QA 환경 관리
               </Button>
+              <Button size="sm" variant="outline" onClick={() => setApiSettingsOpen(true)}>
+                Attribute API 설정
+              </Button>
             </div>
           ) : null}
         </div>
@@ -96,7 +101,7 @@ function ProjectShell() {
           <TabLink to="/w/$wsId/p/$projectId/taxonomy" params={{ wsId, projectId }}>
             택소노미
           </TabLink>
-          {(stages ?? []).map((stage) => (
+          {(stages ?? []).map((stage: QaEnvironment) => (
             <TabLink
               key={stage.id}
               to="/w/$wsId/p/$projectId/qa/$stageSlug"
@@ -114,6 +119,11 @@ function ProjectShell() {
         stages={stages ?? []}
         open={stagesOpen}
         onOpenChange={setStagesOpen}
+      />
+      <AttributeApiSettings
+        projectId={projectId}
+        open={apiSettingsOpen}
+        onOpenChange={setApiSettingsOpen}
       />
       {renameOpen ? (
         <RenameProjectDialog
@@ -165,7 +175,9 @@ function RenameProjectDialog({
         <form onSubmit={submit}>
           <DialogHeader>
             <DialogTitle>프로젝트 정보 수정</DialogTitle>
-            <DialogDescription>이름과 설명을 바꿔도 택소노미와 QA 기록은 그대로예요.</DialogDescription>
+            <DialogDescription>
+              이름과 설명을 바꿔도 택소노미와 QA 기록은 그대로예요.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-1.5">

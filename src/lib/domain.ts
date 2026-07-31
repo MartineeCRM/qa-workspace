@@ -22,15 +22,7 @@ export function canAdmin(role: WorkspaceRole | null | undefined) {
   return role === "owner" || role === "admin";
 }
 
-export const DATA_TYPES = [
-  "string",
-  "number",
-  "integer",
-  "boolean",
-  "datetime",
-  "array",
-  "object",
-] as const;
+export const DATA_TYPES = ["string", "number", "boolean", "array", "array of object"] as const;
 export type DataType = (typeof DATA_TYPES)[number];
 
 export const RULE_TYPES = [
@@ -181,4 +173,10 @@ export function errorMessage(error: unknown, fallback = "문제가 발생했어�
   if (typeof error === "string") return error;
   const anyErr = error as { message?: string; details?: string; hint?: string };
   return anyErr.message || anyErr.details || anyErr.hint || fallback;
+}
+
+export function authErrorMessage(error: unknown, fallback = "문제가 발생했어요") {
+  const msg = errorMessage(error, fallback);
+  if (msg === "Invalid login credentials") return "이메일 또는 비밀번호가 올바르지 않아요";
+  return msg;
 }

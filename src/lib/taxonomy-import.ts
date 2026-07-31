@@ -22,15 +22,7 @@ export type ImportedTaxonomy = {
   userAttributes: ImportedAttribute[];
 };
 
-const DATA_TYPES = new Set([
-  "string",
-  "number",
-  "integer",
-  "boolean",
-  "datetime",
-  "array",
-  "object",
-]);
+const DATA_TYPES = new Set(["string", "number", "boolean", "array", "array of object"]);
 
 function str(value: unknown): string {
   return typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
@@ -127,7 +119,8 @@ function parseCsvTaxonomy(text: string): ImportedTaxonomy {
       const ev = ensureEvent(eventName || str(row.technical_name));
       ev.display_name = str(row.display_name) || ev.display_name;
       ev.description = str(row.description) || ev.description;
-      ev.trigger_description = str(row.trigger_description ?? row.trigger) || ev.trigger_description;
+      ev.trigger_description =
+        str(row.trigger_description ?? row.trigger) || ev.trigger_description;
       continue;
     }
     const attr = normaliseAttribute(row);
@@ -200,7 +193,8 @@ export function parseTaxonomyFile(fileName: string, text: string): ImportedTaxon
   if (lower.endsWith(".yaml") || lower.endsWith(".yml")) return parseStructured(yaml.load(text));
   // 확장자를 모르면 내용으로 추측해요.
   const trimmed = text.trim();
-  if (trimmed.startsWith("{") || trimmed.startsWith("[")) return parseStructured(JSON.parse(trimmed));
+  if (trimmed.startsWith("{") || trimmed.startsWith("["))
+    return parseStructured(JSON.parse(trimmed));
   if (trimmed.split(/\r?\n/)[0].includes(",")) return parseCsvTaxonomy(text);
   return parseStructured(yaml.load(text));
 }
@@ -290,7 +284,10 @@ export function sampleJson() {
 }
 
 export function sampleYaml() {
-  return yaml.dump({ events: SAMPLE.events, user_attributes: SAMPLE.userAttributes }, { lineWidth: 100 });
+  return yaml.dump(
+    { events: SAMPLE.events, user_attributes: SAMPLE.userAttributes },
+    { lineWidth: 100 },
+  );
 }
 
 export function sampleCsv() {

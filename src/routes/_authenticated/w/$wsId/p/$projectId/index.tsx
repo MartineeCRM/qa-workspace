@@ -1,20 +1,22 @@
 import { createFileRoute, Link, useParams } from "@tanstack/react-router";
 import { Activity, AlertTriangle, Layers, ListTree, ShieldCheck } from "lucide-react";
 
-import { EmptyState, Panel } from "@/components/app/layout-parts";
+import { EmptyState, Panel, Stat } from "@/components/app/layout-parts";
 import { CoverageBar } from "@/components/app/coverage";
 import { Pill } from "@/components/app/badges";
 import {
   buildCoverageItems,
-  stageCoverage,
+  environmentCoverage,
   statusKey,
   useActivity,
+  useEnvironments,
   useProject,
   useProjectItemStatuses,
   useRules,
-  useStages,
-  useTaxonomyAttributes,
+  useTaxonomyCustomAttributes,
+  useTaxonomyEventProperties,
   useTaxonomyEvents,
+  type QaEnvironment,
 } from "@/lib/queries";
 import { formatDateTime } from "@/lib/domain";
 
@@ -43,23 +45,24 @@ function ProjectOverview() {
   const { wsId, projectId } = useParams({ from: "/_authenticated/w/$wsId/p/$projectId/" });
   const { data: project } = useProject(projectId);
   const { data: events = [] } = useTaxonomyEvents(projectId);
-  const { data: attributes = [] } = useTaxonomyAttributes(projectId);
+  const { data: eventProperties = [] } = useTaxonomyEventProperties(projectId);
+  const { data: customAttributes = [] } = useTaxonomyCustomAttributes(projectId);
   const { data: rules = [] } = useRules(projectId);
-  const { data: stages = [] } = useStages(projectId);
+  const { data: stages = [] } = useEnvironments(projectId);
   const { data: statuses = [] } = useProjectItemStatuses(projectId);
   const { data: activity = [] } = useActivity({ projectId, limit: 12 });
 
-  const items = buildCoverageItems(events, attributes);
+  const items = buildCoverageItems(events, eventProperties, customAttributes);
   const activeEvents = events.filter((e) => e.is_active).length;
   const activeAttributes = items.length - activeEvents;
 
   const itemByKey = new Map(items.map((i) => [i.key, i]));
-  const stageById = new Map(stages.map((s) => [s.id, s]));
+  const environmentById = new Map(stages.map((s) => [s.id, s]));
   const issues = statuses
     .filter((s) => s.status === "failed" || s.status === "blocked")
     .map((s) => ({
       id: s.id,
-      stage: stageById.get(s.stage_id),
+      stage: environmentById.get(s.qa_environment_id),
       item: itemByKey.get(statusKey(s)),
       status: s.status,
       notes: s.notes,
@@ -94,11 +97,14 @@ function ProjectOverview() {
         }
       >
         {stages.length === 0 ? (
-          <EmptyState title="QA 환경이 없어요" description="프로젝트를 만들면 기본 환경이 함께 생겨요." />
+          <EmptyState
+            title="QA 환경이 없어요"
+            description="프로젝트를 만들면 기본 환경이 함께 생겨요."
+          />
         ) : (
           <ul className="divide-y">
-            {stages.map((stage) => {
-              const cov = stageCoverage(items, statuses, stage.id);
+            {stages.map((stage: QaEnvironment) => {
+              const cov = environmentCoverage(items, statuses, stage.id);
               return (
                 <li key={stage.id} className="px-4 py-3">
                   <div className="flex items-center justify-between gap-4">
@@ -164,7 +170,9 @@ function ProjectOverview() {
                       {issue.notes ? (
                         <p className="mt-0.5 text-xs text-muted-foreground">{issue.notes}</p>
                       ) : null}
-                      <p className="text-xs text-muted-foreground">{formatDateTime(issue.updatedAt)}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {formatDateTime(issue.updatedAt)}
+                      </p>
                     </div>
                   </div>
                 </li>
@@ -186,7 +194,9 @@ function ProjectOverview() {
               {activity.map((entry) => (
                 <li key={entry.id} className="px-4 py-2 text-sm">
                   <p>{entry.summary}</p>
-                  <p className="text-xs text-muted-foreground">{formatDateTime(entry.created_at)}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {formatDateTime(entry.created_at)}
+                  </p>
                 </li>
               ))}
             </ul>
@@ -195,29 +205,10 @@ function ProjectOverview() {
       </div>
 
       <p className="text-xs text-muted-foreground">
-        택소노미에는 이벤트 {events.length}개, 속성 {attributes.length}개, 검증 규칙 {rules.length}개가
-        등록돼 있어요.
+        택소노미에는 이벤트 {events.length}개, 속성{" "}
+        {eventProperties.length + customAttributes.length}개, 검증 규칙 {rules.length}개가 등록돼
+        있어요.
       </p>
-    </div>
-  );
-}
-
-function Stat({
-  icon: Icon,
-  label,
-  value,
-}: {
-  icon: React.ComponentType<{ className?: string }>;
-  label: string;
-  value: number;
-}) {
-  return (
-    <div className="rounded-md border bg-card px-4 py-3 shadow-panel">
-      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-        <Icon className="size-4" />
-        {label}
-      </div>
-      <p className="mt-1 text-2xl font-semibold tabular-nums">{value}</p>
     </div>
   );
 }
