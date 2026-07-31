@@ -25,6 +25,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { QaRoundsPanel } from "@/components/app/qa-rounds-panel";
 import {
   buildCoverageItems,
   db,
@@ -359,6 +360,7 @@ function StagePage() {
         <TabsList>
           <TabsTrigger value="results">검증 결과</TabsTrigger>
           <TabsTrigger value="uploads">업로드·분석 기록</TabsTrigger>
+          <TabsTrigger value="rounds">라운드</TabsTrigger>
         </TabsList>
 
         <TabsContent value="results" className="mt-4 space-y-3">
@@ -494,6 +496,10 @@ function StagePage() {
               </Table>
             )}
           </Panel>
+        </TabsContent>
+
+        <TabsContent value="rounds" className="mt-4">
+          <QaRoundsPanel projectId={projectId} environmentId={stage.id} />
         </TabsContent>
       </Tabs>
     </div>

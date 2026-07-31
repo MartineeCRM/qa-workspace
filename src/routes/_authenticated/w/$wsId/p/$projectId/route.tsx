@@ -110,15 +110,6 @@ function ProjectShell() {
               {stage.name}
             </TabLink>
           ))}
-          {(stages ?? []).map((stage: QaEnvironment) => (
-            <TabLink
-              key={`${stage.id}-rounds`}
-              to="/w/$wsId/p/$projectId/qa/$stageSlug/rounds"
-              params={{ wsId, projectId, stageSlug: stage.slug }}
-            >
-              {stage.name} 라운드
-            </TabLink>
-          ))}
         </ul>
       </div>
       <Outlet />

@@ -1,7 +1,6 @@
-import { createFileRoute, useParams } from "@tanstack/react-router";
 import { useState } from "react";
 
-import { PageHeader, Panel, EmptyState } from "@/components/app/layout-parts";
+import { EmptyState, Panel } from "@/components/app/layout-parts";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -13,7 +12,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useAuth } from "@/lib/auth";
-import { useEnvironments, useTaxonomyCustomAttributes, useTaxonomyEvents } from "@/lib/queries";
+import { useTaxonomyCustomAttributes, useTaxonomyEvents } from "@/lib/queries";
 import {
   useCreateQaRound,
   useCreateQaSession,
@@ -23,30 +22,25 @@ import {
   useQaSessions,
 } from "@/lib/qa-rounds-queries";
 
-export const Route = createFileRoute("/_authenticated/w/$wsId/p/$projectId/qa/$stageSlug/rounds")({
-  component: RoundsPage,
-});
-
-function RoundsPage() {
-  const { projectId, stageSlug } = useParams({
-    from: "/_authenticated/w/$wsId/p/$projectId/qa/$stageSlug/rounds",
-  });
+export function QaRoundsPanel({
+  projectId,
+  environmentId,
+}: {
+  projectId: string;
+  environmentId: string;
+}) {
   const { user } = useAuth();
-  const { data: environments = [] } = useEnvironments(projectId);
-  const environment = environments.find((e) => e.slug === stageSlug);
   const { data: events = [] } = useTaxonomyEvents(projectId);
   const { data: customAttributes = [] } = useTaxonomyCustomAttributes(projectId);
-  const { data: rounds = [] } = useQaRounds(environment?.id ?? "");
+  const { data: rounds = [] } = useQaRounds(environmentId);
   const [selectedRoundId, setSelectedRoundId] = useState<string | null>(null);
   const activeRoundId = selectedRoundId ?? rounds[0]?.id ?? "";
   const { data: checklistItems = [] } = useQaChecklistItems(activeRoundId);
   const { data: sessions = [] } = useQaSessions(activeRoundId);
-  const createRound = useCreateQaRound(projectId, environment?.id ?? "");
+  const createRound = useCreateQaRound(projectId, environmentId);
   const createSession = useCreateQaSession(activeRoundId);
   const override = useOverrideChecklistResult();
   const [sessionName, setSessionName] = useState("");
-
-  if (!environment) return null;
 
   function handleCreateSession() {
     if (!user || !sessionName.trim()) return;
@@ -69,16 +63,15 @@ function RoundsPage() {
   }
 
   return (
-    <div className="space-y-5 p-6">
-      <PageHeader
-        title={`${environment.name} QA 라운드`}
-        description="1차는 전체 검증, 이후 차수는 이전 차수의 실패·미수집 항목만 자동으로 승계돼요."
-        actions={
-          <Button onClick={handleCreateRound} disabled={createRound.isPending}>
-            새 라운드 시작
-          </Button>
-        }
-      />
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-xs text-muted-foreground">
+          1차는 전체 검증, 이후 차수는 이전 차수의 실패·미수집 항목만 자동으로 승계돼요.
+        </p>
+        <Button size="sm" onClick={handleCreateRound} disabled={createRound.isPending}>
+          새 라운드 시작
+        </Button>
+      </div>
 
       {rounds.length === 0 ? (
         <EmptyState
