@@ -60,7 +60,7 @@ type AnyAttribute =
   TaxonomyEventProperty | TaxonomyCustomAttribute | TaxonomyCustomAttributeProperty;
 
 type StatusFilter = "all" | "active" | "inactive";
-type SortKey = "name" | "updatedRecent" | "propertyCount";
+type SortKey = "name" | "updatedRecent";
 
 const PAGE_SIZE = 20;
 
@@ -70,18 +70,14 @@ function matchesStatus(isActive: boolean, filter: StatusFilter) {
   return true;
 }
 
-function sortByKey<T extends { id: string; technical_name: string; updated_at: string }>(
+function sortByKey<T extends { technical_name: string; updated_at: string }>(
   items: T[],
   key: SortKey,
-  getPropertyCount: (id: string) => number,
 ): T[] {
   if (key === "updatedRecent") {
     return [...items].sort(
       (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
     );
-  }
-  if (key === "propertyCount") {
-    return [...items].sort((a, b) => getPropertyCount(b.id) - getPropertyCount(a.id));
   }
   return [...items].sort((a, b) => a.technical_name.localeCompare(b.technical_name));
 }
@@ -158,11 +154,7 @@ export function TaxonomyTab({
       children.some((c) => c.technical_name.toLowerCase().includes(term))
     );
   });
-  const visibleEvents = sortByKey(
-    filteredEvents,
-    sortKey,
-    (id) => attrsByEvent.get(id)?.length ?? 0,
-  );
+  const visibleEvents = sortByKey(filteredEvents, sortKey);
   const pagedEvents = visibleEvents.slice(0, visibleCount);
 
   function propertyMatches(p: TaxonomyEventProperty) {
@@ -187,11 +179,7 @@ export function TaxonomyTab({
       (a.display_name ?? "").toLowerCase().includes(term)
     );
   });
-  const visibleCustomAttributes = sortByKey(
-    filteredCustomAttributes,
-    sortKey,
-    (id) => subPropsByAttribute.get(id)?.length ?? 0,
-  );
+  const visibleCustomAttributes = sortByKey(filteredCustomAttributes, sortKey);
   const pagedCustomAttributes = visibleCustomAttributes.slice(0, visibleCount);
 
   // 검색 결과가 한쪽 탭에만 있으면 그쪽으로 자동으로 옮겨줘요.
@@ -317,8 +305,8 @@ export function TaxonomyTab({
               onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
             >
               <option value="all">전체 상태</option>
-              <option value="active">측정 중</option>
-              <option value="inactive">중지됨</option>
+              <option value="active">포함</option>
+              <option value="inactive">미포함</option>
             </NativeSelect>
             <NativeSelect
               aria-label="정렬"
@@ -327,7 +315,6 @@ export function TaxonomyTab({
             >
               <option value="name">이름순</option>
               <option value="updatedRecent">최근 수정순</option>
-              <option value="propertyCount">프로퍼티 많은순</option>
             </NativeSelect>
             <Input
               placeholder="이벤트·Property·어트리뷰트 검색…"

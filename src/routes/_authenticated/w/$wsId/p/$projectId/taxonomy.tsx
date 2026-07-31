@@ -6,8 +6,6 @@ import { TaxonomyTab } from "@/components/app/taxonomy-tab";
 import { RulesTab } from "@/components/app/rules-tab";
 import {
   buildCoverageItems,
-  useEnvironments,
-  useProjectItemStatuses,
   useRules,
   useTaxonomyCustomAttributeProperties,
   useTaxonomyCustomAttributes,
@@ -15,7 +13,7 @@ import {
   useTaxonomyEvents,
 } from "@/lib/queries";
 import { useWorkspaceContext } from "@/lib/workspace-context";
-import { canEdit, formatPercent } from "@/lib/domain";
+import { canEdit } from "@/lib/domain";
 
 export const Route = createFileRoute("/_authenticated/w/$wsId/p/$projectId/taxonomy")({
   head: () => ({
@@ -46,17 +44,11 @@ function TaxonomyPage() {
   const { data: customAttributes = [] } = useTaxonomyCustomAttributes(projectId);
   const { data: customAttributeProperties = [] } = useTaxonomyCustomAttributeProperties(projectId);
   const { data: rules = [] } = useRules(projectId);
-  const { data: environments = [] } = useEnvironments(projectId);
-  const { data: statuses = [] } = useProjectItemStatuses(projectId);
 
   const items = buildCoverageItems(events, eventProperties, customAttributes);
   const eventCount = items.filter((i) => i.kind === "event").length;
   const propertyCount = items.filter((i) => i.kind === "property").length;
   const attributeCount = items.filter((i) => i.kind === "attribute").length;
-
-  const totalSlots = items.length * Math.max(environments.length, 1);
-  const verifiedSlots = statuses.filter((s) => s.status === "verified").length;
-  const coverageRatio = totalSlots === 0 ? 0 : verifiedSlots / totalSlots;
 
   return (
     <div className="mx-auto max-w-[1240px] space-y-5 p-6">
@@ -65,13 +57,8 @@ function TaxonomyPage() {
         description="이 고객의 단일 기준이에요. 모든 QA 환경이 이 택소노미를 검증하고, 규칙을 환경별로 복사하지 않아요."
       />
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-[1.4fr_1fr_1fr_1fr]">
-        <Stat
-          label="검증 커버리지"
-          value={formatPercent(coverageRatio)}
-          hint={`${verifiedSlots} / ${totalSlots}`}
-          progress={{ ratio: coverageRatio }}
-        />
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <Stat label="전체 커버리지" value={items.length} />
         <Stat label="이벤트" value={eventCount} />
         <Stat label="이벤트 프로퍼티" value={propertyCount} />
         <Stat label="어트리뷰트" value={attributeCount} />
