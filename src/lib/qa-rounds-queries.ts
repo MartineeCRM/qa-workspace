@@ -10,6 +10,7 @@ export type QaRound = {
   project_id: string;
   qa_environment_id: string;
   round_number: number;
+  name: string | null;
   previous_round_id: string | null;
   started_by: string;
   started_at: string;
@@ -54,7 +55,7 @@ export function useQaRounds(environmentId: string) {
         .from("qa_rounds")
         .select("*")
         .eq("qa_environment_id", environmentId)
-        .order("round_number", { ascending: false });
+        .order("round_number", { ascending: true });
       if (error) throw error;
       return data as QaRound[];
     },
@@ -257,6 +258,32 @@ export function useCreateQaRound(projectId: string, environmentId: string) {
         .single();
       if (roundError) throw roundError;
       return round as QaRound;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["qa-rounds", environmentId] });
+    },
+  });
+}
+
+export function useRenameQaRound(environmentId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ roundId, name }: { roundId: string; name: string | null }) => {
+      const { error } = await db.from("qa_rounds").update({ name }).eq("id", roundId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["qa-rounds", environmentId] });
+    },
+  });
+}
+
+export function useDeleteQaRound(environmentId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (roundId: string) => {
+      const { error } = await db.from("qa_rounds").delete().eq("id", roundId);
+      if (error) throw error;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["qa-rounds", environmentId] });
