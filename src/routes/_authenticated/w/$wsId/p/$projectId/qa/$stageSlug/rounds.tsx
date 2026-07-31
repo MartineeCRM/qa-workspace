@@ -3,6 +3,7 @@ import { useState } from "react";
 
 import { PageHeader, Panel, EmptyState } from "@/components/app/layout-parts";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Table,
   TableBody,
@@ -15,9 +16,11 @@ import { useAuth } from "@/lib/auth";
 import { useEnvironments, useTaxonomyCustomAttributes, useTaxonomyEvents } from "@/lib/queries";
 import {
   useCreateQaRound,
+  useCreateQaSession,
   useOverrideChecklistResult,
   useQaChecklistItems,
   useQaRounds,
+  useQaSessions,
 } from "@/lib/qa-rounds-queries";
 
 export const Route = createFileRoute("/_authenticated/w/$wsId/p/$projectId/qa/$stageSlug/rounds")({
@@ -37,10 +40,19 @@ function RoundsPage() {
   const [selectedRoundId, setSelectedRoundId] = useState<string | null>(null);
   const activeRoundId = selectedRoundId ?? rounds[0]?.id ?? "";
   const { data: checklistItems = [] } = useQaChecklistItems(activeRoundId);
+  const { data: sessions = [] } = useQaSessions(activeRoundId);
   const createRound = useCreateQaRound(projectId, environment?.id ?? "");
+  const createSession = useCreateQaSession(activeRoundId);
   const override = useOverrideChecklistResult();
+  const [sessionName, setSessionName] = useState("");
 
   if (!environment) return null;
+
+  function handleCreateSession() {
+    if (!user || !sessionName.trim()) return;
+    createSession.mutate({ userId: user.id, name: sessionName.trim() });
+    setSessionName("");
+  }
 
   function handleCreateRound() {
     if (!user) return;
@@ -88,6 +100,40 @@ function RoundsPage() {
               </button>
             ))}
           </div>
+
+          <Panel
+            title="세션"
+            description="라운드 안의 실행 단위예요. 세션 하나가 행동+스냅샷 캡처 → CSV 업로드 → 시간순 검증까지의 한 사이클이에요."
+          >
+            <div className="space-y-3 px-4 py-4">
+              <div className="flex gap-2">
+                <Input
+                  value={sessionName}
+                  onChange={(e) => setSessionName(e.target.value)}
+                  placeholder="예: 장바구니, 구매, 기타 오류사항 검증"
+                  className="max-w-xs"
+                />
+                <Button
+                  size="sm"
+                  onClick={handleCreateSession}
+                  disabled={createSession.isPending || !sessionName.trim()}
+                >
+                  세션 시작
+                </Button>
+              </div>
+              {sessions.length === 0 ? (
+                <p className="text-sm text-muted-foreground">아직 이 라운드에 세션이 없어요.</p>
+              ) : (
+                <ul className="divide-y">
+                  {sessions.map((s) => (
+                    <li key={s.id} className="py-2 text-sm">
+                      {s.name}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </Panel>
 
           <Panel
             title="체크리스트"

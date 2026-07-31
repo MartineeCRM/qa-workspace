@@ -15,6 +15,15 @@ export type QaRound = {
   ended_at: string | null;
 };
 
+export type QaSession = {
+  id: string;
+  qa_round_id: string;
+  name: string;
+  started_by: string;
+  started_at: string;
+  ended_at: string | null;
+};
+
 export type QaChecklistItem = {
   id: string;
   qa_round_id: string;
@@ -47,6 +56,40 @@ export function useQaRounds(environmentId: string) {
         .order("round_number", { ascending: false });
       if (error) throw error;
       return data as QaRound[];
+    },
+  });
+}
+
+export function useQaSessions(roundId: string) {
+  return useQuery({
+    queryKey: ["qa-sessions", roundId],
+    enabled: Boolean(roundId),
+    queryFn: async () => {
+      const { data, error } = await db
+        .from("qa_sessions")
+        .select("*")
+        .eq("qa_round_id", roundId)
+        .order("started_at", { ascending: false });
+      if (error) throw error;
+      return data as QaSession[];
+    },
+  });
+}
+
+export function useCreateQaSession(roundId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ userId, name }: { userId: string; name: string }) => {
+      const { data, error } = await db
+        .from("qa_sessions")
+        .insert({ qa_round_id: roundId, name, started_by: userId })
+        .select()
+        .single();
+      if (error) throw error;
+      return data as QaSession;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["qa-sessions", roundId] });
     },
   });
 }
