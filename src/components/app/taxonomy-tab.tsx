@@ -898,14 +898,25 @@ function AttributeDialog({
         .filter((s) => checkedSiblings[s.id] ?? true)
         .map((s) => s.id);
       const targetIds = [attribute.id, ...checkedSiblingIds];
-      const { error } = await db.from(table).update(basePayload).in("id", targetIds);
+      const { data, error } = await db
+        .from(table)
+        .update(basePayload)
+        .in("id", targetIds)
+        .select("id");
       setSaving(false);
       if (error) return toast.error(errorMessage(error));
-      toast.success(
-        checkedSiblingIds.length > 0
-          ? `속성을 수정했어요 (이벤트 ${1 + checkedSiblingIds.length}개에 적용)`
-          : "속성을 수정했어요",
-      );
+      const appliedCount = data?.length ?? 0;
+      if (appliedCount < targetIds.length) {
+        toast.info(
+          `이벤트 ${appliedCount}/${targetIds.length}개에만 적용됐어요. 권한이 없는 이벤트는 제외됐어요.`,
+        );
+      } else {
+        toast.success(
+          checkedSiblingIds.length > 0
+            ? `속성을 수정했어요 (이벤트 ${appliedCount}개에 적용)`
+            : "속성을 수정했어요",
+        );
+      }
       onSaved();
       onClose();
       return;

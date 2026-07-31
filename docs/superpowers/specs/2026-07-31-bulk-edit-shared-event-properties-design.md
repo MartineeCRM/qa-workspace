@@ -98,6 +98,19 @@ const { error } = await db
 - 형제 없음 또는 전부 체크 해제: 기존 그대로 "속성을 수정했어요"
 - 체크된 형제가 N개 있으면: `"속성을 수정했어요 (이벤트 ${1 + N}개에 적용)"`
 
+**일부만 반영된 경우 (권한 등으로 인한 부분 적용)**: `update(...).in("id", targetIds)`는 RLS
+정책상 권한이 없는 행을 조용히 건너뛴다 — Postgres는 `UPDATE ... WHERE id IN (...)` 실행 시 RLS
+`USING` 절이 걸러낸 행을 에러 없이 제외하기 때문에, `error`가 `null`이어도 실제로는 `targetIds`보다
+적은 행이 바뀌었을 수 있다. 이를 감지하기 위해 update에 `.select("id")`를 붙여 실제로 반영된 행의
+id 목록을 받고, 그 개수(`appliedCount`)를 `targetIds.length`와 비교한다:
+
+- `appliedCount === targetIds.length` (전부 반영): 위의 성공 토스트를 그대로 쓰되, 개수는
+  `appliedCount` 기준으로 표시한다.
+- `appliedCount < targetIds.length` (일부만 반영): 성공 토스트 대신
+  `"이벤트 ${appliedCount}/${targetIds.length}개에만 적용됐어요. 권한이 없는 이벤트는 제외됐어요."`를
+  `toast.info`로 보여준다 (하드 에러는 아니지만 사용자가 알아야 할 상황이라 `error`가 아닌 `info`를
+  씀 — 이 코드베이스에서 "일부만 적용됨" 류의 메시지에 이미 쓰이는 톤과 동일).
+
 ## 테스트 관점
 
 - 이 프로젝트는 별도 단위 테스트 스위트가 없으므로(수동 QA 중심), 구현 후 다음을 `agent-browser`로
