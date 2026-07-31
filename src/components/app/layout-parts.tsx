@@ -42,7 +42,7 @@ export function EmptyState({
   icon?: React.ComponentType<{ className?: string }>;
 }) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-md border border-dashed bg-card px-6 py-14 text-center">
+    <div className="flex flex-col items-center justify-center rounded-lg border border-dashed bg-card px-6 py-14 text-center">
       {Icon ? <Icon className="mb-3 size-6 text-muted-foreground" /> : null}
       <p className="text-sm font-semibold">{title}</p>
       {description ? (
@@ -67,7 +67,7 @@ export function Panel({
   className?: string;
 }) {
   return (
-    <section className={cn("rounded-md border bg-card shadow-panel", className)}>
+    <section className={cn("rounded-lg border bg-card shadow-panel", className)}>
       {title ? (
         <header className="flex items-start justify-between gap-3 border-b px-4 py-3">
           <div>
@@ -94,7 +94,7 @@ export function Stat({
   value: number;
 }) {
   return (
-    <div className="rounded-md border bg-card px-4 py-3 shadow-panel">
+    <div className="rounded-lg border bg-card px-4 py-3 shadow-panel">
       <div className="flex items-center gap-2 text-xs text-muted-foreground">
         <Icon className="size-4" />
         {label}
