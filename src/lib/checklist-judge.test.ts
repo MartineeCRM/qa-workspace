@@ -102,6 +102,31 @@ describe("judgeEventStructural", () => {
     ]);
     expect(violations).toEqual([]);
   });
+
+  it("flags a distinct message when the required property key is present but its value is null", () => {
+    const eventsWithNullValue: RunEvent[] = [
+      {
+        event_id: "evt-1",
+        raw_event_name: "purchase",
+        occurred_at: "2026-07-28T17:39:22Z",
+        external_user_id: "u_1",
+        raw_properties: { payment_method: null, order_no: "20260728-8831" },
+      },
+    ];
+    const violations = judgeEventStructural(eventsWithNullValue, [
+      {
+        id: "p4",
+        event_id: "evt-1",
+        technical_name: "payment_method",
+        data_type: "string",
+        is_required: true,
+        allowed_values: null,
+      },
+    ]);
+    expect(violations).toEqual([
+      { property: "payment_method", reason: "필수 프로퍼티 값이 비어 있습니다" },
+    ]);
+  });
 });
 
 describe("judgeAttributeStructural", () => {
@@ -115,6 +140,22 @@ describe("judgeAttributeStructural", () => {
     });
     expect(violations).toEqual([
       { property: "price_tier", reason: "타입이 string이어야 하는데 number입니다" },
+    ]);
+  });
+
+  it("flags a value outside allowed_values", () => {
+    const violations = judgeAttributeStructural("BRONZE", {
+      id: "a2",
+      technical_name: "membership_grade",
+      data_type: "string",
+      is_required: true,
+      allowed_values: ["GOLD", "SILVER"],
+    });
+    expect(violations).toEqual([
+      {
+        property: "membership_grade",
+        reason: '허용된 값(GOLD, SILVER) 중이 아닙니다: "BRONZE"',
+      },
     ]);
   });
 });
@@ -136,5 +177,16 @@ describe("collectRuleEvidence", () => {
       { kind: "event", technicalName: "purchase", runEvents },
       { kind: "custom_attribute", technicalName: "membership_grade", snapshots },
     ]);
+  });
+
+  it("falls back to an empty string when the rule description is null", () => {
+    const bundle = collectRuleEvidence(
+      {
+        description: null,
+        targets: [{ kind: "event", id: "evt-1", technicalName: "purchase" }],
+      },
+      { runEvents, snapshots },
+    );
+    expect(bundle.ruleDescription).toBe("");
   });
 });

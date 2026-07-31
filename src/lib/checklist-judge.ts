@@ -37,12 +37,16 @@ export function matchEventLogs(eventId: string, runEvents: RunEvent[]): RunEvent
   return runEvents.filter((r) => r.event_id === eventId);
 }
 
+function hasCapturedValue(snapshot: AttributeSnapshot, technicalName: string): boolean {
+  return snapshot.status === "captured" && !!snapshot.payload && technicalName in snapshot.payload;
+}
+
 export function matchLatestSnapshotValue(
   technicalName: string,
   snapshots: AttributeSnapshot[],
 ): unknown {
   const captured = snapshots
-    .filter((s) => s.status === "captured" && s.payload && technicalName in s.payload)
+    .filter((s) => hasCapturedValue(s, technicalName))
     .sort((a, b) => (b.captured_at ?? "").localeCompare(a.captured_at ?? ""));
   return captured[0]?.payload?.[technicalName];
 }
@@ -93,7 +97,11 @@ export function judgeEventStructural(
       .map((e) => e.raw_properties[prop.technical_name])
       .filter((v) => v !== undefined && v !== null);
     if (prop.is_required && values.length === 0) {
-      violations.push({ property: prop.technical_name, reason: "필수 프로퍼티가 로그에 없습니다" });
+      const keyPresent = matchedEvents.some((e) => prop.technical_name in e.raw_properties);
+      violations.push({
+        property: prop.technical_name,
+        reason: keyPresent ? "필수 프로퍼티 값이 비어 있습니다" : "필수 프로퍼티가 로그에 없습니다",
+      });
       continue;
     }
     for (const value of values) {
@@ -145,9 +153,7 @@ export function collectRuleEvidence(
         : {
             kind: "custom_attribute" as const,
             technicalName: t.technicalName,
-            snapshots: data.snapshots.filter(
-              (s) => s.status === "captured" && s.payload && t.technicalName in s.payload,
-            ),
+            snapshots: data.snapshots.filter((s) => hasCapturedValue(s, t.technicalName)),
           },
     ),
   };
