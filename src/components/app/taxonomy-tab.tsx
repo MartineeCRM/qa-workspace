@@ -9,6 +9,7 @@ import { TaxonomyImport } from "@/components/app/taxonomy-import";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { NativeSelect } from "@/components/ui/native-select";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -57,6 +58,33 @@ import { cn } from "@/lib/utils";
 type AnyAttribute =
   TaxonomyEventProperty | TaxonomyCustomAttribute | TaxonomyCustomAttributeProperty;
 
+type StatusFilter = "all" | "active" | "inactive";
+type SortKey = "name" | "updatedRecent" | "propertyCount";
+
+const PAGE_SIZE = 20;
+
+function matchesStatus(isActive: boolean, filter: StatusFilter) {
+  if (filter === "active") return isActive;
+  if (filter === "inactive") return !isActive;
+  return true;
+}
+
+function sortByKey<T extends { id: string; technical_name: string; updated_at: string }>(
+  items: T[],
+  key: SortKey,
+  getPropertyCount: (id: string) => number,
+): T[] {
+  if (key === "updatedRecent") {
+    return [...items].sort(
+      (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
+    );
+  }
+  if (key === "propertyCount") {
+    return [...items].sort((a, b) => getPropertyCount(b.id) - getPropertyCount(a.id));
+  }
+  return [...items].sort((a, b) => a.technical_name.localeCompare(b.technical_name));
+}
+
 export function TaxonomyTab({
   projectId,
   events,
@@ -75,6 +103,9 @@ export function TaxonomyTab({
   const qc = useQueryClient();
   const { user } = useAuth();
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [sortKey, setSortKey] = useState<SortKey>("name");
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [activeTab, setActiveTab] = useState<"events" | "attributes">("events");
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const [openAttr, setOpenAttr] = useState<Record<string, boolean>>({});
@@ -116,7 +147,8 @@ export function TaxonomyTab({
     return map;
   }, [eventProperties]);
 
-  const visibleEvents = events.filter((e) => {
+  const filteredEvents = events.filter((e) => {
+    if (!matchesStatus(e.is_active, statusFilter)) return false;
     if (!term) return true;
     const children = attrsByEvent.get(e.id) ?? [];
     return (
@@ -125,6 +157,12 @@ export function TaxonomyTab({
       children.some((c) => c.technical_name.toLowerCase().includes(term))
     );
   });
+  const visibleEvents = sortByKey(
+    filteredEvents,
+    sortKey,
+    (id) => attrsByEvent.get(id)?.length ?? 0,
+  );
+  const pagedEvents = visibleEvents.slice(0, visibleCount);
 
   function propertyMatches(p: TaxonomyEventProperty) {
     return (
@@ -140,13 +178,20 @@ export function TaxonomyTab({
     return matches.length > 0 ? matches : children;
   }
 
-  const visibleCustomAttributes = customAttributes.filter((a) => {
+  const filteredCustomAttributes = customAttributes.filter((a) => {
+    if (!matchesStatus(a.is_active, statusFilter)) return false;
     if (!term) return true;
     return (
       a.technical_name.toLowerCase().includes(term) ||
       (a.display_name ?? "").toLowerCase().includes(term)
     );
   });
+  const visibleCustomAttributes = sortByKey(
+    filteredCustomAttributes,
+    sortKey,
+    (id) => subPropsByAttribute.get(id)?.length ?? 0,
+  );
+  const pagedCustomAttributes = visibleCustomAttributes.slice(0, visibleCount);
 
   // 검색 결과가 한쪽 탭에만 있으면 그쪽으로 자동으로 옮겨줘요.
   useEffect(() => {
@@ -157,6 +202,11 @@ export function TaxonomyTab({
       setActiveTab("events");
     }
   }, [term, visibleEvents.length, visibleCustomAttributes.length]);
+
+  // 검색어/필터/정렬/탭이 바뀌면 더 보기로 늘려둔 개수를 다시 첫 페이지로 되돌려요.
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [term, statusFilter, sortKey, activeTab]);
 
   async function removeEvent(event: TaxonomyEvent) {
     const { error } = await db.from("taxonomy_events").delete().eq("id", event.id);
@@ -259,23 +309,43 @@ export function TaxonomyTab({
               어트리뷰트 {customAttributes.length}
             </button>
           </div>
-          <Input
-            placeholder="이벤트·Property·어트리뷰트 검색…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="h-[34px] w-[260px]"
-          />
+          <div className="flex items-center gap-2">
+            <NativeSelect
+              aria-label="상태 필터"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
+            >
+              <option value="all">전체 상태</option>
+              <option value="active">측정 중</option>
+              <option value="inactive">중지됨</option>
+            </NativeSelect>
+            <NativeSelect
+              aria-label="정렬"
+              value={sortKey}
+              onChange={(e) => setSortKey(e.target.value as SortKey)}
+            >
+              <option value="name">이름순</option>
+              <option value="updatedRecent">최근 수정순</option>
+              <option value="propertyCount">프로퍼티 많은순</option>
+            </NativeSelect>
+            <Input
+              placeholder="이벤트·Property·어트리뷰트 검색…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="h-[34px] w-[260px]"
+            />
+          </div>
         </div>
 
         {activeTab === "events" ? (
           visibleEvents.length === 0 ? (
             <EmptyState
-              title="아직 이벤트가 없어요"
+              title={events.length === 0 ? "아직 이벤트가 없어요" : "조건에 맞는 이벤트가 없어요"}
               description="이 고객이 구현해야 할 이벤트를 등록해 주세요. 속성은 이벤트 아래에 붙어요."
             />
           ) : (
             <ul className="divide-y">
-              {visibleEvents.map((event) => {
+              {pagedEvents.map((event) => {
                 const children = childrenFor(event.id);
                 const expanded = open[event.id] ?? true;
                 return (
@@ -363,12 +433,14 @@ export function TaxonomyTab({
           )
         ) : visibleCustomAttributes.length === 0 ? (
           <EmptyState
-            title={customAttributes.length === 0 ? "어트리뷰트가 없어요" : "검색 결과가 없어요"}
+            title={
+              customAttributes.length === 0 ? "어트리뷰트가 없어요" : "조건에 맞는 항목이 없어요"
+            }
             description="프로필 수준의 속성을 여기에 추가해요."
           />
         ) : (
           <ul className="divide-y">
-            {visibleCustomAttributes.map((attr) =>
+            {pagedCustomAttributes.map((attr) =>
               attr.data_type === "array of object" ? (
                 <ExpandableCustomAttributeRow
                   key={attr.id}
@@ -407,6 +479,29 @@ export function TaxonomyTab({
             )}
           </ul>
         )}
+
+        {(() => {
+          const total = activeTab === "events" ? visibleEvents.length : visibleCustomAttributes.length;
+          const shown = activeTab === "events" ? pagedEvents.length : pagedCustomAttributes.length;
+          const noun = activeTab === "events" ? "이벤트" : "어트리뷰트";
+          if (total === 0) return null;
+          return (
+            <div className="flex items-center justify-between border-t px-5 py-3">
+              <p className="text-xs text-muted-foreground">
+                {noun} {total}개 중 {shown}개 표시 중이에요
+              </p>
+              {shown < total ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
+                >
+                  더 보기
+                </Button>
+              ) : null}
+            </div>
+          );
+        })()}
       </div>
 
       {eventDialog ? (
