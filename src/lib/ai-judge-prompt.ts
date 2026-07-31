@@ -23,6 +23,8 @@ export function buildJudgePrompt(input: JudgePromptInput): string {
     ...evidenceLines,
     "",
     "다른 설명 없이 다음 JSON 형식으로만 응답하세요:",
-    '{"verdict": "passed" | "failed", "reasoning": "판단 이유 (한국어, 1-2문장)", "evidence": <근거로 사용한 로그 중 핵심 부분>}',
+    "마크다운 코드 블록(```json 등) 없이 순수 JSON 텍스트만 출력하세요.",
+    '{"verdict": "failed", "reasoning": "이벤트 값과 스냅샷 값이 일치하지 않습니다", "evidence": {"event_value": "GOLD", "snapshot_value": "SILVER"}}',
+    'verdict은 반드시 "passed" 또는 "failed" 중 하나여야 합니다.',
   ].join("\n");
 }

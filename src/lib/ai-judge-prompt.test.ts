@@ -6,7 +6,11 @@ describe("buildJudgePrompt", () => {
     const prompt = buildJudgePrompt({
       ruleDescription: "profile_update 이후 membership_grade가 같은 값이어야 함",
       targets: [
-        { kind: "event", technicalName: "profile_update", runEvents: [{ membership_grade: "GOLD" }] },
+        {
+          kind: "event",
+          technicalName: "profile_update",
+          runEvents: [{ membership_grade: "GOLD" }],
+        },
         {
           kind: "custom_attribute",
           technicalName: "membership_grade",
@@ -20,5 +24,15 @@ describe("buildJudgePrompt", () => {
     expect(prompt).toContain("GOLD");
     expect(prompt).toContain("SILVER");
     expect(prompt).toContain('"verdict"');
+  });
+
+  it("does not throw and still includes the rule description and JSON format instructions when targets is empty", () => {
+    const prompt = buildJudgePrompt({
+      ruleDescription: "연결된 대상이 없는 규칙",
+      targets: [],
+    });
+    expect(prompt).toContain("연결된 대상이 없는 규칙");
+    expect(prompt).toContain('"verdict"');
+    expect(prompt).toContain("JSON");
   });
 });
