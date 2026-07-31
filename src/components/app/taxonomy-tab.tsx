@@ -424,6 +424,7 @@ export function TaxonomyTab({
           projectId={projectId}
           userId={user?.id ?? ""}
           events={events}
+          eventProperties={eventProperties}
           attribute={attrDialog.attribute}
           eventId={attrDialog.eventId}
           onClose={() => setAttrDialog(null)}
@@ -740,6 +741,7 @@ function AttributeDialog({
   projectId,
   userId,
   events,
+  eventProperties,
   attribute,
   eventId,
   onClose,
@@ -748,6 +750,7 @@ function AttributeDialog({
   projectId: string;
   userId: string;
   events: TaxonomyEvent[];
+  eventProperties: TaxonomyEventProperty[];
   attribute: AnyAttribute | null;
   eventId: string | null;
   onClose: () => void;
