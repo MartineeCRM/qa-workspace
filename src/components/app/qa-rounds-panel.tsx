@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState, type KeyboardEvent } from "react";
-import { X } from "lucide-react";
+import { MoreHorizontal, X } from "lucide-react";
+import { toast } from "sonner";
 
 import { EmptyState, Panel } from "@/components/app/layout-parts";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Table,
   TableBody,
@@ -12,6 +14,32 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { errorMessage } from "@/lib/domain";
+import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
 import {
   useTaxonomyCustomAttributes,
@@ -24,14 +52,16 @@ import {
   useCaptureAttributeSnapshot,
   useCreateQaRound,
   useCreateQaSession,
+  useDeleteQaRound,
   useOverrideChecklistResult,
   useQaAttributeSnapshots,
   useQaChecklistItems,
   useQaRounds,
   useQaSessions,
   useRemoveChecklistItem,
+  useRenameQaRound,
+  type QaRound,
 } from "@/lib/qa-rounds-queries";
-import { toast } from "sonner";
 
 type SearchTarget =
   | { kind: "event"; id: string; label: string; sub: string | null }
@@ -41,25 +71,35 @@ export function QaRoundsPanel({
   projectId,
   environmentId,
   onActiveSessionChange,
+  editable = false,
+  canDeleteRounds = false,
 }: {
   projectId: string;
   environmentId: string;
   onActiveSessionChange?: (sessionId: string) => void;
+  editable?: boolean;
+  canDeleteRounds?: boolean;
 }) {
   const { user } = useAuth();
   const { data: events = [] } = useTaxonomyEvents(projectId);
   const { data: customAttributes = [] } = useTaxonomyCustomAttributes(projectId);
   const { data: rounds = [] } = useQaRounds(environmentId);
+  const latestRound = rounds[rounds.length - 1];
   const [selectedRoundId, setSelectedRoundId] = useState<string | null>(null);
-  const activeRoundId = selectedRoundId ?? rounds[0]?.id ?? "";
+  const activeRoundId = selectedRoundId ?? latestRound?.id ?? "";
   const { data: sessions = [] } = useQaSessions(activeRoundId);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const activeSessionId = selectedSessionId ?? sessions[0]?.id ?? "";
   const { data: checklistItems = [] } = useQaChecklistItems(activeSessionId);
   const createRound = useCreateQaRound(projectId, environmentId);
+  const renameRound = useRenameQaRound(environmentId);
+  const deleteRound = useDeleteQaRound(environmentId);
   const createSession = useCreateQaSession(activeRoundId);
   const override = useOverrideChecklistResult();
   const [sessionName, setSessionName] = useState("");
+  const [renamingRound, setRenamingRound] = useState<QaRound | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  const [deletingRound, setDeletingRound] = useState<QaRound | null>(null);
 
   useEffect(() => {
     onActiveSessionChange?.(activeSessionId);
@@ -73,8 +113,39 @@ export function QaRoundsPanel({
 
   function handleCreateRound() {
     if (!user) return;
-    const latestRound = rounds[0];
     createRound.mutate({ userId: user.id, previousRoundId: latestRound?.id ?? null });
+  }
+
+  function startRename(round: QaRound) {
+    setRenamingRound(round);
+    setRenameValue(round.name ?? "");
+  }
+
+  function submitRename() {
+    if (!renamingRound) return;
+    renameRound.mutate(
+      { roundId: renamingRound.id, name: renameValue.trim() || null },
+      {
+        onError: (error) => toast.error(errorMessage(error)),
+        onSuccess: () => {
+          toast.success("라운드 이름을 수정했어요");
+          setRenamingRound(null);
+        },
+      },
+    );
+  }
+
+  function confirmDelete() {
+    if (!deletingRound) return;
+    const roundId = deletingRound.id;
+    deleteRound.mutate(roundId, {
+      onError: (error) => toast.error(errorMessage(error)),
+      onSuccess: () => {
+        toast.success("라운드를 삭제했어요");
+        if (selectedRoundId === roundId) setSelectedRoundId(null);
+        setDeletingRound(null);
+      },
+    });
   }
 
   return (
@@ -97,17 +168,99 @@ export function QaRoundsPanel({
         <>
           <div className="flex flex-wrap gap-2">
             {rounds.map((r) => (
-              <button
+              <div
                 key={r.id}
-                onClick={() => setSelectedRoundId(r.id)}
-                className={`rounded-md border px-3 py-1 text-sm ${
-                  r.id === activeRoundId ? "bg-muted font-medium" : "text-muted-foreground"
-                }`}
+                className={cn(
+                  "group flex items-center gap-1 rounded-md border pl-3 pr-1 py-1 text-sm",
+                  r.id === activeRoundId ? "bg-muted font-medium" : "text-muted-foreground",
+                )}
               >
-                {r.round_number}차
-              </button>
+                <button type="button" onClick={() => setSelectedRoundId(r.id)}>
+                  {r.name?.trim() ? r.name : `${r.round_number}차`}
+                </button>
+                {editable ? (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="size-5 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
+                        aria-label={`${r.round_number}차 라운드 작업 메뉴`}
+                      >
+                        <MoreHorizontal className="size-3.5" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-36">
+                      <DropdownMenuItem onSelect={() => startRename(r)}>이름 수정</DropdownMenuItem>
+                      {canDeleteRounds ? (
+                        <>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            className="text-destructive focus:bg-destructive/10 focus:text-destructive"
+                            onSelect={() => setDeletingRound(r)}
+                          >
+                            삭제
+                          </DropdownMenuItem>
+                        </>
+                      ) : null}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                ) : null}
+              </div>
             ))}
           </div>
+
+          {renamingRound ? (
+            <Dialog open onOpenChange={(v) => (v ? null : setRenamingRound(null))}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>라운드 이름 수정</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-1.5">
+                  <Label htmlFor="round-name">이름</Label>
+                  <Input
+                    id="round-name"
+                    value={renameValue}
+                    onChange={(e) => setRenameValue(e.target.value)}
+                    placeholder={`${renamingRound.round_number}차`}
+                  />
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setRenamingRound(null)}>
+                    취소
+                  </Button>
+                  <Button onClick={submitRename} disabled={renameRound.isPending}>
+                    저장
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          ) : null}
+
+          <AlertDialog
+            open={!!deletingRound}
+            onOpenChange={(v) => (v ? null : setDeletingRound(null))}
+          >
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>
+                  “
+                  {deletingRound?.name?.trim()
+                    ? deletingRound.name
+                    : `${deletingRound?.round_number}차`}
+                  ” 라운드를 삭제할까요?
+                </AlertDialogTitle>
+                <AlertDialogDescription>
+                  이 라운드에 속한 세션·체크리스트·검증 결과·스냅샷이 모두 함께 사라져요. 되돌릴 수
+                  없어요.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>취소</AlertDialogCancel>
+                <AlertDialogAction onClick={confirmDelete}>삭제</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
 
           <Panel
             title="세션"
