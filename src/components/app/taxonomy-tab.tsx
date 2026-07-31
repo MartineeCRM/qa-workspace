@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -1012,6 +1013,47 @@ function AttributeDialog({
             </div>
             <Switch checked={required} onCheckedChange={setRequired} />
           </div>
+          {siblings.length > 0 ? (
+            <div className="space-y-2 rounded-md border px-3 py-2.5">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-sm font-medium">다른 이벤트에도 적용 ({siblings.length}개)</p>
+                <div className="flex gap-1">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => toggleAllSiblings(true)}
+                  >
+                    전체 선택
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => toggleAllSiblings(false)}
+                  >
+                    전체 해제
+                  </Button>
+                </div>
+              </div>
+              <ul className="max-h-48 space-y-1.5 overflow-y-auto">
+                {siblings.map((s) => (
+                  <li key={s.id} className="flex items-center gap-2">
+                    <Checkbox
+                      id={`sibling-${s.id}`}
+                      checked={checkedSiblings[s.id] ?? true}
+                      onCheckedChange={(v) =>
+                        setCheckedSiblings((prev) => ({ ...prev, [s.id]: v === true }))
+                      }
+                    />
+                    <Label htmlFor={`sibling-${s.id}`} className="mono-token text-sm font-normal">
+                      {eventNameById.get(s.event_id) ?? "—"}
+                    </Label>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>
