@@ -151,6 +151,15 @@ export type ActivityLog = {
   created_at: string;
 };
 
+export type WorkspaceInvite = {
+  id: string;
+  workspace_id: string;
+  email: string;
+  role: WorkspaceRole;
+  invited_by: string;
+  created_at: string;
+};
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as any;
 
@@ -216,14 +225,32 @@ export function useMembers(workspaceId: string) {
           role: WorkspaceRole;
           user_id: string;
           created_at: string;
-          profiles: { display_name: string; avatar_url: string | null } | null;
+          profiles: {
+            display_name: string;
+            avatar_url: string | null;
+            email: string | null;
+          } | null;
         }>
       >(
         await db
           .from("workspace_members")
-          .select("id, role, user_id, created_at, profiles(display_name, avatar_url)")
+          .select("id, role, user_id, created_at, profiles(display_name, avatar_url, email)")
           .eq("workspace_id", workspaceId)
           .order("created_at"),
+      ),
+  });
+}
+
+export function usePendingInvites(workspaceId: string) {
+  return useQuery({
+    queryKey: ["invites", workspaceId],
+    queryFn: async () =>
+      unwrap<WorkspaceInvite[]>(
+        await db
+          .from("workspace_invites")
+          .select("id, workspace_id, email, role, invited_by, created_at")
+          .eq("workspace_id", workspaceId)
+          .order("created_at", { ascending: false }),
       ),
   });
 }

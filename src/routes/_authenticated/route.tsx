@@ -1,11 +1,11 @@
-import { createFileRoute, Outlet } from "@tanstack/react-router";
-import { ensureSession } from "@/lib/auto-session";
+import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
   beforeLoad: async () => {
-    const ok = await ensureSession();
-    if (!ok) throw new Error("Could not open the workspace. Please refresh.");
+    const { data } = await supabase.auth.getSession();
+    if (!data.session) throw redirect({ to: "/login" });
     return {};
   },
   component: () => <Outlet />,

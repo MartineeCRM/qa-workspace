@@ -1,4 +1,4 @@
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,8 +12,13 @@ import {
 import { ShieldCheck, UserRound } from "lucide-react";
 
 export function TopBar({ children }: { children?: React.ReactNode }) {
-  const { profile, user } = useAuth();
+  const { profile, user, signOut } = useAuth();
+  const navigate = useNavigate();
 
+  async function handleSignOut() {
+    await signOut();
+    navigate({ to: "/login" });
+  }
 
   return (
     <header className="sticky top-0 z-30 flex h-12 items-center justify-between gap-4 border-b bg-card px-4">
@@ -42,7 +47,8 @@ export function TopBar({ children }: { children?: React.ReactNode }) {
           <DropdownMenuItem asChild>
             <Link to="/account">내 프로필</Link>
           </DropdownMenuItem>
-
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onSelect={handleSignOut}>로그아웃</DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
     </header>
