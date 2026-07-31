@@ -77,6 +77,8 @@ taxonomy_custom_attributes (
 
 ### 3. QA 실행 & 데이터 수집 (신규)
 
+라운드(차수)는 여러 개의 **세션**으로 나뉜다. 세션 하나가 "행동 수행 + 어트리뷰트 스냅샷 캡처 → 그 결과 CSV 업로드 → 시간순 정렬 검증"이라는 완결된 실행 단위다(라운드 1은 보통 기능/시나리오별로 세션을 나누고 — "장바구니", "구매" — 라운드 2 이후는 검증 대상 카테고리별로 나눌 수 있다 — "장바구니 재검증", "기타 오류사항 검증"). `qa_run_events`/`qa_attribute_snapshots`는 라운드가 아니라 **세션**에 붙는다.
+
 ```sql
 qa_rounds (  -- "차수"
   id, project_id, qa_environment_id,
@@ -85,8 +87,14 @@ qa_rounds (  -- "차수"
   started_by, started_at, ended_at
 )
 
-qa_run_events (  -- 원본 로그 CSV 업로드 결과 (EVENT_ID/USER_ID/TIME/NAME/PROPERTIES 컬럼)
+qa_sessions (  -- 라운드 안의 실행 단위 (구 "sprint")
   id, qa_round_id REFERENCES qa_rounds(id),
+  name text,  -- "장바구니", "구매", "기타 오류사항 검증" 등
+  started_by, started_at, ended_at
+)
+
+qa_run_events (  -- 원본 로그 CSV 업로드 결과 (EVENT_ID/USER_ID/TIME/NAME/PROPERTIES 컬럼)
+  id, qa_session_id REFERENCES qa_sessions(id),
   event_id REFERENCES taxonomy_events(id),  -- NAME 매칭 실패 시 null
   raw_event_name text,
   occurred_at timestamptz,
@@ -95,7 +103,7 @@ qa_run_events (  -- 원본 로그 CSV 업로드 결과 (EVENT_ID/USER_ID/TIME/NA
 )
 
 qa_attribute_snapshots (  -- 외부 API 호출로 시점별 attribute 상태 캡처
-  id, qa_round_id REFERENCES qa_rounds(id),
+  id, qa_session_id REFERENCES qa_sessions(id),
   external_user_id text,
   snapshot_name text,
   status text CHECK (status IN ('requesting','captured','failed')),
@@ -105,7 +113,7 @@ qa_attribute_snapshots (  -- 외부 API 호출로 시점별 attribute 상태 캡
 )
 ```
 
-`qa_run_events`와 `qa_attribute_snapshots`는 `occurred_at`/`captured_at` 기준으로 병합해 하나의 타임라인으로 재구성할 수 있다 — "이 이벤트 이후 이 attribute가 어떻게 바뀌었는가"를 판정하는 근거가 된다.
+`qa_run_events`와 `qa_attribute_snapshots`는 `occurred_at`/`captured_at` 기준으로 병합해 하나의 타임라인으로 재구성할 수 있다 — "이 이벤트 이후 이 attribute가 어떻게 바뀌었는가"를 판정하는 근거가 된다. 판정(`qa_checklist_item_results`)은 라운드 단위로 존재하므로, 근거를 모을 때는 그 라운드에 속한 **모든 세션**의 `qa_run_events`/`qa_attribute_snapshots`를 합쳐서(세션 경계와 무관하게) 하나의 타임라인으로 본다.
 
 ### 4. 체크리스트 & 차수 승계 (신규)
 
@@ -229,7 +237,7 @@ qa_discussion_comments (
 | `validation_rules` | 재구성 (event_id/attribute_id → event_id/property_id/custom_attribute_id + description) |
 | `qa_item_status` | 컬럼 확장 (동일 3-컬럼 패턴), 기능 동일 |
 | `qa_uploads`, `qa_analysis_runs` | 변경 없음 (참조 컬럼명만 qa_environment_id로 개명) |
-| (없음) | `qa_rounds`, `qa_run_events`, `qa_attribute_snapshots`, `qa_round_checklist_items`, `qa_checklist_item_results`, `qa_discussions`, `qa_discussion_comments`, `project_attribute_api_settings` (전부 신규) |
+| (없음) | `qa_rounds`, `qa_sessions`, `qa_run_events`, `qa_attribute_snapshots`, `qa_round_checklist_items`, `qa_checklist_item_results`, `qa_discussions`, `qa_discussion_comments`, `project_attribute_api_settings` (전부 신규) |
 
 ## 마이그레이션 순서 고려사항
 
@@ -241,6 +249,7 @@ qa_discussion_comments (
 ## 테스트 계획
 
 - 1차 차수 생성 시 프로젝트의 모든 이벤트/attribute가 체크리스트에 자동 포함되는지
+- 한 라운드 안에 여러 세션을 만들고, 각 세션의 `qa_run_events`/`qa_attribute_snapshots`가 라운드 전체 타임라인으로 합쳐져서 판정 근거로 쓰이는지
 - CSV 업로드 시 EVENT_ID/USER_ID/TIME/NAME/PROPERTIES가 `qa_run_events`로 올바르게 파싱되는지, NAME 매칭 실패 시 event_id가 null로 남는지
 - attribute 스냅샷 캡처 후 이전 스냅샷과 diff가 되는지
 - 레이어1→2→3 순서대로 평가가 중단되는지(레이어1 실패 시 레이어2/3 스킵 등)
