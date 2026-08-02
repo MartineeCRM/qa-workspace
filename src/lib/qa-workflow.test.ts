@@ -78,13 +78,16 @@ describe("buildMergedTimeline", () => {
 
   it("orders rows chronologically and only emits changed attribute keys per snapshot", () => {
     const rows = buildMergedTimeline(runEvents, snapshots);
-    expect(rows.map((r) => r.name)).toEqual(["cart_item_count", "cart_item_added"]);
+    expect(rows.map((r) => r.name)).toEqual(["cart_item_added", "cart_item_count"]);
     expect(rows[0]).toMatchObject({
+      source: "event",
+      name: "cart_item_added",
+    });
+    expect(rows[1]).toMatchObject({
       source: "snapshot",
       name: "cart_item_count",
       change: "0 → 1",
     });
-    expect(rows[1]).toMatchObject({ source: "event", name: "cart_item_added" });
   });
 
   it("emits no row for the first snapshot (nothing to diff against)", () => {

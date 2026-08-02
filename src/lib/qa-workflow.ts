@@ -56,10 +56,7 @@ export function buildMergedTimeline(
       if (before === after) continue;
       snapshotRows.push({
         key: `snapshot:${snapshot.id}:${key}`,
-        // Anchored to the previous snapshot's capture time (the last confirmed
-        // baseline before the value drifted), not the current snapshot's — so a
-        // diff sorts alongside the events that happened during that window.
-        occurredAt: (previous.captured_at ?? previous.requested_at) as string,
+        occurredAt: snapshot.captured_at as string,
         source: "snapshot",
         name: key,
         change: `${formatValue(before)} → ${formatValue(after)}`,
