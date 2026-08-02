@@ -334,6 +334,27 @@ function StagePage() {
     });
     if (runError) throw runError;
 
+    const eventByTechnicalName = new Map(events.map((e) => [e.technical_name, e.id]));
+    const runEventRows = parsed.rows.map((row) => {
+      const eventName = eventColumn ? row[eventColumn] : "";
+      return {
+        qa_session_id: activeSessionId,
+        event_id: eventByTechnicalName.get(eventName) ?? null,
+        raw_event_name: eventName,
+        occurred_at: new Date(row[timeColumn]).toISOString(),
+        external_user_id: row[userColumn],
+        raw_properties:
+          (propertiesColumn ? safeJsonParse(row[propertiesColumn] ?? "") : null) ??
+          Object.fromEntries(
+            parsed.headers
+              .filter((h) => h !== eventColumn && h !== timeColumn && h !== userColumn)
+              .map((h) => [h, row[h]]),
+          ),
+      };
+    });
+    const { error: runEventsError } = await db.from("qa_run_events").insert(runEventRows);
+    if (runEventsError) throw runEventsError;
+
     qc.invalidateQueries({ queryKey: ["item-status", projectId] });
     qc.invalidateQueries({ queryKey: ["uploads", stage.id] });
     qc.invalidateQueries({ queryKey: ["runs", stage.id] });
