@@ -1,6 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchBrazeAttributeSnapshot } from "@/lib/attribute-snapshot.functions";
+import { judgeChecklistItem } from "@/lib/checklist-analysis";
+import type { AttributeSnapshot, RunEvent } from "@/lib/checklist-judge";
+import type {
+  TaxonomyCustomAttribute,
+  TaxonomyEvent,
+  TaxonomyEventProperty,
+  ValidationRule,
+} from "@/lib/queries";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as any;
@@ -41,6 +49,7 @@ export type QaChecklistItemResult = {
   ai_evidence: unknown;
   failed_layer: "existence" | "structural" | "qualitative" | null;
   final_status: "passed" | "failed" | "not_collected";
+  judged_by: "rule" | "ai" | null;
   overridden_by: string | null;
   overridden_at: string | null;
   override_reason: string | null;
@@ -318,6 +327,83 @@ export function useOverrideChecklistResult() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["qa-checklist-items"] });
+    },
+  });
+}
+
+export type QaRunEvent = {
+  id: string;
+  qa_session_id: string;
+  event_id: string | null;
+  raw_event_name: string;
+  occurred_at: string;
+  external_user_id: string;
+  raw_properties: Record<string, unknown>;
+};
+
+export function useQaRunEvents(sessionId: string) {
+  return useQuery({
+    queryKey: ["qa-run-events", sessionId],
+    enabled: Boolean(sessionId),
+    queryFn: async () => {
+      const { data, error } = await db
+        .from("qa_run_events")
+        .select("*")
+        .eq("qa_session_id", sessionId)
+        .order("occurred_at", { ascending: true });
+      if (error) throw error;
+      return data as QaRunEvent[];
+    },
+  });
+}
+
+export function useUploadRunEventsLog(sessionId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (
+      rows: Array<{
+        event_id: string | null;
+        raw_event_name: string;
+        occurred_at: string;
+        external_user_id: string;
+        raw_properties: Record<string, unknown>;
+      }>,
+    ) => {
+      if (rows.length === 0) return;
+      const { error } = await db
+        .from("qa_run_events")
+        .insert(rows.map((r) => ({ ...r, qa_session_id: sessionId })));
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["qa-run-events", sessionId] });
+    },
+  });
+}
+
+export function useAnalyzeChecklist(sessionId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: {
+      checklistItems: QaChecklistItem[];
+      events: TaxonomyEvent[];
+      eventProperties: TaxonomyEventProperty[];
+      customAttributes: TaxonomyCustomAttribute[];
+      rules: ValidationRule[];
+      runEvents: RunEvent[];
+      snapshots: AttributeSnapshot[];
+    }) => {
+      if (input.checklistItems.length === 0) return;
+      const results = await Promise.all(
+        input.checklistItems.map((item) => judgeChecklistItem(item, input)),
+      );
+      const { error } = await db
+        .from("qa_checklist_item_results")
+        .upsert(results, { onConflict: "checklist_item_id" });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["qa-checklist-items", sessionId] });
     },
   });
 }
