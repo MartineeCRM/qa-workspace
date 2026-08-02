@@ -71,6 +71,7 @@ export function ResultPanel({
   const [tab, setTab] = useState<"failed" | "passed">("failed");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [analyzeFailed, setAnalyzeFailed] = useState(false);
 
   const { data: runEvents = [] } = useQaRunEvents(sessionId);
   const { data: snapshots = [] } = useQaAttributeSnapshots(sessionId);
@@ -109,12 +110,35 @@ export function ResultPanel({
         runEvents: [...runEvents, ...rows],
         snapshots,
       });
+      setAnalyzeFailed(false);
       toast.success("로그를 업로드하고 판정을 완료했어요");
     } catch (error) {
-      toast.error(errorMessage(error, "로그는 저장됐지만 판정에 실패했어요. 다시 시도해주세요."));
+      setAnalyzeFailed(true);
+      toast.error(
+        errorMessage(error, "로그는 저장됐지만 판정에 실패했어요. 아래 '재분석' 버튼으로 다시 시도해주세요."),
+      );
     } finally {
       setBusy(false);
       if (fileRef.current) fileRef.current.value = "";
+    }
+  }
+
+  async function runAnalysis() {
+    try {
+      await analyze.mutateAsync({
+        checklistItems,
+        events,
+        eventProperties,
+        customAttributes,
+        rules,
+        runEvents,
+        snapshots,
+      });
+      setAnalyzeFailed(false);
+      toast.success("판정을 완료했어요");
+    } catch (error) {
+      setAnalyzeFailed(true);
+      toast.error(errorMessage(error, "판정에 실패했어요. 다시 시도해주세요."));
     }
   }
 
@@ -172,6 +196,11 @@ export function ResultPanel({
           <Button size="sm" disabled={busy} onClick={() => fileRef.current?.click()}>
             <Upload className="size-4" /> {busy ? "처리 중…" : "로그 업로드"}
           </Button>
+          {analyzeFailed ? (
+            <Button size="sm" variant="outline" onClick={runAnalysis} disabled={analyze.isPending}>
+              재분석
+            </Button>
+          ) : null}
         </>
       }
     >
