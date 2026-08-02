@@ -3,6 +3,7 @@ import { MoreHorizontal, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { EmptyState, Panel } from "@/components/app/layout-parts";
+import { ResultPanel } from "@/components/app/qa-result-panel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -43,6 +44,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
 import {
   useTaxonomyCustomAttributes,
+  useTaxonomyEventProperties,
   useTaxonomyEvents,
   type TaxonomyCustomAttribute,
   type TaxonomyEvent,
@@ -83,6 +85,7 @@ export function QaRoundsPanel({
   const { user } = useAuth();
   const { data: events = [] } = useTaxonomyEvents(projectId);
   const { data: customAttributes = [] } = useTaxonomyCustomAttributes(projectId);
+  const { data: eventProperties = [] } = useTaxonomyEventProperties(projectId);
   const { data: rounds = [] } = useQaRounds(environmentId);
   const latestRound = rounds[rounds.length - 1];
   const [selectedRoundId, setSelectedRoundId] = useState<string | null>(null);
@@ -304,22 +307,32 @@ export function QaRoundsPanel({
           </Panel>
 
           {activeSessionId ? (
-            <ChecklistPanel
-              sessionId={activeSessionId}
-              events={events}
-              customAttributes={customAttributes}
-              checklistItems={checklistItems}
-              userId={user?.id}
-              onOverride={(resultId) =>
-                user &&
-                override.mutate({
-                  resultId,
-                  finalStatus: "failed",
-                  overriddenBy: user.id,
-                  overrideReason: "수동 검토 결과 오류로 재분류",
-                })
-              }
-            />
+            <>
+              <ChecklistPanel
+                sessionId={activeSessionId}
+                events={events}
+                customAttributes={customAttributes}
+                checklistItems={checklistItems}
+                userId={user?.id}
+                onOverride={(resultId) =>
+                  user &&
+                  override.mutate({
+                    resultId,
+                    finalStatus: "failed",
+                    overriddenBy: user.id,
+                    overrideReason: "수동 검토 결과 오류로 재분류",
+                  })
+                }
+              />
+              <ResultPanel
+                sessionId={activeSessionId}
+                projectId={projectId}
+                events={events}
+                eventProperties={eventProperties}
+                customAttributes={customAttributes}
+                checklistItems={checklistItems}
+              />
+            </>
           ) : (
             <Panel
               title="체크리스트"
