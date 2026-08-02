@@ -21,7 +21,8 @@ import { Route as AuthenticatedWWsIdSettingsRouteImport } from './routes/_authen
 import { Route as AuthenticatedWWsIdPProjectIdRouteRouteImport } from './routes/_authenticated/w/$wsId/p/$projectId/route'
 import { Route as AuthenticatedWWsIdPProjectIdIndexRouteImport } from './routes/_authenticated/w/$wsId/p/$projectId/index'
 import { Route as AuthenticatedWWsIdPProjectIdTaxonomyRouteImport } from './routes/_authenticated/w/$wsId/p/$projectId/taxonomy'
-import { Route as AuthenticatedWWsIdPProjectIdQaStageSlugRouteImport } from './routes/_authenticated/w/$wsId/p/$projectId/qa/$stageSlug'
+import { Route as AuthenticatedWWsIdPProjectIdQaStageSlugRouteRouteImport } from './routes/_authenticated/w/$wsId/p/$projectId/qa/$stageSlug/route'
+import { Route as AuthenticatedWWsIdPProjectIdQaStageSlugIndexRouteImport } from './routes/_authenticated/w/$wsId/p/$projectId/qa/$stageSlug/index'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -86,11 +87,17 @@ const AuthenticatedWWsIdPProjectIdTaxonomyRoute =
     path: '/taxonomy',
     getParentRoute: () => AuthenticatedWWsIdPProjectIdRouteRoute,
   } as any)
-const AuthenticatedWWsIdPProjectIdQaStageSlugRoute =
-  AuthenticatedWWsIdPProjectIdQaStageSlugRouteImport.update({
+const AuthenticatedWWsIdPProjectIdQaStageSlugRouteRoute =
+  AuthenticatedWWsIdPProjectIdQaStageSlugRouteRouteImport.update({
     id: '/qa/$stageSlug',
     path: '/qa/$stageSlug',
     getParentRoute: () => AuthenticatedWWsIdPProjectIdRouteRoute,
+  } as any)
+const AuthenticatedWWsIdPProjectIdQaStageSlugIndexRoute =
+  AuthenticatedWWsIdPProjectIdQaStageSlugIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AuthenticatedWWsIdPProjectIdQaStageSlugRouteRoute,
   } as any)
 
 export interface FileRoutesByFullPath {
@@ -105,7 +112,8 @@ export interface FileRoutesByFullPath {
   '/w/$wsId/p/$projectId': typeof AuthenticatedWWsIdPProjectIdRouteRouteWithChildren
   '/w/$wsId/p/$projectId/taxonomy': typeof AuthenticatedWWsIdPProjectIdTaxonomyRoute
   '/w/$wsId/p/$projectId/': typeof AuthenticatedWWsIdPProjectIdIndexRoute
-  '/w/$wsId/p/$projectId/qa/$stageSlug': typeof AuthenticatedWWsIdPProjectIdQaStageSlugRoute
+  '/w/$wsId/p/$projectId/qa/$stageSlug': typeof AuthenticatedWWsIdPProjectIdQaStageSlugRouteRouteWithChildren
+  '/w/$wsId/p/$projectId/qa/$stageSlug/': typeof AuthenticatedWWsIdPProjectIdQaStageSlugIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -117,7 +125,7 @@ export interface FileRoutesByTo {
   '/w/$wsId': typeof AuthenticatedWWsIdIndexRoute
   '/w/$wsId/p/$projectId/taxonomy': typeof AuthenticatedWWsIdPProjectIdTaxonomyRoute
   '/w/$wsId/p/$projectId': typeof AuthenticatedWWsIdPProjectIdIndexRoute
-  '/w/$wsId/p/$projectId/qa/$stageSlug': typeof AuthenticatedWWsIdPProjectIdQaStageSlugRoute
+  '/w/$wsId/p/$projectId/qa/$stageSlug': typeof AuthenticatedWWsIdPProjectIdQaStageSlugIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -133,7 +141,8 @@ export interface FileRoutesById {
   '/_authenticated/w/$wsId/p/$projectId': typeof AuthenticatedWWsIdPProjectIdRouteRouteWithChildren
   '/_authenticated/w/$wsId/p/$projectId/taxonomy': typeof AuthenticatedWWsIdPProjectIdTaxonomyRoute
   '/_authenticated/w/$wsId/p/$projectId/': typeof AuthenticatedWWsIdPProjectIdIndexRoute
-  '/_authenticated/w/$wsId/p/$projectId/qa/$stageSlug': typeof AuthenticatedWWsIdPProjectIdQaStageSlugRoute
+  '/_authenticated/w/$wsId/p/$projectId/qa/$stageSlug': typeof AuthenticatedWWsIdPProjectIdQaStageSlugRouteRouteWithChildren
+  '/_authenticated/w/$wsId/p/$projectId/qa/$stageSlug/': typeof AuthenticatedWWsIdPProjectIdQaStageSlugIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -150,6 +159,7 @@ export interface FileRouteTypes {
     | '/w/$wsId/p/$projectId/taxonomy'
     | '/w/$wsId/p/$projectId/'
     | '/w/$wsId/p/$projectId/qa/$stageSlug'
+    | '/w/$wsId/p/$projectId/qa/$stageSlug/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -177,6 +187,7 @@ export interface FileRouteTypes {
     | '/_authenticated/w/$wsId/p/$projectId/taxonomy'
     | '/_authenticated/w/$wsId/p/$projectId/'
     | '/_authenticated/w/$wsId/p/$projectId/qa/$stageSlug'
+    | '/_authenticated/w/$wsId/p/$projectId/qa/$stageSlug/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -276,16 +287,38 @@ declare module '@tanstack/react-router' {
       id: '/_authenticated/w/$wsId/p/$projectId/qa/$stageSlug'
       path: '/qa/$stageSlug'
       fullPath: '/w/$wsId/p/$projectId/qa/$stageSlug'
-      preLoaderRoute: typeof AuthenticatedWWsIdPProjectIdQaStageSlugRouteImport
+      preLoaderRoute: typeof AuthenticatedWWsIdPProjectIdQaStageSlugRouteRouteImport
       parentRoute: typeof AuthenticatedWWsIdPProjectIdRouteRoute
+    }
+    '/_authenticated/w/$wsId/p/$projectId/qa/$stageSlug/': {
+      id: '/_authenticated/w/$wsId/p/$projectId/qa/$stageSlug/'
+      path: '/'
+      fullPath: '/w/$wsId/p/$projectId/qa/$stageSlug/'
+      preLoaderRoute: typeof AuthenticatedWWsIdPProjectIdQaStageSlugIndexRouteImport
+      parentRoute: typeof AuthenticatedWWsIdPProjectIdQaStageSlugRouteRoute
     }
   }
 }
 
+interface AuthenticatedWWsIdPProjectIdQaStageSlugRouteRouteChildren {
+  AuthenticatedWWsIdPProjectIdQaStageSlugIndexRoute: typeof AuthenticatedWWsIdPProjectIdQaStageSlugIndexRoute
+}
+
+const AuthenticatedWWsIdPProjectIdQaStageSlugRouteRouteChildren: AuthenticatedWWsIdPProjectIdQaStageSlugRouteRouteChildren =
+  {
+    AuthenticatedWWsIdPProjectIdQaStageSlugIndexRoute:
+      AuthenticatedWWsIdPProjectIdQaStageSlugIndexRoute,
+  }
+
+const AuthenticatedWWsIdPProjectIdQaStageSlugRouteRouteWithChildren =
+  AuthenticatedWWsIdPProjectIdQaStageSlugRouteRoute._addFileChildren(
+    AuthenticatedWWsIdPProjectIdQaStageSlugRouteRouteChildren,
+  )
+
 interface AuthenticatedWWsIdPProjectIdRouteRouteChildren {
   AuthenticatedWWsIdPProjectIdTaxonomyRoute: typeof AuthenticatedWWsIdPProjectIdTaxonomyRoute
   AuthenticatedWWsIdPProjectIdIndexRoute: typeof AuthenticatedWWsIdPProjectIdIndexRoute
-  AuthenticatedWWsIdPProjectIdQaStageSlugRoute: typeof AuthenticatedWWsIdPProjectIdQaStageSlugRoute
+  AuthenticatedWWsIdPProjectIdQaStageSlugRouteRoute: typeof AuthenticatedWWsIdPProjectIdQaStageSlugRouteRouteWithChildren
 }
 
 const AuthenticatedWWsIdPProjectIdRouteRouteChildren: AuthenticatedWWsIdPProjectIdRouteRouteChildren =
@@ -294,8 +327,8 @@ const AuthenticatedWWsIdPProjectIdRouteRouteChildren: AuthenticatedWWsIdPProject
       AuthenticatedWWsIdPProjectIdTaxonomyRoute,
     AuthenticatedWWsIdPProjectIdIndexRoute:
       AuthenticatedWWsIdPProjectIdIndexRoute,
-    AuthenticatedWWsIdPProjectIdQaStageSlugRoute:
-      AuthenticatedWWsIdPProjectIdQaStageSlugRoute,
+    AuthenticatedWWsIdPProjectIdQaStageSlugRouteRoute:
+      AuthenticatedWWsIdPProjectIdQaStageSlugRouteRouteWithChildren,
   }
 
 const AuthenticatedWWsIdPProjectIdRouteRouteWithChildren =
