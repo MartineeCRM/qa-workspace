@@ -217,6 +217,13 @@ function StagePage() {
         toast.error("유저 구분 컬럼을 찾을 수 없어요 — USER_ID 같은 컬럼이 있어야 해요");
         return;
       }
+      const invalidTimeRowIndex = parsed.rows.findIndex(
+        (row) => Number.isNaN(new Date(row[timeColumn]).getTime()),
+      );
+      if (invalidTimeRowIndex !== -1) {
+        toast.error(`${invalidTimeRowIndex + 1}번째 행의 시간 값을 읽을 수 없어요`);
+        return;
+      }
       const { data: upload, error: uploadError } = await db
         .from("qa_uploads")
         .insert({
@@ -352,8 +359,12 @@ function StagePage() {
           ),
       };
     });
-    const { error: runEventsError } = await db.from("qa_run_events").insert(runEventRows);
-    if (runEventsError) throw runEventsError;
+    const RUN_EVENTS_BATCH_SIZE = 500;
+    for (let i = 0; i < runEventRows.length; i += RUN_EVENTS_BATCH_SIZE) {
+      const batch = runEventRows.slice(i, i + RUN_EVENTS_BATCH_SIZE);
+      const { error: runEventsError } = await db.from("qa_run_events").insert(batch);
+      if (runEventsError) throw runEventsError;
+    }
 
     qc.invalidateQueries({ queryKey: ["item-status", projectId] });
     qc.invalidateQueries({ queryKey: ["uploads", stage.id] });
