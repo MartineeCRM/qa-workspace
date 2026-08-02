@@ -9,14 +9,21 @@ export type QaBreadcrumbItem = {
 
 export function QaBreadcrumb({ items }: { items: QaBreadcrumbItem[] }) {
   return (
-    <nav className="flex flex-wrap items-center gap-[7px] text-[12.5px]">
+    <nav aria-label="경로" className="flex flex-wrap items-center gap-[7px] text-[12.5px]">
       {items.map((item, index) => {
         const isLast = index === items.length - 1;
         return (
           <Fragment key={`${item.label}-${index}`}>
-            {index > 0 ? <span className="text-[#cbd4de]">/</span> : null}
+            {index > 0 ? (
+              <span aria-hidden className="text-[#cbd4de]">
+                /
+              </span>
+            ) : null}
             {isLast || !item.to ? (
-              <span className={isLast ? "font-semibold text-[#1c2431]" : "text-[#8b97a8]"}>
+              <span
+                aria-current={isLast ? "page" : undefined}
+                className={isLast ? "font-semibold text-[#1c2431]" : "text-[#8b97a8]"}
+              >
                 {item.label}
               </span>
             ) : (
