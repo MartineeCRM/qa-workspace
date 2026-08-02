@@ -1,7 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { Check } from "lucide-react";
 import { deriveSessionStep } from "@/lib/qa-workflow";
-import { useQaChecklistItems, useQaRunEvents, type QaSession } from "@/lib/qa-rounds-queries";
+import {
+  useQaChecklistItems,
+  useQaRounds,
+  useQaRunEvents,
+  type QaSession,
+} from "@/lib/qa-rounds-queries";
+import { QaBreadcrumb } from "@/components/app/qa-breadcrumb";
 import { QaSessionChecklistPanel } from "@/components/app/qa-session-checklist-panel";
 import { QaSessionCollectionPanel } from "@/components/app/qa-session-collection-panel";
 import { QaSessionAnalysisPanel } from "@/components/app/qa-session-analysis-panel";
@@ -15,14 +21,22 @@ const STEPS = [
 ] as const;
 
 export function QaSessionView({
+  wsId,
   projectId,
+  stageSlug,
+  roundId,
   environmentId,
   session,
 }: {
+  wsId: string;
   projectId: string;
+  stageSlug: string;
+  roundId: string;
   environmentId: string;
   session: QaSession;
 }) {
+  const { data: rounds = [] } = useQaRounds(environmentId);
+  const round = rounds.find((r) => r.id === roundId);
   const { data: checklistItems = [] } = useQaChecklistItems(session.id);
   const { data: runEvents = [] } = useQaRunEvents(session.id);
   const hasResults = checklistItems.some((i) => i.qa_checklist_item_results.length > 0);
@@ -58,6 +72,21 @@ export function QaSessionView({
 
   return (
     <div className="space-y-4">
+      <QaBreadcrumb
+        items={[
+          {
+            label: "개발 QA",
+            to: "/w/$wsId/p/$projectId/qa/$stageSlug",
+            params: { wsId, projectId, stageSlug },
+          },
+          {
+            label: round?.name?.trim() ? round.name : `${round?.round_number ?? ""}차`,
+            to: "/w/$wsId/p/$projectId/qa/$stageSlug/$roundId",
+            params: { wsId, projectId, stageSlug, roundId },
+          },
+          { label: session.name },
+        ]}
+      />
       <div>
         <h2 className="text-[21px] font-bold">{session.name}</h2>
         <p className="mt-1 text-[12.5px] text-[#8b97a8]">

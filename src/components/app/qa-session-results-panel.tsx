@@ -108,11 +108,8 @@ export function QaSessionResultsPanel({
           <Link
             key={item.id}
             from="/w/$wsId/p/$projectId/qa/$stageSlug/$roundId/$sessionId"
-            // $itemId route doesn't exist until Task 12 — cast the same way
-            // TabLink/SideLink do for routes outside their own known union
-            // (src/routes/_authenticated/w/$wsId/route.tsx, .../p/$projectId/route.tsx).
-            to={"/w/$wsId/p/$projectId/qa/$stageSlug/$roundId/$sessionId/$itemId" as never}
-            params={((prev: object) => ({ ...prev, itemId: item.id })) as never}
+            to="/w/$wsId/p/$projectId/qa/$stageSlug/$roundId/$sessionId/$itemId"
+            params={(prev) => ({ ...prev, itemId: item.id })}
             className="grid grid-cols-[minmax(0,1fr)_150px_96px_120px_20px] items-center gap-3 border-b border-[#f1f4f8] px-[18px] py-3 hover:bg-[#f7f9fc]"
           >
             <span className="mono-token truncate text-[13px]">

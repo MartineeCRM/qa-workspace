@@ -10,7 +10,7 @@ export const Route = createFileRoute(
 });
 
 function SessionIndexPage() {
-  const { projectId, stageSlug, roundId, sessionId } = useParams({
+  const { wsId, projectId, stageSlug, roundId, sessionId } = useParams({
     from: "/_authenticated/w/$wsId/p/$projectId/qa/$stageSlug/$roundId/$sessionId/",
   });
   const { data: stages = [] } = useEnvironments(projectId);
@@ -19,5 +19,14 @@ function SessionIndexPage() {
   const session = sessions.find((s) => s.id === sessionId);
   if (!stage || !session) return null;
 
-  return <QaSessionView projectId={projectId} environmentId={stage.id} session={session} />;
+  return (
+    <QaSessionView
+      wsId={wsId}
+      projectId={projectId}
+      stageSlug={stageSlug}
+      roundId={roundId}
+      environmentId={stage.id}
+      session={session}
+    />
+  );
 }

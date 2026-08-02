@@ -9,12 +9,20 @@ export const Route = createFileRoute(
 });
 
 function RoundIndexPage() {
-  const { projectId, stageSlug, roundId } = useParams({
+  const { wsId, projectId, stageSlug, roundId } = useParams({
     from: "/_authenticated/w/$wsId/p/$projectId/qa/$stageSlug/$roundId/",
   });
   const { data: stages = [] } = useEnvironments(projectId);
   const stage = stages.find((s) => s.slug === stageSlug);
   if (!stage) return null;
 
-  return <QaRoundView projectId={projectId} environmentId={stage.id} roundId={roundId} />;
+  return (
+    <QaRoundView
+      wsId={wsId}
+      projectId={projectId}
+      stageSlug={stageSlug}
+      environmentId={stage.id}
+      roundId={roundId}
+    />
+  );
 }

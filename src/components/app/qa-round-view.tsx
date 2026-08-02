@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/app/layout-parts";
+import { QaBreadcrumb } from "@/components/app/qa-breadcrumb";
 import { useAuth } from "@/lib/auth";
 import {
   useCreateQaRound,
@@ -56,11 +57,15 @@ function RoundMetricCard({
 }
 
 export function QaRoundView({
+  wsId,
   projectId,
+  stageSlug,
   environmentId,
   roundId,
 }: {
+  wsId: string;
   projectId: string;
+  stageSlug: string;
   environmentId: string;
   roundId: string;
 }) {
@@ -77,6 +82,16 @@ export function QaRoundView({
 
   return (
     <div className="space-y-4">
+      <QaBreadcrumb
+        items={[
+          {
+            label: "개발 QA",
+            to: "/w/$wsId/p/$projectId/qa/$stageSlug",
+            params: { wsId, projectId, stageSlug },
+          },
+          { label: round.name?.trim() ? round.name : `${round.round_number}차` },
+        ]}
+      />
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h2 className="text-[21px] font-bold tracking-[-0.4px]">

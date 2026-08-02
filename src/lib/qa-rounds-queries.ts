@@ -53,6 +53,7 @@ export type QaChecklistItemResult = {
   overridden_by: string | null;
   overridden_at: string | null;
   override_reason: string | null;
+  updated_at: string;
 };
 
 export function useQaRounds(environmentId: string) {
@@ -753,6 +754,43 @@ export function useRoundDispositionSummary(roundId: string) {
           unresolvedErrors += 1;
       }
       return { passed, unresolvedErrors, carriedOver };
+    },
+  });
+}
+
+export type RoundHistoryEntry = {
+  roundNumber: number;
+  reasoning: string | null;
+  finalStatus: "passed" | "failed" | "not_collected";
+};
+
+export function useChecklistItemRoundHistory(itemId: string) {
+  return useQuery({
+    queryKey: ["qa-item-round-history", itemId],
+    enabled: Boolean(itemId),
+    queryFn: async () => {
+      const history: RoundHistoryEntry[] = [];
+      let currentId: string | null = itemId;
+      while (currentId) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data: item, error }: { data: any; error: unknown } = await db
+          .from("qa_round_checklist_items")
+          .select(
+            "carried_from_item_id, qa_sessions(qa_rounds(round_number)), qa_checklist_item_results(ai_reasoning, final_status)",
+          )
+          .eq("id", currentId)
+          .maybeSingle();
+        if (error) throw error;
+        if (!item) break;
+        const result = item.qa_checklist_item_results?.[0];
+        history.push({
+          roundNumber: item.qa_sessions?.qa_rounds?.round_number ?? 0,
+          reasoning: result?.ai_reasoning ?? null,
+          finalStatus: result?.final_status ?? "not_collected",
+        });
+        currentId = item.carried_from_item_id;
+      }
+      return history;
     },
   });
 }
