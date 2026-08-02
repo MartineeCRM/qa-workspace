@@ -127,6 +127,7 @@ async function judgeQualitative(
   targetType: "event" | "custom_attribute",
   ctx: {
     events: TaxonomyEvent[];
+    eventProperties: TaxonomyEventProperty[];
     customAttributes: TaxonomyCustomAttribute[];
     rules: ValidationRule[];
     runEvents: RunEvent[];
@@ -151,17 +152,29 @@ async function judgeQualitative(
     };
   }
 
-  const targets = rule.validation_rule_targets.map((t) => {
-    const label =
-      t.target_type === "event"
-        ? (ctx.events.find((e) => e.id === t.target_id)?.technical_name ?? t.target_id)
-        : (ctx.customAttributes.find((a) => a.id === t.target_id)?.technical_name ?? t.target_id);
-    return {
-      kind: t.target_type as "event" | "custom_attribute",
-      id: t.target_id,
-      technicalName: label,
-    };
-  });
+  const targets = rule.validation_rule_targets
+    .map((t) => {
+      if (t.target_type === "event") {
+        const label = ctx.events.find((e) => e.id === t.target_id)?.technical_name ?? t.target_id;
+        return { kind: "event" as const, id: t.target_id, technicalName: label };
+      }
+      if (t.target_type === "custom_attribute") {
+        const label =
+          ctx.customAttributes.find((a) => a.id === t.target_id)?.technical_name ?? t.target_id;
+        return { kind: "custom_attribute" as const, id: t.target_id, technicalName: label };
+      }
+      // property: no separate evidence source — resolve to the parent event,
+      // since the property's value already lives inside that event's raw_properties in qa_run_events
+      const property = ctx.eventProperties.find((p) => p.id === t.target_id);
+      if (!property) return null;
+      const parentEvent = ctx.events.find((e) => e.id === property.event_id);
+      return {
+        kind: "event" as const,
+        id: property.event_id,
+        technicalName: `${parentEvent?.technical_name ?? property.event_id}.${property.technical_name}`,
+      };
+    })
+    .filter((t): t is NonNullable<typeof t> => t !== null);
 
   const bundle = collectRuleEvidence(
     { description: rule.description, targets },
