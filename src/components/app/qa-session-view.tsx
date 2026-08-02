@@ -1,12 +1,23 @@
 import { useEffect, useRef, useState } from "react";
 import { Check } from "lucide-react";
+import { toast } from "sonner";
 import { deriveSessionStep } from "@/lib/qa-workflow";
+import { errorMessage } from "@/lib/domain";
 import {
+  useAnalyzeChecklist,
+  useQaAttributeSnapshots,
   useQaChecklistItems,
   useQaRounds,
   useQaRunEvents,
   type QaSession,
 } from "@/lib/qa-rounds-queries";
+import {
+  useRules,
+  useTaxonomyCustomAttributes,
+  useTaxonomyEventProperties,
+  useTaxonomyEvents,
+} from "@/lib/queries";
+import { Button } from "@/components/ui/button";
 import { QaBreadcrumb } from "@/components/app/qa-breadcrumb";
 import { QaSessionChecklistPanel } from "@/components/app/qa-session-checklist-panel";
 import { QaSessionCollectionPanel } from "@/components/app/qa-session-collection-panel";
@@ -39,6 +50,12 @@ export function QaSessionView({
   const round = rounds.find((r) => r.id === roundId);
   const { data: checklistItems = [] } = useQaChecklistItems(session.id);
   const { data: runEvents = [] } = useQaRunEvents(session.id);
+  const { data: snapshots = [] } = useQaAttributeSnapshots(session.id);
+  const { data: events = [] } = useTaxonomyEvents(projectId);
+  const { data: eventProperties = [] } = useTaxonomyEventProperties(projectId);
+  const { data: customAttributes = [] } = useTaxonomyCustomAttributes(projectId);
+  const { data: rules = [] } = useRules(projectId);
+  const analyze = useAnalyzeChecklist(session.id);
   const hasResults = checklistItems.some((i) => i.qa_checklist_item_results.length > 0);
   const currentStep = deriveSessionStep({
     checklistItemCount: checklistItems.length,
@@ -70,6 +87,23 @@ export function QaSessionView({
   // doesn't catch.
   const effectiveStep = Math.min(viewingStep, currentStep) as 1 | 2 | 3 | 4;
 
+  async function runAnalysis() {
+    try {
+      await analyze.mutateAsync({
+        checklistItems,
+        events,
+        eventProperties,
+        customAttributes,
+        rules,
+        runEvents,
+        snapshots,
+      });
+      toast.success("판정을 완료했어요");
+    } catch (error) {
+      toast.error(errorMessage(error, "판정에 실패했어요. 다시 시도해주세요."));
+    }
+  }
+
   return (
     <div className="space-y-4">
       <QaBreadcrumb
@@ -87,11 +121,18 @@ export function QaSessionView({
           { label: session.name },
         ]}
       />
-      <div>
-        <h2 className="text-[21px] font-bold">{session.name}</h2>
-        <p className="mt-1 text-[12.5px] text-[#8b97a8]">
-          체크리스트 {checklistItems.length} · 이벤트 {runEvents.length}행
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-[21px] font-bold">{session.name}</h2>
+          <p className="mt-1 text-[12.5px] text-[#8b97a8]">
+            체크리스트 {checklistItems.length} · 이벤트 {runEvents.length}행
+          </p>
+        </div>
+        {currentStep === 3 ? (
+          <Button onClick={runAnalysis} disabled={analyze.isPending}>
+            분석 돌리기
+          </Button>
+        ) : null}
       </div>
 
       <div className="my-[18px] grid grid-cols-[repeat(auto-fit,minmax(170px,1fr))] gap-2">
