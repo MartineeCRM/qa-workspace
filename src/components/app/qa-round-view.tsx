@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { EmptyState } from "@/components/app/layout-parts";
 import { useAuth } from "@/lib/auth";
 import {
@@ -9,7 +8,6 @@ import {
   useCreateQaSession,
   useQaRounds,
   useQaSessions,
-  type QaRound,
 } from "@/lib/qa-rounds-queries";
 
 function SessionProgressBar({ step }: { step: number }) {
@@ -67,10 +65,12 @@ export function QaRoundView({
 }) {
   const { user } = useAuth();
   const { data: rounds = [] } = useQaRounds(environmentId);
-  const round = rounds.find((r) => r.id === roundId) as QaRound;
+  const round = rounds.find((r) => r.id === roundId);
   const { data: sessions = [] } = useQaSessions(roundId);
   const createRound = useCreateQaRound(projectId, environmentId);
   const latestRound = rounds[rounds.length - 1];
+
+  if (!round) return null;
 
   return (
     <div className="space-y-4">
@@ -130,8 +130,12 @@ export function QaRoundView({
           <Link
             key={s.id}
             from="/w/$wsId/p/$projectId/qa/$stageSlug/$roundId"
-            to="/w/$wsId/p/$projectId/qa/$stageSlug/$roundId/$sessionId"
-            params={(prev) => ({ ...prev, sessionId: s.id })}
+            // $sessionId route doesn't exist until Task 7, so its literal path/params
+            // shape isn't in the router's type registry yet — cast the same way
+            // TabLink/SideLink do for routes outside their own known union
+            // (src/routes/_authenticated/w/$wsId/route.tsx, .../p/$projectId/route.tsx).
+            to={"/w/$wsId/p/$projectId/qa/$stageSlug/$roundId/$sessionId" as never}
+            params={((prev: object) => ({ ...prev, sessionId: s.id })) as never}
             className="rounded-[14px] border border-[#e3e8ef] bg-white p-4 hover:border-[#2b6a9c] hover:shadow-[0_2px_10px_rgba(28,36,49,0.06)]"
           >
             <div className="flex items-center justify-between">
