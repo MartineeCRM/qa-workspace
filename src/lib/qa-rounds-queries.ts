@@ -623,6 +623,71 @@ export function useQaDiscussion(resultId: string) {
   });
 }
 
+export function usePendingCarryOverItems(sessionId: string, previousRoundId: string | null) {
+  return useQuery({
+    queryKey: ["qa-pending-carryover", sessionId, previousRoundId],
+    enabled: Boolean(sessionId && previousRoundId),
+    queryFn: async () => {
+      const { data: prevSessions, error: prevSessionsError } = await db
+        .from("qa_sessions")
+        .select("id")
+        .eq("qa_round_id", previousRoundId);
+      if (prevSessionsError) throw prevSessionsError;
+      const prevSessionIds = (prevSessions ?? []).map((s: { id: string }) => s.id);
+      if (prevSessionIds.length === 0) return [];
+
+      const { data: carried, error: carriedError } = await db
+        .from("qa_round_checklist_items")
+        .select("id, target_type, target_id")
+        .in("qa_session_id", prevSessionIds)
+        .eq("disposition", "carried_over");
+      if (carriedError) throw carriedError;
+
+      const { data: alreadyLinked, error: linkedError } = await db
+        .from("qa_round_checklist_items")
+        .select("carried_from_item_id")
+        .eq("qa_session_id", sessionId)
+        .not("carried_from_item_id", "is", null);
+      if (linkedError) throw linkedError;
+      const linkedIds = new Set(
+        (alreadyLinked ?? []).map((r: { carried_from_item_id: string }) => r.carried_from_item_id),
+      );
+
+      return (carried ?? []).filter((c: { id: string }) => !linkedIds.has(c.id)) as Array<{
+        id: string;
+        target_type: "event" | "custom_attribute";
+        target_id: string;
+      }>;
+    },
+  });
+}
+
+export function useAdoptCarryOverItems(sessionId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (
+      items: Array<{ id: string; target_type: "event" | "custom_attribute"; target_id: string }>,
+    ) => {
+      if (items.length === 0) return;
+      const rows = items.map((item) => ({
+        qa_session_id: sessionId,
+        target_type: item.target_type,
+        target_id: item.target_id,
+        carried_from_item_id: item.id,
+      }));
+      const { error } = await db.from("qa_round_checklist_items").upsert(rows, {
+        onConflict: "qa_session_id,target_type,target_id",
+        ignoreDuplicates: true,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["qa-checklist-items", sessionId] });
+      qc.invalidateQueries({ queryKey: ["qa-pending-carryover", sessionId] });
+    },
+  });
+}
+
 export function useAddDiscussionComment(resultId: string) {
   const qc = useQueryClient();
   return useMutation({
