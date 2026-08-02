@@ -391,7 +391,9 @@ export function useAnalyzeChecklist(sessionId: string) {
       // result row, if any) so we can skip re-judging items a QA lead already overrode —
       // re-running analysis must not strand stale overridden_by/overridden_at/override_reason
       // metadata under a freshly-computed final_status.
-      checklistItems: Array<QaChecklistItem & { qa_checklist_item_results?: QaChecklistItemResult[] }>;
+      checklistItems: Array<
+        QaChecklistItem & { qa_checklist_item_results?: QaChecklistItemResult[] }
+      >;
       events: TaxonomyEvent[];
       eventProperties: TaxonomyEventProperty[];
       customAttributes: TaxonomyCustomAttribute[];
@@ -475,7 +477,12 @@ export function useCarryOverItems(environmentId: string) {
       userId,
       assigneeId,
     }: {
-      items: Array<{ id: string; qa_session_id: string; target_type: "event" | "custom_attribute"; target_id: string }>;
+      items: Array<{
+        id: string;
+        qa_session_id: string;
+        target_type: "event" | "custom_attribute";
+        target_id: string;
+      }>;
       userId: string;
       assigneeId: string | null;
     }) => {
@@ -521,24 +528,23 @@ export function useCarryOverItems(environmentId: string) {
         nextRoundId = createdRound.id;
       }
 
-      const { data: existingNextSession, error: nextSessionError } = await db
+      // qa_sessions_round_name_uq (qa_round_id, name) makes this atomic: concurrent
+      // carry-overs racing to create the "이월 항목" session for the same round will
+      // converge on a single row instead of splitting items across duplicates. Note this
+      // intentionally omits ignoreDuplicates — with DO NOTHING, Postgres's RETURNING
+      // clause omits rows skipped due to conflict, so .select().single() would fail
+      // whenever the session already existed. The default merge (DO UPDATE) always
+      // returns the row via RETURNING, whether freshly inserted or pre-existing.
+      const { data: nextSession, error: nextSessionError } = await db
         .from("qa_sessions")
-        .select("id")
-        .eq("qa_round_id", nextRoundId)
-        .eq("name", "이월 항목")
-        .maybeSingle();
+        .upsert(
+          { qa_round_id: nextRoundId, name: "이월 항목", started_by: userId },
+          { onConflict: "qa_round_id,name" },
+        )
+        .select()
+        .single();
       if (nextSessionError) throw nextSessionError;
-
-      let nextSessionId: string = existingNextSession?.id;
-      if (!nextSessionId) {
-        const { data: createdSession, error: createSessionError } = await db
-          .from("qa_sessions")
-          .insert({ qa_round_id: nextRoundId, name: "이월 항목", started_by: userId })
-          .select()
-          .single();
-        if (createSessionError) throw createSessionError;
-        nextSessionId = createdSession.id;
-      }
+      const nextSessionId: string = nextSession.id;
 
       const rows = items.map((item) => ({
         qa_session_id: nextSessionId,
@@ -547,9 +553,10 @@ export function useCarryOverItems(environmentId: string) {
         carried_from_item_id: item.id,
         assigned_to: assigneeId,
       }));
-      const { error: insertError } = await db
-        .from("qa_round_checklist_items")
-        .upsert(rows, { onConflict: "qa_session_id,target_type,target_id", ignoreDuplicates: true });
+      const { error: insertError } = await db.from("qa_round_checklist_items").upsert(rows, {
+        onConflict: "qa_session_id,target_type,target_id",
+        ignoreDuplicates: true,
+      });
       if (insertError) throw insertError;
 
       const { error: dispositionError } = await db
