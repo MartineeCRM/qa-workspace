@@ -302,7 +302,9 @@ function StagePage() {
         title={stage.name}
         description={
           stage.description ??
-          "이 환경은 현재 택소노미를 검증해요. 검증 상태만 저장하고, 자체 규칙은 갖지 않아요."
+          (activeSessionId
+            ? "이 환경은 현재 택소노미를 검증해요. 검증 상태만 저장하고, 자체 규칙은 갖지 않아요."
+            : "이 환경은 현재 택소노미를 검증해요. CSV를 올리려면 라운드 탭에서 세션을 먼저 골라주세요.")
         }
         actions={
           editable ? (
@@ -317,7 +319,11 @@ function StagePage() {
                   if (file) handleFile(file);
                 }}
               />
-              <Button size="sm" disabled={busy} onClick={() => fileRef.current?.click()}>
+              <Button
+                size="sm"
+                disabled={busy || !activeSessionId}
+                onClick={() => fileRef.current?.click()}
+              >
                 <Upload className="size-4" /> CSV 올리고 분석하기
               </Button>
             </>
