@@ -530,20 +530,29 @@ export function useCarryOverItems(environmentId: string) {
 
       // qa_sessions_round_name_uq (qa_round_id, name) makes this atomic: concurrent
       // carry-overs racing to create the "이월 항목" session for the same round will
-      // converge on a single row instead of splitting items across duplicates. Note this
-      // intentionally omits ignoreDuplicates — with DO NOTHING, Postgres's RETURNING
-      // clause omits rows skipped due to conflict, so .select().single() would fail
-      // whenever the session already existed. The default merge (DO UPDATE) always
-      // returns the row via RETURNING, whether freshly inserted or pre-existing.
-      const { data: nextSession, error: nextSessionError } = await db
+      // converge on a single row instead of splitting items across duplicates.
+      // ignoreDuplicates (DO NOTHING) is required here instead of the default merge
+      // (DO UPDATE): without it, every re-run against an already-existing session would
+      // silently overwrite started_by to whoever's carry-over ran most recently,
+      // clobbering the original creator's id. DO NOTHING means Postgres's RETURNING
+      // clause omits the row when it already existed, so we can't chain .select() on
+      // the upsert itself — instead we fetch the id with a separate plain select
+      // afterward, which the unique constraint guarantees will find the row either way.
+      const { error: nextSessionError } = await db
         .from("qa_sessions")
         .upsert(
           { qa_round_id: nextRoundId, name: "이월 항목", started_by: userId },
-          { onConflict: "qa_round_id,name" },
-        )
-        .select()
-        .single();
+          { onConflict: "qa_round_id,name", ignoreDuplicates: true },
+        );
       if (nextSessionError) throw nextSessionError;
+
+      const { data: nextSession, error: nextSessionFetchError } = await db
+        .from("qa_sessions")
+        .select("id")
+        .eq("qa_round_id", nextRoundId)
+        .eq("name", "이월 항목")
+        .single();
+      if (nextSessionFetchError) throw nextSessionFetchError;
       const nextSessionId: string = nextSession.id;
 
       const rows = items.map((item) => ({
