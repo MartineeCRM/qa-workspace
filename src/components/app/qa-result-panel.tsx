@@ -5,8 +5,9 @@ import { Check, Clipboard, Upload } from "lucide-react";
 import { EmptyState, Panel } from "@/components/app/layout-parts";
 import { Pill } from "@/components/app/badges";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { errorMessage } from "@/lib/domain";
-import { parseRunEventsCsv } from "@/lib/run-events-csv";
+import { parseRunEventsCsv, type ParsedRunEventRow } from "@/lib/run-events-csv";
 import {
   useAnalyzeChecklist,
   useQaAttributeSnapshots,
@@ -31,6 +32,11 @@ const LAYER_RANK: Record<string, number> = { none: 0, structural: 1, qualitative
 function layerOf(result: QaChecklistItemResult | undefined): "none" | "structural" | "qualitative" {
   if (!result || result.final_status !== "failed" || !result.failed_layer) return "none";
   return result.failed_layer === "structural" ? "structural" : "qualitative";
+}
+
+function judgeBadgeLabel(result: QaChecklistItemResult | undefined): string {
+  if (!result) return "미판정";
+  return result.judged_by === "ai" ? "AI" : "RULE";
 }
 
 function itemLabel(
@@ -76,14 +82,24 @@ export function ResultPanel({
 
   async function handleFile(file: File) {
     setBusy(true);
+
+    let rows: Array<ParsedRunEventRow & { event_id: string | null }>;
     try {
       const text = await file.text();
       const parsedRows = parseRunEventsCsv(text);
-      const rows = parsedRows.map((r) => ({
+      rows = parsedRows.map((r) => ({
         ...r,
         event_id: eventByName.get(r.raw_event_name)?.id ?? null,
       }));
       await uploadLog.mutateAsync(rows);
+    } catch (error) {
+      setBusy(false);
+      if (fileRef.current) fileRef.current.value = "";
+      toast.error(errorMessage(error, "로그 파싱 또는 업로드에 실패했어요"));
+      return;
+    }
+
+    try {
       await analyze.mutateAsync({
         checklistItems,
         events,
@@ -95,7 +111,7 @@ export function ResultPanel({
       });
       toast.success("로그를 업로드하고 판정을 완료했어요");
     } catch (error) {
-      toast.error(errorMessage(error, "로그 처리에 실패했어요"));
+      toast.error(errorMessage(error, "로그는 저장됐지만 판정에 실패했어요. 다시 시도해주세요."));
     } finally {
       setBusy(false);
       if (fileRef.current) fileRef.current.value = "";
@@ -128,9 +144,13 @@ export function ResultPanel({
     ]
       .filter(Boolean)
       .join("\n\n");
-    navigator.clipboard.writeText(bundle);
-    setCopiedId(item.id);
-    setTimeout(() => setCopiedId(null), 1400);
+    navigator.clipboard
+      .writeText(bundle)
+      .then(() => {
+        setCopiedId(item.id);
+        setTimeout(() => setCopiedId(null), 1400);
+      })
+      .catch(() => toast.error("복사에 실패했어요"));
   }
 
   return (
@@ -155,26 +175,26 @@ export function ResultPanel({
         </>
       }
     >
-      <div className="flex items-center gap-2 border-b px-4 py-2">
-        <button
-          type="button"
-          onClick={() => setTab("failed")}
-          className={`rounded-md px-3 py-1.5 text-sm font-medium ${
-            tab === "failed" ? "bg-destructive/10 text-destructive" : "text-muted-foreground"
-          }`}
-        >
-          불합격 항목 <span className="ml-1 text-xs">{failed.length}</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => setTab("passed")}
-          className={`rounded-md px-3 py-1.5 text-sm font-medium ${
-            tab === "passed" ? "bg-published/40 text-published-foreground" : "text-muted-foreground"
-          }`}
-        >
-          통과한 항목 <span className="ml-1 text-xs">{passed.length}</span>
-        </button>
-      </div>
+      <Tabs
+        value={tab}
+        onValueChange={(v) => setTab(v as "failed" | "passed")}
+        className="border-b px-4 py-2"
+      >
+        <TabsList>
+          <TabsTrigger
+            value="failed"
+            className="data-[state=active]:bg-destructive/10 data-[state=active]:text-destructive data-[state=active]:shadow-none"
+          >
+            불합격 항목 <span className="ml-1 text-xs">{failed.length}</span>
+          </TabsTrigger>
+          <TabsTrigger
+            value="passed"
+            className="data-[state=active]:bg-published/40 data-[state=active]:text-published-foreground data-[state=active]:shadow-none"
+          >
+            통과한 항목 <span className="ml-1 text-xs">{passed.length}</span>
+          </TabsTrigger>
+        </TabsList>
+      </Tabs>
 
       {checklistItems.length === 0 ? (
         <EmptyState title="체크리스트가 비어 있어요" description="먼저 위 체크리스트에 항목을 담아주세요." />
@@ -206,7 +226,7 @@ export function ResultPanel({
                     <span className="mono-token min-w-0 flex-1 truncate">
                       {itemLabel(item, events, customAttributes)}
                     </span>
-                    <Pill>{result?.judged_by === "ai" ? "AI" : "RULE"}</Pill>
+                    <Pill>{judgeBadgeLabel(result)}</Pill>
                   </button>
                 </li>
               );
@@ -220,7 +240,7 @@ export function ResultPanel({
                   {itemLabel(selected, events, customAttributes)}
                 </span>
                 <Pill>{selectedResult?.final_status ?? "not_collected"}</Pill>
-                <Pill>{selectedResult?.judged_by === "ai" ? "AI" : "RULE"}</Pill>
+                <Pill>{judgeBadgeLabel(selectedResult)}</Pill>
               </div>
               <p className="text-sm">{selectedResult?.ai_reasoning ?? "판단 이유가 없어요."}</p>
               <div className="relative overflow-hidden rounded-md bg-[#111113]">
