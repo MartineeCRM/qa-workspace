@@ -247,17 +247,39 @@ function StagePage() {
   ) {
     if (!stage) return;
     const eventColumn = parsed.headers.find((h) => EVENT_COLUMNS.includes(h.toLowerCase()));
+    const propertiesColumn = parsed.headers.find((h) =>
+      PROPERTIES_COLUMNS.includes(h.toLowerCase()),
+    );
     const seenEvents = new Set<string>();
     const seenAttributes = new Set<string>();
+
+    function safeJsonParse(raw: string): Record<string, unknown> | null {
+      try {
+        const value = JSON.parse(raw);
+        return value && typeof value === "object" ? (value as Record<string, unknown>) : null;
+      } catch {
+        return null;
+      }
+    }
 
     for (const row of parsed.rows) {
       const eventName = eventColumn ? row[eventColumn] : "";
       if (eventName) seenEvents.add(eventName);
-      for (const header of parsed.headers) {
-        if (header === eventColumn) continue;
-        if ((row[header] ?? "") === "") continue;
-        seenAttributes.add(`${eventName}::${header}`);
-        seenAttributes.add(`::${header}`);
+      if (propertiesColumn) {
+        const parsedProperties = safeJsonParse(row[propertiesColumn] ?? "");
+        if (parsedProperties) {
+          for (const key of Object.keys(parsedProperties)) {
+            seenAttributes.add(`${eventName}::${key}`);
+            seenAttributes.add(`::${key}`);
+          }
+        }
+      } else {
+        for (const header of parsed.headers) {
+          if (header === eventColumn) continue;
+          if ((row[header] ?? "") === "") continue;
+          seenAttributes.add(`${eventName}::${header}`);
+          seenAttributes.add(`::${header}`);
+        }
       }
     }
 
