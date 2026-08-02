@@ -784,7 +784,7 @@ export const Route = createFileRoute("/_authenticated/w/$wsId/p/$projectId/qa/$s
 
     if (rounds && rounds[0]) {
       throw redirect({
-        to: "/_authenticated/w/$wsId/p/$projectId/qa/$stageSlug/$roundId",
+        to: "/w/$wsId/p/$projectId/qa/$stageSlug/$roundId",
         params: { ...params, roundId: rounds[0].id },
       });
     }
@@ -972,8 +972,9 @@ export function QaRoundView({
         {rounds.map((r) => (
           <Link
             key={r.id}
-            to="/_authenticated/w/$wsId/p/$projectId/qa/$stageSlug/$roundId"
-            params={{ roundId: r.id }}
+            from="/w/$wsId/p/$projectId/qa/$stageSlug/$roundId"
+            to="/w/$wsId/p/$projectId/qa/$stageSlug/$roundId"
+            params={(prev) => ({ ...prev, roundId: r.id })}
             className={
               r.id === roundId
                 ? "rounded-lg border border-[#1c2431] bg-[#1c2431] px-[13px] py-1.5 text-[13px] font-semibold text-white"
@@ -1002,8 +1003,9 @@ export function QaRoundView({
         {sessions.map((s) => (
           <Link
             key={s.id}
-            to="/_authenticated/w/$wsId/p/$projectId/qa/$stageSlug/$roundId/$sessionId"
-            params={{ sessionId: s.id }}
+            from="/w/$wsId/p/$projectId/qa/$stageSlug/$roundId"
+            to="/w/$wsId/p/$projectId/qa/$stageSlug/$roundId/$sessionId"
+            params={(prev) => ({ ...prev, sessionId: s.id })}
             className="rounded-[14px] border border-[#e3e8ef] bg-white p-4 hover:border-[#2b6a9c] hover:shadow-[0_2px_10px_rgba(28,36,49,0.06)]"
           >
             <div className="flex items-center justify-between">
@@ -2122,8 +2124,9 @@ export function QaSessionResultsPanel({
         return (
           <Link
             key={item.id}
-            to="/_authenticated/w/$wsId/p/$projectId/qa/$stageSlug/$roundId/$sessionId/$itemId"
-            params={{ itemId: item.id }}
+            from="/w/$wsId/p/$projectId/qa/$stageSlug/$roundId/$sessionId"
+            to="/w/$wsId/p/$projectId/qa/$stageSlug/$roundId/$sessionId/$itemId"
+            params={(prev) => ({ ...prev, itemId: item.id })}
             className="grid grid-cols-[minmax(0,1fr)_150px_96px_120px_20px] items-center gap-3 border-b border-[#f1f4f8] px-[18px] py-3 hover:bg-[#f7f9fc]"
           >
             <span className="mono-token truncate text-[13px]">
@@ -2460,15 +2463,17 @@ export function QaItemView({
 
           <div className="flex gap-2">
             <Link
-              to="/_authenticated/w/$wsId/p/$projectId/qa/$stageSlug/$roundId/$sessionId/$itemId"
-              params={{ itemId: previousChecklistItemId(orderedIds, item.id) }}
+              from="/w/$wsId/p/$projectId/qa/$stageSlug/$roundId/$sessionId/$itemId"
+              to="/w/$wsId/p/$projectId/qa/$stageSlug/$roundId/$sessionId/$itemId"
+              params={(prev) => ({ ...prev, itemId: previousChecklistItemId(orderedIds, item.id) })}
               className="flex-1 rounded-md border px-3 py-2 text-center text-sm hover:border-[#2b6a9c]"
             >
               ← 이전 항목
             </Link>
             <Link
-              to="/_authenticated/w/$wsId/p/$projectId/qa/$stageSlug/$roundId/$sessionId/$itemId"
-              params={{ itemId: nextChecklistItemId(orderedIds, item.id) }}
+              from="/w/$wsId/p/$projectId/qa/$stageSlug/$roundId/$sessionId/$itemId"
+              to="/w/$wsId/p/$projectId/qa/$stageSlug/$roundId/$sessionId/$itemId"
+              params={(prev) => ({ ...prev, itemId: nextChecklistItemId(orderedIds, item.id) })}
               className="flex-1 rounded-md border px-3 py-2 text-center text-sm hover:border-[#2b6a9c]"
             >
               다음 항목 →
@@ -2518,17 +2523,17 @@ function ItemPage() {
         items={[
           {
             label: "개발 QA",
-            to: "/_authenticated/w/$wsId/p/$projectId/qa/$stageSlug",
+            to: "/w/$wsId/p/$projectId/qa/$stageSlug",
             params: {},
           },
           {
             label: "라운드",
-            to: "/_authenticated/w/$wsId/p/$projectId/qa/$stageSlug/$roundId",
+            to: "/w/$wsId/p/$projectId/qa/$stageSlug/$roundId",
             params: { roundId },
           },
           {
             label: session.name,
-            to: "/_authenticated/w/$wsId/p/$projectId/qa/$stageSlug/$roundId/$sessionId",
+            to: "/w/$wsId/p/$projectId/qa/$stageSlug/$roundId/$sessionId",
             params: { roundId, sessionId },
           },
           { label: itemId },
