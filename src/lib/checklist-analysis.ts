@@ -134,11 +134,17 @@ async function judgeQualitative(
     snapshots: AttributeSnapshot[];
   },
 ): Promise<ChecklistItemVerdict> {
-  const rule = ctx.rules.find(
-    (r) =>
-      r.is_enabled &&
-      r.validation_rule_targets.some((t) => t.target_type === targetType && t.target_id === targetId),
-  );
+  const rule = ctx.rules.find((r) => {
+    if (!r.is_enabled) return false;
+    return r.validation_rule_targets.some((t) => {
+      if (t.target_type === targetType && t.target_id === targetId) return true;
+      if (targetType === "event" && t.target_type === "property") {
+        const property = ctx.eventProperties.find((p) => p.id === t.target_id);
+        return property?.event_id === targetId;
+      }
+      return false;
+    });
+  });
 
   if (!rule) {
     return {
@@ -176,14 +182,29 @@ async function judgeQualitative(
     })
     .filter((t): t is NonNullable<typeof t> => t !== null);
 
+  const dedupedTargets = Array.from(new Map(targets.map((t) => [`${t.kind}:${t.id}`, t])).values());
+
   const bundle = collectRuleEvidence(
-    { description: rule.description, targets },
+    { description: rule.description, targets: dedupedTargets },
     { runEvents: ctx.runEvents, snapshots: ctx.snapshots },
   );
 
-  const result = await judgeChecklistItemWithAI({
-    data: { ruleDescription: bundle.ruleDescription, targets: bundle.targets },
-  });
+  let result: Awaited<ReturnType<typeof judgeChecklistItemWithAI>>;
+  try {
+    result = await judgeChecklistItemWithAI({
+      data: { ruleDescription: bundle.ruleDescription, targets: bundle.targets },
+    });
+  } catch (error) {
+    return {
+      checklist_item_id: checklistItemId,
+      ai_verdict: "not_collected",
+      ai_reasoning: error instanceof Error ? error.message : "AI 판정 호출에 실패했어요.",
+      ai_evidence: null,
+      failed_layer: null,
+      final_status: "not_collected",
+      judged_by: "ai",
+    };
+  }
 
   if (!result.ok) {
     return {

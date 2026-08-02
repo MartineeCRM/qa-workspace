@@ -385,7 +385,11 @@ export function useAnalyzeChecklist(sessionId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: {
-      checklistItems: QaChecklistItem[];
+      // Accepts the joined shape returned by useQaChecklistItems (item + its existing
+      // result row, if any) so we can skip re-judging items a QA lead already overrode —
+      // re-running analysis must not strand stale overridden_by/overridden_at/override_reason
+      // metadata under a freshly-computed final_status.
+      checklistItems: Array<QaChecklistItem & { qa_checklist_item_results?: QaChecklistItemResult[] }>;
       events: TaxonomyEvent[];
       eventProperties: TaxonomyEventProperty[];
       customAttributes: TaxonomyCustomAttribute[];
@@ -393,9 +397,12 @@ export function useAnalyzeChecklist(sessionId: string) {
       runEvents: RunEvent[];
       snapshots: AttributeSnapshot[];
     }) => {
-      if (input.checklistItems.length === 0) return;
+      const itemsToJudge = input.checklistItems.filter(
+        (item) => !item.qa_checklist_item_results?.[0]?.overridden_by,
+      );
+      if (itemsToJudge.length === 0) return;
       const results = await Promise.all(
-        input.checklistItems.map((item) => judgeChecklistItem(item, input)),
+        itemsToJudge.map((item) => judgeChecklistItem(item, input)),
       );
       const { error } = await db
         .from("qa_checklist_item_results")
