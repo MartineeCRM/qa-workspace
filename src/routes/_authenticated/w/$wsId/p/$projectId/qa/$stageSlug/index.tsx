@@ -23,7 +23,7 @@ export const Route = createFileRoute("/_authenticated/w/$wsId/p/$projectId/qa/$s
 
     if (rounds && rounds[0]) {
       throw redirect({
-        to: "/_authenticated/w/$wsId/p/$projectId/qa/$stageSlug/$roundId",
+        to: "/w/$wsId/p/$projectId/qa/$stageSlug/$roundId",
         params: { ...params, roundId: rounds[0].id },
       });
     }
