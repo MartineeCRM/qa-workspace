@@ -212,8 +212,14 @@ function ChecklistPanel({
   );
   const stagedKeys = useMemo(() => new Set(staged.map((t) => `${t.kind}:${t.id}`)), [staged]);
 
-  const searchTargets: SearchTarget[] = useMemo(() => {
-    const q = search.trim().toLowerCase();
+  const hasUnaddedItems = useMemo(
+    () =>
+      events.some((e) => !existingKeys.has(`event:${e.id}`)) ||
+      customAttributes.some((a) => !existingKeys.has(`custom_attribute:${a.id}`)),
+    [events, customAttributes, existingKeys],
+  );
+
+  const availableTargets: SearchTarget[] = useMemo(() => {
     const eventTargets: SearchTarget[] = events.map((e) => ({
       kind: "event",
       id: e.id,
@@ -226,14 +232,18 @@ function ChecklistPanel({
       label: a.technical_name,
       sub: a.display_name ?? null,
     }));
-    const all = [...eventTargets, ...attrTargets].filter(
+    return [...eventTargets, ...attrTargets].filter(
       (t) => !existingKeys.has(`${t.kind}:${t.id}`) && !stagedKeys.has(`${t.kind}:${t.id}`),
     );
-    if (!q) return all;
-    return all.filter(
+  }, [events, customAttributes, existingKeys, stagedKeys]);
+
+  const searchTargets: SearchTarget[] = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return availableTargets;
+    return availableTargets.filter(
       (t) => t.label.toLowerCase().includes(q) || (t.sub ?? "").toLowerCase().includes(q),
     );
-  }, [search, events, customAttributes, existingKeys, stagedKeys]);
+  }, [search, availableTargets]);
 
   function stageTarget(target: SearchTarget) {
     setStaged((prev) => [...prev, target]);
@@ -257,7 +267,10 @@ function ChecklistPanel({
       .filter((t) => t.kind === "custom_attribute")
       .map((t) => t.id);
     if (eventIds.length === 0 && customAttributeIds.length === 0) return;
-    addItems.mutate({ eventIds, customAttributeIds });
+    addItems.mutate(
+      { eventIds, customAttributeIds },
+      { onError: (error) => toast.error(error instanceof Error ? error.message : String(error)) },
+    );
     setSearch("");
   }
 
@@ -282,6 +295,7 @@ function ChecklistPanel({
     commitAdd(
       [...eventTargets, ...attrTargets].filter((t) => !existingKeys.has(`${t.kind}:${t.id}`)),
     );
+    setStaged([]);
   }
 
   return (
@@ -305,26 +319,34 @@ function ChecklistPanel({
               className="max-w-xs"
             />
           </div>
-          {search.trim() && searchTargets.length > 0 ? (
-            <ul className="mt-2 max-h-40 divide-y overflow-y-auto rounded-md border">
-              {searchTargets.slice(0, 20).map((t) => {
-                const key = `${t.kind}:${t.id}`;
-                return (
-                  <li key={key}>
-                    <button
-                      type="button"
-                      onClick={() => stageTarget(t)}
-                      className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm hover:bg-muted"
-                    >
-                      <span className="text-xs text-muted-foreground">
-                        {t.kind === "event" ? "이벤트" : "속성"}
-                      </span>
-                      <span className="mono-token text-xs">{t.label}</span>
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
+          {search.trim() ? (
+            searchTargets.length > 0 ? (
+              <ul className="mt-2 max-h-40 divide-y overflow-y-auto rounded-md border">
+                {searchTargets.slice(0, 20).map((t) => {
+                  const key = `${t.kind}:${t.id}`;
+                  return (
+                    <li key={key}>
+                      <button
+                        type="button"
+                        onClick={() => stageTarget(t)}
+                        className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm hover:bg-muted"
+                      >
+                        <span className="text-xs text-muted-foreground">
+                          {t.kind === "event" ? "이벤트" : "속성"}
+                        </span>
+                        <span className="mono-token text-xs">{t.label}</span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <p className="mt-2 text-xs text-muted-foreground">
+                {availableTargets.length === 0
+                  ? "택소노미의 모든 항목이 이미 이 세션에 추가됐어요."
+                  : "일치하는 항목이 없어요."}
+              </p>
+            )
           ) : null}
 
           {staged.length > 0 ? (
@@ -364,10 +386,17 @@ function ChecklistPanel({
           <div>
             <p className="text-xs font-medium">전체 한 번에 추가하기</p>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              검색·체크 없이 택소노미에 있는 이벤트·attribute를 통째로 넣어요.
+              {hasUnaddedItems
+                ? "검색·체크 없이 택소노미에 있는 이벤트·attribute를 통째로 넣어요."
+                : "택소노미의 모든 항목이 이미 이 세션에 추가됐어요."}
             </p>
           </div>
-          <Button size="sm" variant="outline" onClick={handleAddAll} disabled={addItems.isPending}>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleAddAll}
+            disabled={addItems.isPending || !hasUnaddedItems}
+          >
             택소노미 전체 추가
           </Button>
         </div>
