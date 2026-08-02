@@ -8,6 +8,7 @@ import {
   useCreateQaSession,
   useQaRounds,
   useQaSessions,
+  useRoundDispositionSummary,
 } from "@/lib/qa-rounds-queries";
 
 function SessionProgressBar({ step }: { step: number }) {
@@ -69,6 +70,8 @@ export function QaRoundView({
   const { data: sessions = [] } = useQaSessions(roundId);
   const createRound = useCreateQaRound(projectId, environmentId);
   const latestRound = rounds[rounds.length - 1];
+  const { data: summary = { passed: 0, unresolvedErrors: 0, carriedOver: 0 } } =
+    useRoundDispositionSummary(roundId);
 
   if (!round) return null;
 
@@ -118,6 +121,24 @@ export function QaRoundView({
           value={sessions.length}
           sub={`수집 중 ${sessions.filter((s) => !s.ended_at).length} · 완료 ${sessions.filter((s) => s.ended_at).length}`}
           tone="neutral"
+        />
+        <RoundMetricCard
+          label="통과"
+          value={summary.passed}
+          sub="이번 라운드 확정"
+          tone="success"
+        />
+        <RoundMetricCard
+          label="미해결 오류"
+          value={summary.unresolvedErrors}
+          sub="처리 대기 중"
+          tone="danger"
+        />
+        <RoundMetricCard
+          label="다음 차수 이월"
+          value={summary.carriedOver}
+          sub="다음 라운드로 넘어감"
+          tone="purple"
         />
       </div>
 

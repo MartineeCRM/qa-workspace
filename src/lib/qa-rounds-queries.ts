@@ -720,3 +720,39 @@ export function useAddDiscussionComment(resultId: string) {
     },
   });
 }
+
+export function useRoundDispositionSummary(roundId: string) {
+  return useQuery({
+    queryKey: ["qa-round-disposition-summary", roundId],
+    enabled: Boolean(roundId),
+    queryFn: async () => {
+      const { data: sessions, error: sessionsError } = await db
+        .from("qa_sessions")
+        .select("id")
+        .eq("qa_round_id", roundId);
+      if (sessionsError) throw sessionsError;
+      const sessionIds = (sessions ?? []).map((s: { id: string }) => s.id);
+      if (sessionIds.length === 0) {
+        return { passed: 0, unresolvedErrors: 0, carriedOver: 0 };
+      }
+
+      const { data: items, error: itemsError } = await db
+        .from("qa_round_checklist_items")
+        .select("id, disposition, qa_checklist_item_results(final_status)")
+        .in("qa_session_id", sessionIds);
+      if (itemsError) throw itemsError;
+
+      let passed = 0;
+      let unresolvedErrors = 0;
+      let carriedOver = 0;
+      for (const item of items ?? []) {
+        const finalStatus = item.qa_checklist_item_results?.[0]?.final_status ?? "not_collected";
+        if (item.disposition === "carried_over") carriedOver += 1;
+        if (item.disposition === "passed_override" || finalStatus === "passed") passed += 1;
+        else if (item.disposition === "unresolved" && finalStatus !== "passed")
+          unresolvedErrors += 1;
+      }
+      return { passed, unresolvedErrors, carriedOver };
+    },
+  });
+}
