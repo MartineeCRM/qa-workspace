@@ -105,6 +105,9 @@ function parseCsv(text: string): ParsedCsv {
 }
 
 const EVENT_COLUMNS = ["event", "event_name", "eventname", "name"];
+const TIME_COLUMNS = ["time", "timestamp", "occurred_at", "event_time"];
+const USER_COLUMNS = ["user_id", "external_user_id", "userid", "distinct_id"];
+const PROPERTIES_COLUMNS = ["properties", "props", "raw_properties"];
 
 function StagePage() {
   const { projectId, stageSlug } = useParams({
@@ -192,12 +195,33 @@ function StagePage() {
 
   async function handleFile(file: File) {
     if (!stage) return;
+    if (!activeSessionId) {
+      toast.error("CSV를 올리려면 라운드 탭에서 세션을 먼저 골라주세요");
+      return;
+    }
     setBusy(true);
     try {
       const text = await file.text();
       const parsed = parseCsv(text);
       if (parsed.rows.length === 0) {
         toast.error("CSV에 데이터 행이 없어요");
+        return;
+      }
+      const timeColumn = parsed.headers.find((h) => TIME_COLUMNS.includes(h.toLowerCase()));
+      const userColumn = parsed.headers.find((h) => USER_COLUMNS.includes(h.toLowerCase()));
+      if (!timeColumn) {
+        toast.error("시간 컬럼을 찾을 수 없어요 — TIME 같은 컬럼이 있어야 해요");
+        return;
+      }
+      if (!userColumn) {
+        toast.error("유저 구분 컬럼을 찾을 수 없어요 — USER_ID 같은 컬럼이 있어야 해요");
+        return;
+      }
+      const invalidTimeRowIndex = parsed.rows.findIndex(
+        (row) => Number.isNaN(new Date(row[timeColumn]).getTime()),
+      );
+      if (invalidTimeRowIndex !== -1) {
+        toast.error(`${invalidTimeRowIndex + 1}번째 행의 시간 값을 읽을 수 없어요`);
         return;
       }
       const { data: upload, error: uploadError } = await db
@@ -213,7 +237,7 @@ function StagePage() {
         .single();
       if (uploadError) throw uploadError;
 
-      await runAnalysis(parsed, upload.id);
+      await runAnalysis(parsed, upload.id, timeColumn, userColumn);
     } catch (error) {
       toast.error(errorMessage(error));
     } finally {
@@ -222,20 +246,47 @@ function StagePage() {
     }
   }
 
-  async function runAnalysis(parsed: ParsedCsv, uploadId: string | null) {
+  async function runAnalysis(
+    parsed: ParsedCsv,
+    uploadId: string | null,
+    timeColumn: string,
+    userColumn: string,
+  ) {
     if (!stage) return;
     const eventColumn = parsed.headers.find((h) => EVENT_COLUMNS.includes(h.toLowerCase()));
+    const propertiesColumn = parsed.headers.find((h) =>
+      PROPERTIES_COLUMNS.includes(h.toLowerCase()),
+    );
     const seenEvents = new Set<string>();
     const seenAttributes = new Set<string>();
+
+    function safeJsonParse(raw: string): Record<string, unknown> | null {
+      try {
+        const value = JSON.parse(raw);
+        return value && typeof value === "object" ? (value as Record<string, unknown>) : null;
+      } catch {
+        return null;
+      }
+    }
 
     for (const row of parsed.rows) {
       const eventName = eventColumn ? row[eventColumn] : "";
       if (eventName) seenEvents.add(eventName);
-      for (const header of parsed.headers) {
-        if (header === eventColumn) continue;
-        if ((row[header] ?? "") === "") continue;
-        seenAttributes.add(`${eventName}::${header}`);
-        seenAttributes.add(`::${header}`);
+      if (propertiesColumn) {
+        const parsedProperties = safeJsonParse(row[propertiesColumn] ?? "");
+        if (parsedProperties) {
+          for (const key of Object.keys(parsedProperties)) {
+            seenAttributes.add(`${eventName}::${key}`);
+            seenAttributes.add(`::${key}`);
+          }
+        }
+      } else {
+        for (const header of parsed.headers) {
+          if (header === eventColumn) continue;
+          if ((row[header] ?? "") === "") continue;
+          seenAttributes.add(`${eventName}::${header}`);
+          seenAttributes.add(`::${header}`);
+        }
       }
     }
 
@@ -290,6 +341,31 @@ function StagePage() {
     });
     if (runError) throw runError;
 
+    const eventByTechnicalName = new Map(events.map((e) => [e.technical_name, e.id]));
+    const runEventRows = parsed.rows.map((row) => {
+      const eventName = eventColumn ? row[eventColumn] : "";
+      return {
+        qa_session_id: activeSessionId,
+        event_id: eventByTechnicalName.get(eventName) ?? null,
+        raw_event_name: eventName,
+        occurred_at: new Date(row[timeColumn]).toISOString(),
+        external_user_id: row[userColumn],
+        raw_properties:
+          (propertiesColumn ? safeJsonParse(row[propertiesColumn] ?? "") : null) ??
+          Object.fromEntries(
+            parsed.headers
+              .filter((h) => h !== eventColumn && h !== timeColumn && h !== userColumn)
+              .map((h) => [h, row[h]]),
+          ),
+      };
+    });
+    const RUN_EVENTS_BATCH_SIZE = 500;
+    for (let i = 0; i < runEventRows.length; i += RUN_EVENTS_BATCH_SIZE) {
+      const batch = runEventRows.slice(i, i + RUN_EVENTS_BATCH_SIZE);
+      const { error: runEventsError } = await db.from("qa_run_events").insert(batch);
+      if (runEventsError) throw runEventsError;
+    }
+
     qc.invalidateQueries({ queryKey: ["item-status", projectId] });
     qc.invalidateQueries({ queryKey: ["uploads", stage.id] });
     qc.invalidateQueries({ queryKey: ["runs", stage.id] });
@@ -302,7 +378,9 @@ function StagePage() {
         title={stage.name}
         description={
           stage.description ??
-          "이 환경은 현재 택소노미를 검증해요. 검증 상태만 저장하고, 자체 규칙은 갖지 않아요."
+          (activeSessionId
+            ? "이 환경은 현재 택소노미를 검증해요. 검증 상태만 저장하고, 자체 규칙은 갖지 않아요."
+            : "이 환경은 현재 택소노미를 검증해요. CSV를 올리려면 라운드 탭에서 세션을 먼저 골라주세요.")
         }
         actions={
           editable ? (
@@ -317,7 +395,11 @@ function StagePage() {
                   if (file) handleFile(file);
                 }}
               />
-              <Button size="sm" disabled={busy} onClick={() => fileRef.current?.click()}>
+              <Button
+                size="sm"
+                disabled={busy || !activeSessionId}
+                onClick={() => fileRef.current?.click()}
+              >
                 <Upload className="size-4" /> CSV 올리고 분석하기
               </Button>
             </>
