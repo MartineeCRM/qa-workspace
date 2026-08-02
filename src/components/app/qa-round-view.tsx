@@ -130,12 +130,8 @@ export function QaRoundView({
           <Link
             key={s.id}
             from="/w/$wsId/p/$projectId/qa/$stageSlug/$roundId"
-            // $sessionId route doesn't exist until Task 7, so its literal path/params
-            // shape isn't in the router's type registry yet — cast the same way
-            // TabLink/SideLink do for routes outside their own known union
-            // (src/routes/_authenticated/w/$wsId/route.tsx, .../p/$projectId/route.tsx).
-            to={"/w/$wsId/p/$projectId/qa/$stageSlug/$roundId/$sessionId" as never}
-            params={((prev: object) => ({ ...prev, sessionId: s.id })) as never}
+            to="/w/$wsId/p/$projectId/qa/$stageSlug/$roundId/$sessionId"
+            params={(prev) => ({ ...prev, sessionId: s.id })}
             className="rounded-[14px] border border-[#e3e8ef] bg-white p-4 hover:border-[#2b6a9c] hover:shadow-[0_2px_10px_rgba(28,36,49,0.06)]"
           >
             <div className="flex items-center justify-between">
