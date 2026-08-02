@@ -105,6 +105,9 @@ function parseCsv(text: string): ParsedCsv {
 }
 
 const EVENT_COLUMNS = ["event", "event_name", "eventname", "name"];
+const TIME_COLUMNS = ["time", "timestamp", "occurred_at", "event_time"];
+const USER_COLUMNS = ["user_id", "external_user_id", "userid", "distinct_id"];
+const PROPERTIES_COLUMNS = ["properties", "props", "raw_properties"];
 
 function StagePage() {
   const { projectId, stageSlug } = useParams({
@@ -192,12 +195,26 @@ function StagePage() {
 
   async function handleFile(file: File) {
     if (!stage) return;
+    if (!activeSessionId) {
+      toast.error("CSV를 올리려면 라운드 탭에서 세션을 먼저 골라주세요");
+      return;
+    }
     setBusy(true);
     try {
       const text = await file.text();
       const parsed = parseCsv(text);
       if (parsed.rows.length === 0) {
         toast.error("CSV에 데이터 행이 없어요");
+        return;
+      }
+      const timeColumn = parsed.headers.find((h) => TIME_COLUMNS.includes(h.toLowerCase()));
+      const userColumn = parsed.headers.find((h) => USER_COLUMNS.includes(h.toLowerCase()));
+      if (!timeColumn) {
+        toast.error("시간 컬럼을 찾을 수 없어요 — TIME 같은 컬럼이 있어야 해요");
+        return;
+      }
+      if (!userColumn) {
+        toast.error("유저 구분 컬럼을 찾을 수 없어요 — USER_ID 같은 컬럼이 있어야 해요");
         return;
       }
       const { data: upload, error: uploadError } = await db
@@ -213,7 +230,7 @@ function StagePage() {
         .single();
       if (uploadError) throw uploadError;
 
-      await runAnalysis(parsed, upload.id);
+      await runAnalysis(parsed, upload.id, timeColumn, userColumn);
     } catch (error) {
       toast.error(errorMessage(error));
     } finally {
@@ -222,7 +239,12 @@ function StagePage() {
     }
   }
 
-  async function runAnalysis(parsed: ParsedCsv, uploadId: string | null) {
+  async function runAnalysis(
+    parsed: ParsedCsv,
+    uploadId: string | null,
+    timeColumn: string,
+    userColumn: string,
+  ) {
     if (!stage) return;
     const eventColumn = parsed.headers.find((h) => EVENT_COLUMNS.includes(h.toLowerCase()));
     const seenEvents = new Set<string>();
