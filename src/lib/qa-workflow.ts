@@ -25,6 +25,17 @@ function formatValue(value: unknown): string {
   return String(value);
 }
 
+// Snapshot payload values are JSON-safe Braze attribute values, so JSON.stringify
+// is sufficient for deep equality here — no need for a deep-equal library.
+// Object/array-valued attributes always come from separately-fetched/parsed
+// rows, so `===` would never match even when the content is identical.
+function isSameValue(before: unknown, after: unknown): boolean {
+  if (before === after) return true;
+  if (typeof before !== "object" || typeof after !== "object") return false;
+  if (before === null || after === null) return false;
+  return JSON.stringify(before) === JSON.stringify(after);
+}
+
 export function buildMergedTimeline(
   runEvents: QaRunEvent[],
   snapshots: QaAttributeSnapshot[],
@@ -53,7 +64,7 @@ export function buildMergedTimeline(
     for (const key of keys) {
       const before = prevPayload[key];
       const after = payload[key];
-      if (before === after) continue;
+      if (isSameValue(before, after)) continue;
       snapshotRows.push({
         key: `snapshot:${snapshot.id}:${key}`,
         occurredAt: snapshot.captured_at as string,

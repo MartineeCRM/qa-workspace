@@ -37,6 +37,16 @@ describe("deriveSessionStep", () => {
       }),
     ).toBe(4);
   });
+
+  it("returns 1 when the checklist is empty even if the session has already ended", () => {
+    expect(
+      deriveSessionStep({
+        checklistItemCount: 0,
+        endedAt: "2026-08-01T00:00:00Z",
+        hasResults: false,
+      }),
+    ).toBe(1);
+  });
 });
 
 describe("buildMergedTimeline", () => {
@@ -93,6 +103,115 @@ describe("buildMergedTimeline", () => {
   it("emits no row for the first snapshot (nothing to diff against)", () => {
     const rows = buildMergedTimeline([], [snapshots[0]]);
     expect(rows).toEqual([]);
+  });
+
+  it("does not report a spurious change for an object/array attribute with the same content across different instances", () => {
+    const unchangedObjectSnapshots: QaAttributeSnapshot[] = [
+      {
+        id: "sn1",
+        qa_session_id: "s1",
+        external_user_id: "u1",
+        snapshot_name: "담기 전",
+        status: "captured",
+        payload: { tags: ["a", "b"], meta: { color: "red" } },
+        previous_snapshot_id: null,
+        requested_at: "2026-07-31T22:03:00Z",
+        captured_at: "2026-07-31T22:03:11Z",
+      },
+      {
+        id: "sn2",
+        qa_session_id: "s1",
+        external_user_id: "u1",
+        snapshot_name: "담은 후",
+        status: "captured",
+        // Same content, but different array/object instances (as happens with
+        // separately-fetched/parsed rows) — should NOT be reported as a change.
+        payload: { tags: ["a", "b"], meta: { color: "red" } },
+        previous_snapshot_id: "sn1",
+        requested_at: "2026-07-31T22:06:40Z",
+        captured_at: "2026-07-31T22:06:52Z",
+      },
+    ];
+
+    const rows = buildMergedTimeline([], unchangedObjectSnapshots);
+    expect(rows).toEqual([]);
+  });
+
+  it("still detects a real change in an object/array attribute's content", () => {
+    const changedObjectSnapshots: QaAttributeSnapshot[] = [
+      {
+        id: "sn1",
+        qa_session_id: "s1",
+        external_user_id: "u1",
+        snapshot_name: "담기 전",
+        status: "captured",
+        payload: { tags: ["a", "b"], meta: { color: "red" } },
+        previous_snapshot_id: null,
+        requested_at: "2026-07-31T22:03:00Z",
+        captured_at: "2026-07-31T22:03:11Z",
+      },
+      {
+        id: "sn2",
+        qa_session_id: "s1",
+        external_user_id: "u1",
+        snapshot_name: "담은 후",
+        status: "captured",
+        payload: { tags: ["a", "b", "c"], meta: { color: "red" } },
+        previous_snapshot_id: "sn1",
+        requested_at: "2026-07-31T22:06:40Z",
+        captured_at: "2026-07-31T22:06:52Z",
+      },
+    ];
+
+    const rows = buildMergedTimeline([], changedObjectSnapshots);
+    expect(rows.map((r) => r.name)).toEqual(["tags"]);
+    expect(rows[0].change).toBe('["a","b"] → ["a","b","c"]');
+  });
+
+  it("anchors each diff to its immediate predecessor across a 3-snapshot chain", () => {
+    const chain: QaAttributeSnapshot[] = [
+      {
+        id: "sn1",
+        qa_session_id: "s1",
+        external_user_id: "u1",
+        snapshot_name: "1",
+        status: "captured",
+        payload: { cart_item_count: 0 },
+        previous_snapshot_id: null,
+        requested_at: "2026-07-31T22:00:00Z",
+        captured_at: "2026-07-31T22:00:11Z",
+      },
+      {
+        id: "sn2",
+        qa_session_id: "s1",
+        external_user_id: "u1",
+        snapshot_name: "2",
+        status: "captured",
+        payload: { cart_item_count: 1 },
+        previous_snapshot_id: "sn1",
+        requested_at: "2026-07-31T22:05:00Z",
+        captured_at: "2026-07-31T22:05:11Z",
+      },
+      {
+        id: "sn3",
+        qa_session_id: "s1",
+        external_user_id: "u1",
+        snapshot_name: "3",
+        status: "captured",
+        payload: { cart_item_count: 1 },
+        previous_snapshot_id: "sn2",
+        requested_at: "2026-07-31T22:10:00Z",
+        captured_at: "2026-07-31T22:10:11Z",
+      },
+    ];
+
+    const rows = buildMergedTimeline([], chain);
+    // sn2 vs sn1 (predecessor): 0 -> 1, a real change.
+    // sn3 vs sn2 (predecessor): 1 -> 1, no change.
+    // If sn3 were (incorrectly) diffed against sn1 instead of sn2, it would
+    // also show 0 -> 1 and produce a second row — so asserting exactly one
+    // row here confirms each snapshot anchors to its immediate predecessor.
+    expect(rows.map((r) => r.key)).toEqual(["snapshot:sn2:cart_item_count"]);
   });
 });
 
