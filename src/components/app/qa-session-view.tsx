@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Check } from "lucide-react";
 import { deriveSessionStep } from "@/lib/qa-workflow";
 import { useQaChecklistItems, useQaRunEvents, type QaSession } from "@/lib/qa-rounds-queries";
@@ -33,6 +33,29 @@ export function QaSessionView({
   });
   const [viewingStep, setViewingStep] = useState(currentStep);
 
+  // useState's initializer only runs once, and route params changing doesn't remount this
+  // component (same session route, different :sessionId) — so without this effect,
+  // switching sessions or a slow first-load query resolving to a higher currentStep would
+  // leave viewingStep stuck on a stale value. Follow currentStep forward whenever the
+  // session changes, or when currentStep itself advances and the viewer hadn't manually
+  // navigated away from it (so intentionally reviewing an earlier completed step doesn't
+  // get yanked forward by a background refetch).
+  const lastSyncRef = useRef({ sessionId: session.id, currentStep });
+  useEffect(() => {
+    const last = lastSyncRef.current;
+    if (session.id !== last.sessionId) {
+      setViewingStep(currentStep);
+    } else if (currentStep !== last.currentStep && viewingStep === last.currentStep) {
+      setViewingStep(currentStep);
+    }
+    lastSyncRef.current = { sessionId: session.id, currentStep };
+  }, [session.id, currentStep, viewingStep]);
+
+  // Belt-and-suspenders: never render a step further than the session has actually
+  // reached, even if viewingStep is momentarily stale for any reason the effect above
+  // doesn't catch.
+  const effectiveStep = Math.min(viewingStep, currentStep) as 1 | 2 | 3 | 4;
+
   return (
     <div className="space-y-4">
       <div>
@@ -45,12 +68,13 @@ export function QaSessionView({
       <div className="my-[18px] grid grid-cols-[repeat(auto-fit,minmax(170px,1fr))] gap-2">
         {STEPS.map((step) => {
           const reachable = step.n <= currentStep;
-          const isActive = step.n === viewingStep;
+          const isActive = step.n === effectiveStep;
           return (
             <button
               key={step.n}
               type="button"
               disabled={!reachable}
+              aria-current={isActive ? "step" : undefined}
               onClick={() => reachable && setViewingStep(step.n)}
               className={`rounded-xl border bg-white p-3.5 text-left ${
                 isActive ? "border-[#1c2431]" : "border-[#e3e8ef]"
@@ -78,18 +102,18 @@ export function QaSessionView({
         })}
       </div>
 
-      {viewingStep === 1 ? (
+      {effectiveStep === 1 ? (
         <QaSessionChecklistPanel
           projectId={projectId}
           environmentId={environmentId}
           session={session}
         />
       ) : null}
-      {viewingStep === 2 ? (
+      {effectiveStep === 2 ? (
         <QaSessionCollectionPanel projectId={projectId} session={session} />
       ) : null}
-      {viewingStep === 3 ? <QaSessionAnalysisPanel session={session} /> : null}
-      {viewingStep === 4 ? (
+      {effectiveStep === 3 ? <QaSessionAnalysisPanel session={session} /> : null}
+      {effectiveStep === 4 ? (
         <QaSessionResultsPanel
           projectId={projectId}
           environmentId={environmentId}

@@ -1247,7 +1247,7 @@ export function QaSessionView({
 }
 ```
 
-`viewingStep`은 세션이 다시 열릴 때마다 `currentStep`에서 시작하도록, 세션이 바뀌면(=컴포넌트가 다른 `session.id`로 다시 마운트되면) 자연히 초기화된다. Task 8~10에서 각 패널을 실제로 만들기 전까진 이 파일은 컴파일되지 않는다 — 그건 정상이며, 다음 태스크들에서 하나씩 채운다.
+**정정(코드 리뷰에서 발견):** 위 `useState(currentStep)`만으로는 `viewingStep`이 세션이 바뀔 때 자동으로 초기화되지 않는다 — TanStack Router는 같은 라우트의 path param만 바뀌는 경우(`$sessionId`만 다른 값) 컴포넌트를 리마운트하지 않으므로 `useState`의 초기값은 최초 마운트 시 한 번만 평가된다. 첫 로드 시 체크리스트/이벤트 쿼리가 아직 안 끝나 `currentStep`이 임시로 1로 계산되는 경우도 마찬가지로 `viewingStep`이 stale하게 남는다. 실제 구현(Task 7 커밋에 반영됨)은 `session.id`/`currentStep` 변화를 감지해 `viewingStep`을 따라가게 하는 `useEffect`와, 렌더 시점에 `Math.min(viewingStep, currentStep)`으로 한 번 더 clamp하는 안전장치를 추가했다 — 아래 코드 예시는 이 정정 이전의 초기 버전이니 그대로 베끼지 말 것.
 
 - [ ] **Step 3: 세션 인덱스 라우트 작성**
 
