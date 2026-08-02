@@ -38,7 +38,12 @@ export const judgeChecklistItemWithAI = createServerFn({ method: "POST" })
       return { ok: false, error: `Claude API 오류 (HTTP ${response.status})` };
     }
 
-    const body = (await response.json()) as { content?: { type: string; text?: string }[] };
+    let body: { content?: { type: string; text?: string }[] };
+    try {
+      body = await response.json();
+    } catch {
+      return { ok: false, error: "Claude 응답을 JSON으로 해석하지 못했어요." };
+    }
     const text = body.content?.find((c) => c.type === "text")?.text ?? "";
 
     try {
