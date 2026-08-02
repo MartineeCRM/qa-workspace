@@ -579,6 +579,7 @@ export type Database = {
         Row: {
           ended_at: string | null;
           id: string;
+          name: string | null;
           previous_round_id: string | null;
           project_id: string;
           qa_environment_id: string;
@@ -589,6 +590,7 @@ export type Database = {
         Insert: {
           ended_at?: string | null;
           id?: string;
+          name?: string | null;
           previous_round_id?: string | null;
           project_id: string;
           qa_environment_id: string;
@@ -599,6 +601,7 @@ export type Database = {
         Update: {
           ended_at?: string | null;
           id?: string;
+          name?: string | null;
           previous_round_id?: string | null;
           project_id?: string;
           qa_environment_id?: string;

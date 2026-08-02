@@ -43,6 +43,7 @@ import {
 } from "@/lib/queries";
 import { useWorkspaceContext } from "@/lib/workspace-context";
 import {
+  canAdmin,
   canEdit,
   errorMessage,
   formatDateTime,
@@ -117,6 +118,7 @@ function StagePage() {
   const { role } = useWorkspaceContext();
   const { user } = useAuth();
   const editable = canEdit(role);
+  const canDeleteRounds = canAdmin(role);
   const fileRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [filter, setFilter] = useState<string>("all");
@@ -431,6 +433,8 @@ function StagePage() {
             projectId={projectId}
             environmentId={stage.id}
             onActiveSessionChange={setActiveSessionId}
+            editable={editable}
+            canDeleteRounds={canDeleteRounds}
           />
         </TabsContent>
 
