@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<!--
+  Design reference for the Taxonomy screen redesign (Trackspec Taxonomy.html).
+  This is the human-readable template extracted from a "Bundler"-format
+  export the user pasted into chat on 2026-07-31 (see HANDOFF.md). The
+  original export wraps this markup in a React-bundle loader with gzipped
+  base64 assets; that loader/runtime is stripped here since only the
+  static markup (colors, spacing, structure, copy) is useful as a design
+  reference, and it's what was actually analyzed to build the taxonomy
+  list header/select/pagination work. Korean text below is copied as-is
+  from the source export; some strings displayed as mojibake in the
+  original paste and could not be losslessly recovered — see HANDOFF.md
+  for the already-confirmed decoded values (전체 상태 / 측정 중 / 중지됨,
+  이름순 / 최근 수정순 / 프로퍼티 많은순, 81개 중 6개 표시 / 더 보기).
+-->
+<html><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+
+<div>
+<style>
+  body { margin: 0; background: #F5F9FD; }
+  a { color: #2E6C92; text-decoration: none; }
+  a:hover { color: #24587A; }
+  .tsp-row:hover .tsp-rowactions { opacity: 1; }
+</style>
+
+<div style="display: flex; min-height: 100vh; font-family: Pretendard, 'Apple SD Gothic Neo', 'Noto Sans KR', system-ui, sans-serif; color: #3E5C63; background: #FFFFFF;">
+
+  <aside style="width: 232px; flex: 0 0 232px; background: #2A5159; color: #75A5C7; display: flex; flex-direction: column;">
+    <div style="height: 64px; display: flex; align-items: center; gap: 8px; padding: 0 20px; border-bottom: 1px solid rgba(255,255,255,0.08);">
+      <div style="width: 20px; height: 20px; border-radius: 5px; background: #2E6C92; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 11px; font-weight: 700;">T</div>
+      <span style="color: #fff; font-size: 15px; font-weight: 600; letter-spacing: -0.01em;">Trackspec</span>
+    </div>
+    <div style="padding: 20px 20px 8px; font-size: 12px; font-weight: 500; color: #A9C3CB;">워크스페이스</div>
+    <nav style="display: flex; flex-direction: column; gap: 2px; padding: 0 12px;">
+      <div style="display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 6px; background: rgba(255,255,255,0.07); color: #fff; font-size: 14px; font-weight: 500;">프로젝트</div>
+      <div style="display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 6px; color: #C2D6DC; font-size: 14px; font-weight: 500;">설정·멤버</div>
+    </nav>
+  </aside>
+
+  <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; background: #F5F9FD;">
+
+    <header style="height: 64px; flex: 0 0 64px; background: #FFFFFF; border-bottom: 1px solid #DCE6EE; display: flex; align-items: center; justify-content: space-between; padding: 0 32px;">
+      <div style="display: flex; align-items: center; gap: 8px; font-size: 14px;">
+        <span style="font-weight: 600; color: #1F3F46;">CRM</span>
+        <span style="font-size: 12px; color: #6E8A91;">워크스페이스</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 8px; font-size: 14px; color: #3E5C63;">
+        <div style="width: 26px; height: 26px; border-radius: 999px; background: #EAF1F7; color: #3E5C63; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600;">Y</div>
+        yoomin.jeong
+      </div>
+    </header>
+
+    <div style="flex: 1; overflow: auto;">
+      <div style="max-width: 1240px; margin: 0 auto; padding: 28px 32px 80px;">
+
+        <div style="font-size: 13px; color: #6E8A91; margin-bottom: 10px;">프로젝트 <span style="color: #75A5C7;">/</span> 신세계 DF</div>
+
+        <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; flex-wrap: wrap;">
+          <div style="display: flex; align-items: baseline; gap: 10px;">
+            <h1 style="margin: 0; font-size: 26px; font-weight: 700; letter-spacing: -0.02em; color: #1F3F46;">신세계 DF</h1>
+            <span style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; color: #6E8A91;">SSG_DF</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <button type="button" style="height: 36px; padding: 0 14px; border-radius: 8px; border: 1px solid #DCE6EE; background: #FFFFFF; color: #3E5C63; font-family: inherit; font-size: 13px; font-weight: 500; cursor: pointer;">QA 환경 관리</button>
+            <button type="button" style="height: 36px; padding: 0 14px; border-radius: 8px; border: 1px solid #DCE6EE; background: #FFFFFF; color: #3E5C63; font-family: inherit; font-size: 13px; font-weight: 500; cursor: pointer;">Attribute API 설정</button>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 4px; margin-top: 20px; border-bottom: 1px solid #DCE6EE;">
+          <div style="padding: 10px 14px; font-size: 14px; font-weight: 500; color: #6E8A91; cursor: pointer;">개요</div>
+          <div style="padding: 10px 14px; font-size: 14px; font-weight: 600; color: #1F3F46; box-shadow: inset 0 -2px 0 #1F3F46; cursor: pointer;">택소노미</div>
+          <div style="padding: 10px 14px; font-size: 14px; font-weight: 500; color: #6E8A91; cursor: pointer;">개발 QA</div>
+          <div style="padding: 10px 14px; font-size: 14px; font-weight: 500; color: #6E8A91; cursor: pointer;">운영 QA</div>
+        </div>
+
+        <div style="margin-top: 28px; display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; flex-wrap: wrap;">
+          <div>
+            <h2 style="margin: 0 0 6px; font-size: 22px; font-weight: 700; letter-spacing: -0.02em; color: #1F3F46;">택소노미</h2>
+            <p style="margin: 0; font-size: 14px; color: #6E8A91; max-width: 620px; text-wrap: pretty;">이 고객의 단일 기준이에요. 모든 QA 환경이 이 숫자를 기준으로 측정하고, 규칙은 환경별로 복사하지 않아요.</p>
+          </div>
+          <div style="font-size: 12px; color: #6E8A91;">마지막 수정 2026.07.30 · yoomin.jeong</div>
+        </div>
+
+        <div style="margin-top: 20px; display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr; gap: 12px;">
+          <div style="background: #FFFFFF; border: 1px solid #DCE6EE; border-radius: 10px; padding: 18px 20px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; font-size: 13px; color: #6E8A91; font-weight: 500;">
+              <span>검증 커버리지</span>
+              <span style="font-size: 12px; color: #6E8A91;">644 / 1,035</span>
+            </div>
+            <div style="display: flex; align-items: baseline; gap: 8px; margin-top: 6px;">
+              <span style="font-size: 30px; font-weight: 700; letter-spacing: -0.02em; color: #1F3F46;">62.2%</span>
+              <span style="font-size: 12px; font-weight: 600; color: #08A613;">+4.1%p</span>
+            </div>
+            <div style="margin-top: 12px; height: 6px; border-radius: 999px; background: #EAF1F7; overflow: hidden;">
+              <div style="width: 62.2%; height: 100%; background: #2E6C92;"></div>
+            </div>
+          </div>
+          <div style="background: #FFFFFF; border: 1px solid #DCE6EE; border-radius: 10px; padding: 18px 20px;">
+            <div style="font-size: 13px; color: #6E8A91; font-weight: 500;">이벤트</div>
+            <div style="font-size: 30px; font-weight: 700; letter-spacing: -0.02em; color: #1F3F46; margin-top: 6px;">81</div>
+          </div>
+          <div style="background: #FFFFFF; border: 1px solid #DCE6EE; border-radius: 10px; padding: 18px 20px;">
+            <div style="font-size: 13px; color: #6E8A91; font-weight: 500;">이벤트 프로퍼티</div>
+            <div style="font-size: 30px; font-weight: 700; letter-spacing: -0.02em; color: #1F3F46; margin-top: 6px;">881</div>
+          </div>
+          <div style="background: #FFFFFF; border: 1px solid #DCE6EE; border-radius: 10px; padding: 18px 20px;">
+            <div style="font-size: 13px; color: #6E8A91; font-weight: 500;">어트리뷰트</div>
+            <div style="font-size: 30px; font-weight: 700; letter-spacing: -0.02em; color: #1F3F46; margin-top: 6px;">73</div>
+          </div>
+        </div>
+
+        <div style="margin-top: 24px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
+          <div style="display: inline-flex; padding: 3px; gap: 2px; background: #EAF1F7; border-radius: 8px;">
+            <div style="padding: 7px 16px; border-radius: 6px; font-size: 13.5px; font-weight: 600; cursor: pointer; background: #FFFFFF; color: #1F3F46;">이벤트·속성</div>
+            <div style="padding: 7px 16px; border-radius: 6px; font-size: 13.5px; font-weight: 500; cursor: pointer; color: #6E8A91;">검증 규칙</div>
+          </div>
+
+          <div style="display: flex; align-items: center; gap: 8px; position: relative;">
+            <button type="button" style="height: 38px; padding: 0 14px; display: inline-flex; align-items: center; gap: 8px; border-radius: 8px; border: 1px solid #DCE6EE; background: #FFFFFF; color: #3E5C63; font-family: inherit; font-size: 13.5px; font-weight: 500; cursor: pointer;">
+              가져오기
+              <span style="font-size: 10px; color: #9DB2B8;">▼</span>
+            </button>
+            <button type="button" style="height: 38px; padding: 0 16px; display: inline-flex; align-items: center; gap: 8px; border-radius: 8px; border: 1px solid #2E6C92; background: #2E6C92; color: #fff; font-family: inherit; font-size: 13.5px; font-weight: 600; cursor: pointer;">
+              <span style="font-size: 15px; line-height: 1;">+</span> 추가
+              <span style="font-size: 10px; opacity: 0.8;">▼</span>
+            </button>
+
+            <!-- 가져오기 dropdown (open state) -->
+            <div style="position: absolute; top: 46px; right: 0; width: 380px; background: #FFFFFF; border: 1px solid #DCE6EE; border-radius: 10px; box-shadow: 0 8px 24px rgba(42,81,89,0.14); padding: 6px; z-index: 20;">
+              <div style="padding: 12px; border-radius: 8px; cursor: pointer;">
+                <div style="font-size: 13.5px; font-weight: 600; color: #1F3F46;">파일로 일괄 등록</div>
+                <div style="font-size: 12.5px; color: #6E8A91; margin-top: 3px; line-height: 1.5; text-wrap: pretty;">CSV·JSON·YAML을 올리면 이벤트와 속성이 한 번에 등록돼요. 이미 있는 이름은 건너뛰어요.</div>
+              </div>
+              <div style="padding: 12px; border-radius: 8px; cursor: pointer;">
+                <div style="font-size: 13.5px; font-weight: 600; color: #1F3F46;">샘플 데이터셋 내려받기</div>
+                <div style="font-size: 12.5px; color: #6E8A91; margin-top: 3px; line-height: 1.5;">양식에 맞춘 내용을 채워서 다시 올리세요.</div>
+              </div>
+            </div>
+
+            <!-- + 추가 dropdown (open state) -->
+            <div style="position: absolute; top: 46px; right: 0; width: 240px; background: #FFFFFF; border: 1px solid #DCE6EE; border-radius: 10px; box-shadow: 0 8px 24px rgba(42,81,89,0.14); padding: 6px; z-index: 20;">
+              <div style="padding: 10px 12px; border-radius: 8px; cursor: pointer; font-size: 13.5px; font-weight: 500; color: #1F3F46;">이벤트 추가</div>
+              <div style="padding: 10px 12px; border-radius: 8px; cursor: pointer; font-size: 13.5px; font-weight: 500; color: #1F3F46;">사용자 속성 추가</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top: 14px; background: #FFFFFF; border: 1px solid #DCE6EE; border-radius: 10px; overflow: hidden;">
+
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 16px 14px 20px; border-bottom: 1px solid #DCE6EE; flex-wrap: wrap;">
+            <div style="display: flex; align-items: center; gap: 18px;">
+              <div style="font-size: 14px; font-weight: 600; color: #1F3F46; cursor: pointer; padding: 4px 0; box-shadow: inset 0 -2px 0 #1F3F46;">이벤트 <span style="color: #6E8A91; font-weight: 500;">81</span></div>
+              <div style="font-size: 14px; font-weight: 500; color: #6E8A91; cursor: pointer; padding: 4px 0;">어트리뷰트 <span style="color: #6E8A91;">73</span></div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <div style="display: flex; align-items: center; gap: 8px; height: 34px; width: 260px; padding: 0 12px; border: 1px solid #DCE6EE; border-radius: 8px; background: #FFFFFF;">
+                <span style="color: #9DB2B8; font-size: 13px;">🔍</span>
+                <input placeholder="이벤트·속성 검색" style="border: 0; outline: none; background: transparent; font-family: inherit; font-size: 13.5px; width: 100%; color: #3E5C63;">
+              </div>
+              <!-- native <select>, NOT a custom dropdown -->
+              <select style="height: 34px; padding: 0 10px; border: 1px solid #DCE6EE; border-radius: 8px; background: #FFFFFF; font-family: inherit; font-size: 13px; color: #3E5C63; cursor: pointer;">
+                <option>전체 상태</option>
+                <option>측정 중</option>
+                <option>중지됨</option>
+              </select>
+              <select style="height: 34px; padding: 0 10px; border: 1px solid #DCE6EE; border-radius: 8px; background: #FFFFFF; font-family: inherit; font-size: 13px; color: #3E5C63; cursor: pointer;">
+                <option>이름순</option>
+                <option>최근 수정순</option>
+                <option>프로퍼티 많은순</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- one example row of N (login_viewed / login_clicked / login_completed / product_viewed / cart_added / order_completed), repeated -->
+          <div class="tsp-row" style="display: flex; align-items: center; gap: 16px; padding: 16px 20px; border-bottom: 1px solid #EAF1F7;">
+            <span style="color: #9DB2B8; font-size: 11px; cursor: pointer;">▶</span>
+            <div style="flex: 1; min-width: 0;">
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <span style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 15px; font-weight: 700; color: #1F3F46;">login_viewed</span>
+                <span style="font-size: 11px; font-weight: 600; letter-spacing: 0.02em; color: #3E5C63; background: #EAF1F7; border-radius: 4px; padding: 3px 8px;">PROPERTY 3개</span>
+              </div>
+              <div style="font-size: 13px; color: #6E8A91; margin-top: 5px;">온라인 유저가 로그인 페이지를 조회했을 때 (url 에 login 포함)</div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <div style="width: 34px; height: 20px; border-radius: 999px; background: #2E6C92; position: relative; cursor: pointer;">
+                  <div style="position: absolute; top: 2px; left: 16px; width: 16px; height: 16px; border-radius: 999px; background: #fff;"></div>
+                </div>
+                <span style="font-size: 12.5px; font-weight: 500; color: #6E8A91; width: 44px;">측정 중</span>
+              </div>
+              <!-- hover-only row actions (opacity: 0 -> 1 on .tsp-row:hover) -->
+              <div class="tsp-rowactions" style="display: flex; align-items: center; gap: 4px; opacity: 0; transition: opacity 140ms ease-out;">
+                <button type="button" style="width: 30px; height: 30px; border-radius: 7px; border: 1px solid #DCE6EE; background: #FFFFFF; color: #6E8A91; font-family: inherit; font-size: 13px; cursor: pointer;">✎</button>
+                <button type="button" style="width: 30px; height: 30px; border-radius: 7px; border: 1px solid #DCE6EE; background: #FFFFFF; color: #6E8A91; font-family: inherit; font-size: 13px; cursor: pointer;">+</button>
+                <button type="button" style="width: 30px; height: 30px; border-radius: 7px; border: 1px solid #DCE6EE; background: #FFFFFF; color: #6E8A91; font-family: inherit; font-size: 15px; line-height: 1; cursor: pointer;">⋯</button>
+              </div>
+            </div>
+          </div>
+          <!-- (5 more rows omitted here — same shape, 6 mock rows total: login_viewed, login_clicked, login_completed, product_viewed, cart_added, order_completed) -->
+
+          <div style="padding: 14px 20px; display: flex; align-items: center; justify-content: space-between; font-size: 13px; color: #6E8A91;">
+            <span>81개 중 6개 표시</span>
+            <span style="font-weight: 500; color: #2E6C92; cursor: pointer;">더 보기</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+</body></html>

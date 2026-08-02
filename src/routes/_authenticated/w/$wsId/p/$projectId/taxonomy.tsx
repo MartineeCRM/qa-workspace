@@ -1,7 +1,7 @@
+import { useState } from "react";
 import { createFileRoute, useParams } from "@tanstack/react-router";
-import { Layers, ListTree, ShieldCheck, Users } from "lucide-react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { PageHeader, Stat } from "@/components/app/layout-parts";
+import { SegmentedControl } from "@/components/ui/segmented-control";
+import { SectionHeader, Stat } from "@/components/app/layout-parts";
 import { TaxonomyTab } from "@/components/app/taxonomy-tab";
 import { RulesTab } from "@/components/app/rules-tab";
 import {
@@ -37,6 +37,7 @@ function TaxonomyPage() {
   const { projectId } = useParams({ from: "/_authenticated/w/$wsId/p/$projectId/taxonomy" });
   const { role } = useWorkspaceContext();
   const editable = canEdit(role);
+  const [view, setView] = useState<"structure" | "rules">("structure");
 
   const { data: events = [] } = useTaxonomyEvents(projectId);
   const { data: eventProperties = [] } = useTaxonomyEventProperties(projectId);
@@ -50,45 +51,49 @@ function TaxonomyPage() {
   const attributeCount = items.filter((i) => i.kind === "attribute").length;
 
   return (
-    <div className="space-y-5 p-6">
-      <PageHeader
+    <div className="mx-auto max-w-[1240px] space-y-5 p-6">
+      <SectionHeader
         title="택소노미"
         description="이 고객의 단일 기준이에요. 모든 QA 환경이 이 택소노미를 검증하고, 규칙을 환경별로 복사하지 않아요."
       />
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Stat icon={ShieldCheck} label="전체 커버리지" value={items.length} />
-        <Stat icon={ListTree} label="이벤트" value={eventCount} />
-        <Stat icon={Layers} label="이벤트 프로퍼티" value={propertyCount} />
-        <Stat icon={Users} label="어트리뷰트" value={attributeCount} />
+        <Stat label="전체 커버리지" value={items.length} />
+        <Stat label="이벤트" value={eventCount} />
+        <Stat label="이벤트 프로퍼티" value={propertyCount} />
+        <Stat label="어트리뷰트" value={attributeCount} />
       </div>
 
-      <Tabs defaultValue="structure">
-        <TabsList>
-          <TabsTrigger value="structure">이벤트·속성</TabsTrigger>
-          <TabsTrigger value="rules">검증 규칙</TabsTrigger>
-        </TabsList>
-        <TabsContent value="structure" className="mt-4">
-          <TaxonomyTab
-            projectId={projectId}
-            events={events}
-            eventProperties={eventProperties}
-            customAttributes={customAttributes}
-            customAttributeProperties={customAttributeProperties}
-            editable={editable}
-          />
-        </TabsContent>
-        <TabsContent value="rules" className="mt-4">
-          <RulesTab
-            projectId={projectId}
-            rules={rules}
-            events={events}
-            eventProperties={eventProperties}
-            customAttributes={customAttributes}
-            editable={editable}
-          />
-        </TabsContent>
-      </Tabs>
+      <div className="flex items-center justify-between gap-4">
+        <SegmentedControl
+          value={view}
+          onValueChange={setView}
+          options={[
+            { value: "structure", label: "이벤트·속성" },
+            { value: "rules", label: "검증 규칙" },
+          ]}
+        />
+      </div>
+
+      {view === "structure" ? (
+        <TaxonomyTab
+          projectId={projectId}
+          events={events}
+          eventProperties={eventProperties}
+          customAttributes={customAttributes}
+          customAttributeProperties={customAttributeProperties}
+          editable={editable}
+        />
+      ) : (
+        <RulesTab
+          projectId={projectId}
+          rules={rules}
+          events={events}
+          eventProperties={eventProperties}
+          customAttributes={customAttributes}
+          editable={editable}
+        />
+      )}
     </div>
   );
 }

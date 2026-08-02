@@ -228,9 +228,9 @@ function TabLink({
         params={params as any}
         activeOptions={{ exact }}
         className={cn(
-          "inline-flex border-b-2 border-transparent px-3 pb-2 text-sm text-muted-foreground transition-colors hover:text-foreground",
+          "inline-flex border-b-2 border-transparent px-3 pb-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground",
         )}
-        activeProps={{ className: "border-primary text-foreground font-medium" }}
+        activeProps={{ className: "border-foreground text-foreground font-semibold" }}
       >
         {children}
       </Link>

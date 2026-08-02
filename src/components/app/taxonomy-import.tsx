@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Download, Upload } from "lucide-react";
+import { ChevronDown, Upload } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -133,35 +133,43 @@ export function TaxonomyImport({
       />
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button size="sm" variant="outline">
-            <Download className="size-4" /> 예시 데이터셋
+          <Button size="sm" variant="outline" disabled={busy}>
+            {busy ? "불러오는 중…" : "가져오기"} <ChevronDown className="size-3.5" />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-64">
-          <DropdownMenuLabel className="font-normal text-muted-foreground">
-            받은 파일을 채워서 그대로 올리면 돼요
-          </DropdownMenuLabel>
+        <DropdownMenuContent align="end" className="w-[380px]">
+          <DropdownMenuItem
+            className="flex-col items-start gap-0.5 py-2.5"
+            onSelect={() => fileRef.current?.click()}
+          >
+            <span className="flex items-center gap-2 text-sm font-medium">
+              <Upload className="size-4" /> 파일로 일괄 등록
+            </span>
+            <span className="text-xs font-normal text-muted-foreground">
+              CSV·JSON·YAML 파일을 올려서 이벤트와 속성을 한 번에 추가해요
+            </span>
+          </DropdownMenuItem>
           <DropdownMenuSeparator />
+          <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
+            예시 데이터셋 내려받기
+          </DropdownMenuLabel>
           <DropdownMenuItem
             onSelect={() => downloadText("taxonomy-sample.csv", sampleCsv(), "text/csv")}
           >
-            CSV 예시 내려받기
+            CSV 예시
           </DropdownMenuItem>
           <DropdownMenuItem
             onSelect={() => downloadText("taxonomy-sample.json", sampleJson(), "application/json")}
           >
-            JSON 예시 내려받기
+            JSON 예시
           </DropdownMenuItem>
           <DropdownMenuItem
             onSelect={() => downloadText("taxonomy-sample.yaml", sampleYaml(), "text/yaml")}
           >
-            YAML 예시 내려받기
+            YAML 예시
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
-      <Button size="sm" variant="outline" disabled={busy} onClick={() => fileRef.current?.click()}>
-        <Upload className="size-4" /> {busy ? "불러오는 중…" : "파일로 일괄 등록"}
-      </Button>
     </>
   );
 }

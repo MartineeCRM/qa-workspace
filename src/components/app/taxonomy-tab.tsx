@@ -1,17 +1,25 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ChevronDown, ChevronRight, Pencil, Plus, Trash2, Users } from "lucide-react";
+import { ChevronDown, ChevronRight, MoreHorizontal, Plus } from "lucide-react";
 
-import { EmptyState, Panel } from "@/components/app/layout-parts";
+import { EmptyState } from "@/components/app/layout-parts";
 import { Pill } from "@/components/app/badges";
 import { TaxonomyImport } from "@/components/app/taxonomy-import";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { NativeSelect } from "@/components/ui/native-select";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Select,
   SelectContent,
@@ -36,7 +44,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import {
   db,
@@ -47,9 +54,33 @@ import {
 } from "@/lib/queries";
 import { DATA_TYPES, errorMessage } from "@/lib/domain";
 import { useAuth } from "@/lib/auth";
+import { cn } from "@/lib/utils";
 
 type AnyAttribute =
   TaxonomyEventProperty | TaxonomyCustomAttribute | TaxonomyCustomAttributeProperty;
+
+type StatusFilter = "all" | "active" | "inactive";
+type SortKey = "name" | "updatedRecent";
+
+const PAGE_SIZE = 20;
+
+function matchesStatus(isActive: boolean, filter: StatusFilter) {
+  if (filter === "active") return isActive;
+  if (filter === "inactive") return !isActive;
+  return true;
+}
+
+function sortByKey<T extends { technical_name: string; updated_at: string }>(
+  items: T[],
+  key: SortKey,
+): T[] {
+  if (key === "updatedRecent") {
+    return [...items].sort(
+      (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
+    );
+  }
+  return [...items].sort((a, b) => a.technical_name.localeCompare(b.technical_name));
+}
 
 export function TaxonomyTab({
   projectId,
@@ -69,6 +100,9 @@ export function TaxonomyTab({
   const qc = useQueryClient();
   const { user } = useAuth();
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [sortKey, setSortKey] = useState<SortKey>("name");
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [activeTab, setActiveTab] = useState<"events" | "attributes">("events");
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const [openAttr, setOpenAttr] = useState<Record<string, boolean>>({});
@@ -110,7 +144,8 @@ export function TaxonomyTab({
     return map;
   }, [eventProperties]);
 
-  const visibleEvents = events.filter((e) => {
+  const filteredEvents = events.filter((e) => {
+    if (!matchesStatus(e.is_active, statusFilter)) return false;
     if (!term) return true;
     const children = attrsByEvent.get(e.id) ?? [];
     return (
@@ -119,6 +154,8 @@ export function TaxonomyTab({
       children.some((c) => c.technical_name.toLowerCase().includes(term))
     );
   });
+  const visibleEvents = sortByKey(filteredEvents, sortKey);
+  const pagedEvents = visibleEvents.slice(0, visibleCount);
 
   function propertyMatches(p: TaxonomyEventProperty) {
     return (
@@ -134,13 +171,16 @@ export function TaxonomyTab({
     return matches.length > 0 ? matches : children;
   }
 
-  const visibleCustomAttributes = customAttributes.filter((a) => {
+  const filteredCustomAttributes = customAttributes.filter((a) => {
+    if (!matchesStatus(a.is_active, statusFilter)) return false;
     if (!term) return true;
     return (
       a.technical_name.toLowerCase().includes(term) ||
       (a.display_name ?? "").toLowerCase().includes(term)
     );
   });
+  const visibleCustomAttributes = sortByKey(filteredCustomAttributes, sortKey);
+  const pagedCustomAttributes = visibleCustomAttributes.slice(0, visibleCount);
 
   // 검색 결과가 한쪽 탭에만 있으면 그쪽으로 자동으로 옮겨줘요.
   useEffect(() => {
@@ -151,6 +191,11 @@ export function TaxonomyTab({
       setActiveTab("events");
     }
   }, [term, visibleEvents.length, visibleCustomAttributes.length]);
+
+  // 검색어/필터/정렬/탭이 바뀌면 더 보기로 늘려둔 개수를 다시 첫 페이지로 되돌려요.
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [term, statusFilter, sortKey, activeTab]);
 
   async function removeEvent(event: TaxonomyEvent) {
     const { error } = await db.from("taxonomy_events").delete().eq("id", event.id);
@@ -199,203 +244,253 @@ export function TaxonomyTab({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <Input
-          placeholder="이벤트·Property·어트리뷰트 검색…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="h-9 max-w-xs"
-        />
-        <div className="ml-auto flex flex-wrap gap-2">
-          {editable ? (
-            <>
-              <TaxonomyImport
-                projectId={projectId}
-                events={events}
-                eventProperties={eventProperties}
-                customAttributes={customAttributes}
-              />
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setAttrDialog({ attribute: null, eventId: null })}
-              >
-                <Users className="size-4" /> 사용자 속성 추가
-              </Button>
-              <Button size="sm" onClick={() => setEventDialog({ event: null })}>
-                <Plus className="size-4" /> 이벤트 추가
-              </Button>
-            </>
-          ) : null}
-        </div>
-      </div>
-
       {editable ? (
-        <p className="rounded-md border border-dashed bg-surface px-3 py-2 text-xs text-muted-foreground">
-          하나씩 클릭해서 만들지 않아도 돼요. 예시 데이터셋(CSV·JSON·YAML)을 받아 내용을 채운 뒤
-          그대로 올리면 이벤트와 속성이 한 번에 등록돼요. 이미 있는 이름은 건너뛰어요.
-        </p>
+        <div className="flex justify-end gap-2">
+          <TaxonomyImport
+            projectId={projectId}
+            events={events}
+            eventProperties={eventProperties}
+            customAttributes={customAttributes}
+          />
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="sm">
+                <Plus className="size-4" /> 추가 <ChevronDown className="size-3.5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuItem onSelect={() => setEventDialog({ event: null })}>
+                이벤트 추가
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => setAttrDialog({ attribute: null, eventId: null })}>
+                사용자 속성 추가
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       ) : null}
 
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "events" | "attributes")}>
-        <TabsList>
-          <TabsTrigger value="events">이벤트 {events.length}개</TabsTrigger>
-          <TabsTrigger value="attributes">어트리뷰트 {customAttributes.length}개</TabsTrigger>
-        </TabsList>
+      <div className="rounded-lg border bg-card shadow-panel">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b px-5 py-3">
+          <div className="flex items-center gap-5">
+            <button
+              type="button"
+              onClick={() => setActiveTab("events")}
+              className={cn(
+                "pb-2.5 text-sm font-medium transition-colors",
+                activeTab === "events"
+                  ? "text-foreground shadow-[inset_0_-2px_0_var(--color-foreground)]"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              이벤트 {events.length}
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("attributes")}
+              className={cn(
+                "pb-2.5 text-sm font-medium transition-colors",
+                activeTab === "attributes"
+                  ? "text-foreground shadow-[inset_0_-2px_0_var(--color-foreground)]"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              어트리뷰트 {customAttributes.length}
+            </button>
+          </div>
+          <div className="flex items-center gap-2">
+            <NativeSelect
+              aria-label="상태 필터"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
+            >
+              <option value="all">전체 상태</option>
+              <option value="active">포함</option>
+              <option value="inactive">미포함</option>
+            </NativeSelect>
+            <NativeSelect
+              aria-label="정렬"
+              value={sortKey}
+              onChange={(e) => setSortKey(e.target.value as SortKey)}
+            >
+              <option value="name">이름순</option>
+              <option value="updatedRecent">최근 수정순</option>
+            </NativeSelect>
+            <Input
+              placeholder="이벤트·Property·어트리뷰트 검색…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="h-[34px] w-[260px]"
+            />
+          </div>
+        </div>
 
-        <TabsContent value="events" className="mt-4">
-          <Panel title="이벤트" description="모든 QA 환경이 이 정의를 기준으로 측정돼요.">
-            {visibleEvents.length === 0 ? (
-              <EmptyState
-                title="아직 이벤트가 없어요"
-                description="이 고객이 구현해야 할 이벤트를 등록해 주세요. 속성은 이벤트 아래에 붙어요."
-              />
-            ) : (
-              <ul className="divide-y">
-                {visibleEvents.map((event) => {
-                  const children = childrenFor(event.id);
-                  const expanded = open[event.id] ?? true;
-                  return (
-                    <li key={event.id}>
-                      <div className="flex items-start gap-2 px-4 py-3">
-                        <button
-                          type="button"
-                          onClick={() => setOpen((s) => ({ ...s, [event.id]: !expanded }))}
-                          className="mt-0.5 text-muted-foreground hover:text-foreground"
-                          aria-label={expanded ? "접기" : "펼치기"}
-                        >
-                          {expanded ? (
-                            <ChevronDown className="size-4" />
-                          ) : (
-                            <ChevronRight className="size-4" />
-                          )}
-                        </button>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="mono-token text-sm font-semibold">
-                              {event.technical_name}
+        {activeTab === "events" ? (
+          visibleEvents.length === 0 ? (
+            <EmptyState
+              title={events.length === 0 ? "아직 이벤트가 없어요" : "조건에 맞는 이벤트가 없어요"}
+              description="이 고객이 구현해야 할 이벤트를 등록해 주세요. 속성은 이벤트 아래에 붙어요."
+            />
+          ) : (
+            <ul className="divide-y">
+              {pagedEvents.map((event) => {
+                const children = childrenFor(event.id);
+                const expanded = open[event.id] ?? true;
+                return (
+                  <li key={event.id} className="group">
+                    <div className="flex items-start gap-2 px-5 py-3 hover:bg-surface">
+                      <button
+                        type="button"
+                        onClick={() => setOpen((s) => ({ ...s, [event.id]: !expanded }))}
+                        className="mt-0.5 text-muted-foreground hover:text-foreground"
+                        aria-label={expanded ? "접기" : "펼치기"}
+                      >
+                        {expanded ? (
+                          <ChevronDown className="size-4" />
+                        ) : (
+                          <ChevronRight className="size-4" />
+                        )}
+                      </button>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="mono-token text-sm font-semibold">
+                            {event.technical_name}
+                          </span>
+                          {event.display_name ? (
+                            <span className="text-sm text-muted-foreground">
+                              {event.display_name}
                             </span>
-                            {event.display_name ? (
-                              <span className="text-sm text-muted-foreground">
-                                {event.display_name}
-                              </span>
-                            ) : null}
-                            <Pill>property {children.length}개</Pill>
-                            {!event.is_active ? <Pill>비활성</Pill> : null}
-                          </div>
-                          {event.description ? (
-                            <p className="mt-0.5 text-xs text-muted-foreground">
-                              {event.description}
-                            </p>
                           ) : null}
+                          <Pill>property {children.length}개</Pill>
+                          {!event.is_active ? <Pill>비활성</Pill> : null}
                         </div>
-                        {editable ? (
-                          <div className="flex items-center gap-1">
+                        {event.description ? (
+                          <p className="mt-0.5 text-xs text-muted-foreground">
+                            {event.description}
+                          </p>
+                        ) : null}
+                      </div>
+                      {editable ? (
+                        <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-1.5">
                             <Switch
                               checked={event.is_active}
                               onCheckedChange={(v) => toggleActive("taxonomy_events", event.id, v)}
                               aria-label="커버리지 포함 여부"
                             />
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              onClick={() => setAttrDialog({ attribute: null, eventId: event.id })}
-                              aria-label="Property 추가"
-                            >
-                              <Plus className="size-4" />
-                            </Button>
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              onClick={() => setEventDialog({ event })}
-                              aria-label="이벤트 수정"
-                            >
-                              <Pencil className="size-4" />
-                            </Button>
-                            <DeleteButton
-                              onConfirm={() => removeEvent(event)}
+                            <span className="w-11 text-[11px] text-muted-foreground">
+                              {event.is_active ? "측정 중" : "미측정"}
+                            </span>
+                          </div>
+                          <div className="opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+                            <RowActions
                               label={event.technical_name}
+                              editLabel="이벤트 수정"
+                              onEdit={() => setEventDialog({ event })}
+                              onDelete={() => removeEvent(event)}
+                              extra={{
+                                label: "Property 추가",
+                                onClick: () =>
+                                  setAttrDialog({ attribute: null, eventId: event.id }),
+                              }}
                             />
                           </div>
-                        ) : null}
-                      </div>
-                      {expanded && children.length > 0 ? (
-                        <ul className="border-t bg-surface-strong/40">
-                          {children.map((attr) => (
-                            <AttributeRow
-                              key={attr.id}
-                              attribute={attr}
-                              editable={editable}
-                              onEdit={() =>
-                                setAttrDialog({ attribute: attr, eventId: attr.event_id })
-                              }
-                              onDelete={() => removeEventProperty(attr)}
-                              onToggle={(v) =>
-                                toggleActive("taxonomy_event_properties", attr.id, v)
-                              }
-                            />
-                          ))}
-                        </ul>
+                        </div>
                       ) : null}
-                    </li>
-                  );
-                })}
-              </ul>
+                    </div>
+                    {expanded && children.length > 0 ? (
+                      <ul className="border-t bg-surface-strong/40">
+                        {children.map((attr) => (
+                          <AttributeRow
+                            key={attr.id}
+                            attribute={attr}
+                            editable={editable}
+                            onEdit={() =>
+                              setAttrDialog({ attribute: attr, eventId: attr.event_id })
+                            }
+                            onDelete={() => removeEventProperty(attr)}
+                            onToggle={(v) => toggleActive("taxonomy_event_properties", attr.id, v)}
+                          />
+                        ))}
+                      </ul>
+                    ) : null}
+                  </li>
+                );
+              })}
+            </ul>
+          )
+        ) : visibleCustomAttributes.length === 0 ? (
+          <EmptyState
+            title={
+              customAttributes.length === 0 ? "어트리뷰트가 없어요" : "조건에 맞는 항목이 없어요"
+            }
+            description="프로필 수준의 속성을 여기에 추가해요."
+          />
+        ) : (
+          <ul className="divide-y">
+            {pagedCustomAttributes.map((attr) =>
+              attr.data_type === "array of object" ? (
+                <ExpandableCustomAttributeRow
+                  key={attr.id}
+                  attribute={attr}
+                  editable={editable}
+                  expanded={openAttr[attr.id] ?? true}
+                  onToggleExpand={() =>
+                    setOpenAttr((s) => ({ ...s, [attr.id]: !(s[attr.id] ?? true) }))
+                  }
+                  subProperties={subPropsByAttribute.get(attr.id) ?? []}
+                  onEdit={() => setAttrDialog({ attribute: attr, eventId: null })}
+                  onDelete={() => removeCustomAttribute(attr)}
+                  onToggle={(v) => toggleActive("taxonomy_custom_attributes", attr.id, v)}
+                  onAddProperty={() =>
+                    setSubPropDialog({ property: null, customAttributeId: attr.id })
+                  }
+                  onEditProperty={(p) =>
+                    setSubPropDialog({ property: p, customAttributeId: attr.id })
+                  }
+                  onDeleteProperty={removeCustomAttributeProperty}
+                  onTogglePropertyActive={(p, v) =>
+                    toggleActive("taxonomy_custom_attribute_properties", p.id, v)
+                  }
+                />
+              ) : (
+                <AttributeRow
+                  key={attr.id}
+                  attribute={attr}
+                  editable={editable}
+                  noun="어트리뷰트"
+                  onEdit={() => setAttrDialog({ attribute: attr, eventId: null })}
+                  onDelete={() => removeCustomAttribute(attr)}
+                  onToggle={(v) => toggleActive("taxonomy_custom_attributes", attr.id, v)}
+                />
+              ),
             )}
-          </Panel>
-        </TabsContent>
+          </ul>
+        )}
 
-        <TabsContent value="attributes" className="mt-4">
-          <Panel title="어트리뷰트" description="특정 이벤트에 묶이지 않는 사용자 속성이에요.">
-            {visibleCustomAttributes.length === 0 ? (
-              <EmptyState
-                title={customAttributes.length === 0 ? "어트리뷰트가 없어요" : "검색 결과가 없어요"}
-                description="프로필 수준의 속성을 여기에 추가해요."
-              />
-            ) : (
-              <ul className="divide-y">
-                {visibleCustomAttributes.map((attr) =>
-                  attr.data_type === "array of object" ? (
-                    <ExpandableCustomAttributeRow
-                      key={attr.id}
-                      attribute={attr}
-                      editable={editable}
-                      expanded={openAttr[attr.id] ?? true}
-                      onToggleExpand={() =>
-                        setOpenAttr((s) => ({ ...s, [attr.id]: !(s[attr.id] ?? true) }))
-                      }
-                      subProperties={subPropsByAttribute.get(attr.id) ?? []}
-                      onEdit={() => setAttrDialog({ attribute: attr, eventId: null })}
-                      onDelete={() => removeCustomAttribute(attr)}
-                      onToggle={(v) => toggleActive("taxonomy_custom_attributes", attr.id, v)}
-                      onAddProperty={() =>
-                        setSubPropDialog({ property: null, customAttributeId: attr.id })
-                      }
-                      onEditProperty={(p) =>
-                        setSubPropDialog({ property: p, customAttributeId: attr.id })
-                      }
-                      onDeleteProperty={removeCustomAttributeProperty}
-                      onTogglePropertyActive={(p, v) =>
-                        toggleActive("taxonomy_custom_attribute_properties", p.id, v)
-                      }
-                    />
-                  ) : (
-                    <AttributeRow
-                      key={attr.id}
-                      attribute={attr}
-                      editable={editable}
-                      noun="어트리뷰트"
-                      onEdit={() => setAttrDialog({ attribute: attr, eventId: null })}
-                      onDelete={() => removeCustomAttribute(attr)}
-                      onToggle={(v) => toggleActive("taxonomy_custom_attributes", attr.id, v)}
-                    />
-                  ),
-                )}
-              </ul>
-            )}
-          </Panel>
-        </TabsContent>
-      </Tabs>
+        {(() => {
+          const total = activeTab === "events" ? visibleEvents.length : visibleCustomAttributes.length;
+          const shown = activeTab === "events" ? pagedEvents.length : pagedCustomAttributes.length;
+          const noun = activeTab === "events" ? "이벤트" : "어트리뷰트";
+          if (total === 0) return null;
+          return (
+            <div className="flex items-center justify-between border-t px-5 py-3">
+              <p className="text-xs text-muted-foreground">
+                {noun} {total}개 중 {shown}개 표시 중이에요
+              </p>
+              {shown < total ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
+                >
+                  더 보기
+                </Button>
+              ) : null}
+            </div>
+          );
+        })()}
+      </div>
 
       {eventDialog ? (
         <EventDialog
@@ -412,6 +507,7 @@ export function TaxonomyTab({
           projectId={projectId}
           userId={user?.id ?? ""}
           events={events}
+          eventProperties={eventProperties}
           attribute={attrDialog.attribute}
           eventId={attrDialog.eventId}
           onClose={() => setAttrDialog(null)}
@@ -460,8 +556,8 @@ function ExpandableCustomAttributeRow({
   onTogglePropertyActive: (property: TaxonomyCustomAttributeProperty, value: boolean) => void;
 }) {
   return (
-    <li>
-      <div className="flex items-start gap-2 px-4 py-3">
+    <li className="group">
+      <div className="flex items-start gap-2 px-5 py-3 hover:bg-surface">
         <button
           type="button"
           onClick={onToggleExpand}
@@ -482,19 +578,26 @@ function ExpandableCustomAttributeRow({
           ) : null}
         </div>
         {editable ? (
-          <div className="flex items-center gap-1">
-            <Switch
-              checked={attribute.is_active}
-              onCheckedChange={onToggle}
-              aria-label="커버리지 포함 여부"
-            />
-            <Button size="icon" variant="ghost" onClick={onAddProperty} aria-label="필드 추가">
-              <Plus className="size-4" />
-            </Button>
-            <Button size="icon" variant="ghost" onClick={onEdit} aria-label="어트리뷰트 수정">
-              <Pencil className="size-4" />
-            </Button>
-            <DeleteButton onConfirm={onDelete} label={attribute.technical_name} />
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5">
+              <Switch
+                checked={attribute.is_active}
+                onCheckedChange={onToggle}
+                aria-label="커버리지 포함 여부"
+              />
+              <span className="w-11 text-[11px] text-muted-foreground">
+                {attribute.is_active ? "측정 중" : "미측정"}
+              </span>
+            </div>
+            <div className="opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+              <RowActions
+                label={attribute.technical_name}
+                editLabel="어트리뷰트 수정"
+                onEdit={onEdit}
+                onDelete={onDelete}
+                extra={{ label: "필드 추가", onClick: onAddProperty }}
+              />
+            </div>
           </div>
         ) : null}
       </div>
@@ -533,7 +636,7 @@ function AttributeRow({
   noun?: string;
 }) {
   return (
-    <li className="flex items-center gap-2 px-4 py-2 pl-10">
+    <li className="group flex items-center gap-2 px-5 py-2 pl-11 hover:bg-surface">
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           <span className="mono-token text-sm">{attribute.technical_name}</span>
@@ -546,43 +649,85 @@ function AttributeRow({
         ) : null}
       </div>
       {editable ? (
-        <div className="flex items-center gap-1">
-          <Switch
-            checked={attribute.is_active}
-            onCheckedChange={onToggle}
-            aria-label="커버리지 포함 여부"
-          />
-          <Button size="icon" variant="ghost" onClick={onEdit} aria-label={`${noun} 수정`}>
-            <Pencil className="size-4" />
-          </Button>
-          <DeleteButton onConfirm={onDelete} label={attribute.technical_name} />
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1.5">
+            <Switch
+              checked={attribute.is_active}
+              onCheckedChange={onToggle}
+              aria-label="커버리지 포함 여부"
+            />
+            <span className="w-11 text-[11px] text-muted-foreground">
+              {attribute.is_active ? "측정 중" : "미측정"}
+            </span>
+          </div>
+          <div className="opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+            <RowActions
+              label={attribute.technical_name}
+              editLabel={`${noun} 수정`}
+              onEdit={onEdit}
+              onDelete={onDelete}
+            />
+          </div>
         </div>
       ) : null}
     </li>
   );
 }
 
-function DeleteButton({ onConfirm, label }: { onConfirm: () => void; label: string }) {
+function RowActions({
+  label,
+  editLabel,
+  onEdit,
+  onDelete,
+  extra,
+}: {
+  label: string;
+  editLabel: string;
+  onEdit: () => void;
+  onDelete: () => void;
+  extra?: { label: string; onClick: () => void };
+}) {
+  const [confirmOpen, setConfirmOpen] = useState(false);
   return (
-    <AlertDialog>
-      <AlertDialogTrigger asChild>
-        <Button size="icon" variant="ghost" aria-label={`${label} 삭제`}>
-          <Trash2 className="size-4" />
-        </Button>
-      </AlertDialogTrigger>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>“{label}”을(를) 삭제할까요?</AlertDialogTitle>
-          <AlertDialogDescription>
-            택소노미에서 사라지기 때문에 전체 커버리지와 모든 QA 환경 수치가 바로 다시 계산돼요.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel>취소</AlertDialogCancel>
-          <AlertDialogAction onClick={onConfirm}>삭제</AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button size="icon" variant="ghost" className="size-7" aria-label={`${label} 작업 메뉴`}>
+            <MoreHorizontal className="size-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-40">
+          {extra ? (
+            <DropdownMenuItem onSelect={extra.onClick}>{extra.label}</DropdownMenuItem>
+          ) : null}
+          <DropdownMenuItem onSelect={onEdit}>{editLabel}</DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            className="text-destructive focus:bg-destructive/10 focus:text-destructive"
+            onSelect={(e) => {
+              e.preventDefault();
+              setConfirmOpen(true);
+            }}
+          >
+            삭제
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>“{label}”을(를) 삭제할까요?</AlertDialogTitle>
+            <AlertDialogDescription>
+              택소노미에서 사라지기 때문에 전체 커버리지와 모든 QA 환경 수치가 바로 다시 계산돼요.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>취소</AlertDialogCancel>
+            <AlertDialogAction onClick={onDelete}>삭제</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
 
@@ -679,6 +824,7 @@ function AttributeDialog({
   projectId,
   userId,
   events,
+  eventProperties,
   attribute,
   eventId,
   onClose,
@@ -687,6 +833,7 @@ function AttributeDialog({
   projectId: string;
   userId: string;
   events: TaxonomyEvent[];
+  eventProperties: TaxonomyEventProperty[];
   attribute: AnyAttribute | null;
   eventId: string | null;
   onClose: () => void;
@@ -696,6 +843,27 @@ function AttributeDialog({
     attribute && "event_id" in attribute ? attribute.event_id : (eventId ?? "none"),
   );
   const isProperty = parent !== "none";
+
+  const siblings = useMemo(() => {
+    if (!attribute || !isProperty) return [];
+    return eventProperties.filter(
+      (p) => p.technical_name === attribute.technical_name && p.id !== attribute.id,
+    );
+  }, [attribute, isProperty, eventProperties]);
+
+  const eventNameById = useMemo(
+    () => new Map(events.map((e) => [e.id, e.technical_name])),
+    [events],
+  );
+
+  const [checkedSiblings, setCheckedSiblings] = useState<Record<string, boolean>>(() =>
+    Object.fromEntries(siblings.map((s) => [s.id, true])),
+  );
+
+  function toggleAllSiblings(value: boolean) {
+    setCheckedSiblings(Object.fromEntries(siblings.map((s) => [s.id, value])));
+  }
+
   const [technicalName, setTechnicalName] = useState(attribute?.technical_name ?? "");
   const [displayName, setDisplayName] = useState(attribute?.display_name ?? "");
   const [description, setDescription] = useState(attribute?.description ?? "");
@@ -724,6 +892,36 @@ function AttributeDialog({
       allowed_values: allowedValues.length ? allowedValues : null,
     };
     const table = isProperty ? "taxonomy_event_properties" : "taxonomy_custom_attributes";
+
+    if (attribute && isProperty) {
+      const checkedSiblingIds = siblings
+        .filter((s) => checkedSiblings[s.id] ?? true)
+        .map((s) => s.id);
+      const targetIds = [attribute.id, ...checkedSiblingIds];
+      const { data, error } = await db
+        .from(table)
+        .update(basePayload)
+        .in("id", targetIds)
+        .select("id");
+      setSaving(false);
+      if (error) return toast.error(errorMessage(error));
+      const appliedCount = data?.length ?? 0;
+      if (appliedCount < targetIds.length) {
+        toast.info(
+          `이벤트 ${appliedCount}/${targetIds.length}개에만 적용됐어요. 권한이 없는 이벤트는 제외됐어요.`,
+        );
+      } else {
+        toast.success(
+          checkedSiblingIds.length > 0
+            ? `속성을 수정했어요 (이벤트 ${appliedCount}개에 적용)`
+            : "속성을 수정했어요",
+        );
+      }
+      onSaved();
+      onClose();
+      return;
+    }
+
     const payload = isProperty
       ? { ...basePayload, event_id: parent }
       : { ...basePayload, project_id: projectId };
@@ -832,6 +1030,47 @@ function AttributeDialog({
             </div>
             <Switch checked={required} onCheckedChange={setRequired} />
           </div>
+          {siblings.length > 0 ? (
+            <div className="space-y-2 rounded-md border px-3 py-2.5">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-sm font-medium">다른 이벤트에도 적용 ({siblings.length}개)</p>
+                <div className="flex gap-1">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => toggleAllSiblings(true)}
+                  >
+                    전체 선택
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => toggleAllSiblings(false)}
+                  >
+                    전체 해제
+                  </Button>
+                </div>
+              </div>
+              <ul className="max-h-48 space-y-1.5 overflow-y-auto">
+                {siblings.map((s) => (
+                  <li key={s.id} className="flex items-center gap-2">
+                    <Checkbox
+                      id={`sibling-${s.id}`}
+                      checked={checkedSiblings[s.id] ?? true}
+                      onCheckedChange={(v) =>
+                        setCheckedSiblings((prev) => ({ ...prev, [s.id]: v === true }))
+                      }
+                    />
+                    <Label htmlFor={`sibling-${s.id}`} className="mono-token text-sm font-normal">
+                      {eventNameById.get(s.event_id) ?? "—"}
+                    </Label>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>
