@@ -2505,7 +2505,7 @@ export const Route = createFileRoute(
 });
 
 function ItemPage() {
-  const { projectId, stageSlug, roundId, sessionId, itemId } = useParams({
+  const { wsId, projectId, stageSlug, roundId, sessionId, itemId } = useParams({
     from: "/_authenticated/w/$wsId/p/$projectId/qa/$stageSlug/$roundId/$sessionId/$itemId",
   });
   const { data: stages = [] } = useEnvironments(projectId);
@@ -2524,17 +2524,17 @@ function ItemPage() {
           {
             label: "개발 QA",
             to: "/w/$wsId/p/$projectId/qa/$stageSlug",
-            params: {},
+            params: { wsId, projectId, stageSlug },
           },
           {
             label: "라운드",
             to: "/w/$wsId/p/$projectId/qa/$stageSlug/$roundId",
-            params: { roundId },
+            params: { wsId, projectId, stageSlug, roundId },
           },
           {
             label: session.name,
             to: "/w/$wsId/p/$projectId/qa/$stageSlug/$roundId/$sessionId",
-            params: { roundId, sessionId },
+            params: { wsId, projectId, stageSlug, roundId, sessionId },
           },
           { label: itemId },
         ]}
@@ -2554,6 +2554,8 @@ function ItemPage() {
 - [ ] **Step 4: 세션 뷰와 라운드 뷰에도 브레드크럼 추가**
 
 `qa-round-view.tsx`와 `qa-session-view.tsx` 최상단에 각각 `<QaBreadcrumb items={...} />`를 추가한다(라운드 뷰는 `개발 QA / N차 라운드`, 세션 뷰는 `개발 QA / N차 라운드 / 세션명`) — README "모든 뷰 상단에 브레드크럼이 공통으로 붙습니다" 요구사항.
+
+`QaBreadcrumbItem.params`는 `item.params as never`로 캐스트돼서 타입체커가 잡아주지 못한다 — 각 항목의 `params`엔 그 `to` 라우트가 실제로 필요로 하는 **모든** path param(`wsId`, `projectId`, `stageSlug`뿐 아니라 그 아래 단계의 `roundId`/`sessionId`까지, 상위 라우트로 갈 때도 마찬가지)을 빠짐없이 채워 넣는다 — 일부만 채우면 컴파일은 되지만 실제 클릭 시 잘못된 URL로 이동한다. `qa-round-view.tsx`/`qa-session-view.tsx`의 컴포넌트 prop으로 이미 받고 있는 `projectId`/`environmentId`만으로는 `wsId`가 없으니, 이 두 컴포넌트를 호출하는 라우트 파일(`$roundId/index.tsx`, `$roundId/$sessionId/index.tsx`)에서 `useParams`로 `wsId`까지 함께 꺼내 prop으로 내려주거나, 컴포넌트 안에서 직접 `useParams({ from: ... })`로 가져온다.
 
 - [ ] **Step 5: 타입체크**
 
