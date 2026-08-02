@@ -39,6 +39,36 @@ function judgeBadgeLabel(result: QaChecklistItemResult | undefined): string {
   return result.judged_by === "ai" ? "AI" : "RULE";
 }
 
+function StatusPill({ status }: { status: "passed" | "failed" | "not_collected" }) {
+  const styles =
+    status === "passed"
+      ? "bg-published/40 text-published-foreground"
+      : status === "failed"
+        ? "bg-destructive/10 text-destructive"
+        : "bg-surface-strong text-muted-foreground";
+  return (
+    <span
+      className={`inline-flex items-center rounded-sm border border-transparent px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide ${styles}`}
+    >
+      {status === "passed" ? "통과" : status === "failed" ? "불합격" : "미수집"}
+    </span>
+  );
+}
+
+// SeverityBadge (badges.tsx) hardcodes its label via SEVERITY_LABEL (e.g. severity="info" always
+// renders "정보"), so it can't be reused verbatim to say "AI" — instead this mirrors its info-tone
+// classes (border-primary/30 bg-primary/10 text-primary) in a tiny local badge with the right text.
+function JudgeBadge({ result }: { result: QaChecklistItemResult | undefined }) {
+  if (result?.judged_by === "ai") {
+    return (
+      <span className="inline-flex items-center rounded-sm border border-primary/30 bg-primary/10 px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-primary">
+        AI
+      </span>
+    );
+  }
+  return <Pill>{judgeBadgeLabel(result)}</Pill>;
+}
+
 function itemLabel(
   item: QaChecklistItem,
   events: TaxonomyEvent[],
@@ -255,7 +285,7 @@ export function ResultPanel({
                     <span className="mono-token min-w-0 flex-1 truncate">
                       {itemLabel(item, events, customAttributes)}
                     </span>
-                    <Pill>{judgeBadgeLabel(result)}</Pill>
+                    <JudgeBadge result={result} />
                   </button>
                 </li>
               );
@@ -268,8 +298,8 @@ export function ResultPanel({
                 <span className="mono-token text-base font-semibold">
                   {itemLabel(selected, events, customAttributes)}
                 </span>
-                <Pill>{selectedResult?.final_status ?? "not_collected"}</Pill>
-                <Pill>{judgeBadgeLabel(selectedResult)}</Pill>
+                <StatusPill status={selectedResult?.final_status ?? "not_collected"} />
+                <JudgeBadge result={selectedResult} />
               </div>
               <p className="text-sm">{selectedResult?.ai_reasoning ?? "판단 이유가 없어요."}</p>
               <div className="relative overflow-hidden rounded-md bg-[#111113]">
