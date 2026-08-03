@@ -31,7 +31,19 @@ export type TaxonomyAttributeLite = {
   allowed_values: string[] | null;
 };
 
-export type StructuralViolation = { property: string; reason: string };
+export type StructuralViolation = {
+  property: string;
+  reason: string;
+  kind?: "unknown_property";
+  sampleValue?: unknown;
+};
+
+export function inferDataType(value: unknown): string {
+  if (Array.isArray(value)) return "array";
+  if (typeof value === "number") return "number";
+  if (typeof value === "boolean") return "boolean";
+  return "string";
+}
 
 export function matchEventLogs(eventId: string, runEvents: RunEvent[]): RunEvent[] {
   return runEvents.filter((r) => r.event_id === eventId);
@@ -109,6 +121,23 @@ export function judgeEventStructural(
       if (violation) violations.push(violation);
     }
   }
+
+  const knownNames = new Set(properties.map((p) => p.technical_name));
+  const unknownProperties = new Map<string, unknown>();
+  for (const e of matchedEvents) {
+    for (const [key, value] of Object.entries(e.raw_properties)) {
+      if (!knownNames.has(key) && !unknownProperties.has(key)) unknownProperties.set(key, value);
+    }
+  }
+  for (const [property, sampleValue] of unknownProperties) {
+    violations.push({
+      property,
+      reason: "택소노미에 정의되지 않은 프로퍼티입니다",
+      kind: "unknown_property",
+      sampleValue,
+    });
+  }
+
   return violations;
 }
 

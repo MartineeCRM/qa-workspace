@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { ItemStatus, WorkspaceRole } from "@/lib/domain";
 
@@ -342,6 +342,33 @@ export function useTaxonomyEventProperties(projectId: string) {
           .order("sort_order")
           .order("created_at"),
       ),
+  });
+}
+
+export function useAddDiscoveredEventProperty(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: {
+      eventId: string;
+      technicalName: string;
+      dataType: string;
+      sampleValue: unknown;
+      userId: string;
+    }) => {
+      const { error } = await db.from("taxonomy_event_properties").insert({
+        event_id: input.eventId,
+        technical_name: input.technicalName,
+        data_type: input.dataType,
+        is_required: false,
+        allowed_values: null,
+        example_value: input.sampleValue,
+        created_by: input.userId,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["taxonomy-event-properties", projectId] });
+    },
   });
 }
 

@@ -64,6 +64,14 @@ describe("judgeEventStructural", () => {
         is_required: true,
         allowed_values: ["CARD", "BANK", "POINT"],
       },
+      {
+        id: "p1b",
+        event_id: "evt-1",
+        technical_name: "order_no",
+        data_type: "string",
+        is_required: false,
+        allowed_values: null,
+      },
     ]);
     expect(violations).toEqual([
       {
@@ -83,6 +91,22 @@ describe("judgeEventStructural", () => {
         is_required: true,
         allowed_values: null,
       },
+      {
+        id: "p2b",
+        event_id: "evt-1",
+        technical_name: "payment_method",
+        data_type: "string",
+        is_required: false,
+        allowed_values: null,
+      },
+      {
+        id: "p2c",
+        event_id: "evt-1",
+        technical_name: "order_no",
+        data_type: "string",
+        is_required: false,
+        allowed_values: null,
+      },
     ]);
     expect(violations).toEqual([
       { property: "product_id", reason: "필수 프로퍼티가 로그에 없습니다" },
@@ -95,6 +119,14 @@ describe("judgeEventStructural", () => {
         id: "p3",
         event_id: "evt-1",
         technical_name: "order_no",
+        data_type: "string",
+        is_required: true,
+        allowed_values: null,
+      },
+      {
+        id: "p3b",
+        event_id: "evt-1",
+        technical_name: "payment_method",
         data_type: "string",
         is_required: true,
         allowed_values: null,
@@ -122,9 +154,69 @@ describe("judgeEventStructural", () => {
         is_required: true,
         allowed_values: null,
       },
+      {
+        id: "p4b",
+        event_id: "evt-1",
+        technical_name: "order_no",
+        data_type: "string",
+        is_required: false,
+        allowed_values: null,
+      },
     ]);
     expect(violations).toEqual([
       { property: "payment_method", reason: "필수 프로퍼티 값이 비어 있습니다" },
+    ]);
+  });
+
+  it("flags a raw property that isn't defined in the taxonomy", () => {
+    const violations = judgeEventStructural(runEvents, [
+      {
+        id: "p5",
+        event_id: "evt-1",
+        technical_name: "payment_method",
+        data_type: "string",
+        is_required: true,
+        allowed_values: null,
+      },
+    ]);
+    expect(violations).toEqual([
+      {
+        property: "order_no",
+        reason: "택소노미에 정의되지 않은 프로퍼티입니다",
+        kind: "unknown_property",
+        sampleValue: "20260728-8831",
+      },
+    ]);
+  });
+
+  it("only reports each unknown property once across multiple matched events", () => {
+    const repeatedEvents: RunEvent[] = [
+      ...runEvents,
+      {
+        event_id: "evt-1",
+        raw_event_name: "purchase",
+        occurred_at: "2026-07-28T18:01:00Z",
+        external_user_id: "u_2",
+        raw_properties: { payment_method: "credit_card", order_no: "20260728-9002" },
+      },
+    ];
+    const violations = judgeEventStructural(repeatedEvents, [
+      {
+        id: "p6",
+        event_id: "evt-1",
+        technical_name: "payment_method",
+        data_type: "string",
+        is_required: true,
+        allowed_values: null,
+      },
+    ]);
+    expect(violations.filter((v) => v.kind === "unknown_property")).toEqual([
+      {
+        property: "order_no",
+        reason: "택소노미에 정의되지 않은 프로퍼티입니다",
+        kind: "unknown_property",
+        sampleValue: "20260728-8831",
+      },
     ]);
   });
 });

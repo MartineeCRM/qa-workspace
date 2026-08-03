@@ -72,7 +72,7 @@ export async function judgeChecklistItem(
         ...base,
         ai_verdict: "failed",
         ai_reasoning: violations.map((v) => `${v.property}: ${v.reason}`).join("\n"),
-        ai_evidence: matched,
+        ai_evidence: violations,
         failed_layer: "structural",
         final_status: "failed",
         judged_by: "rule",

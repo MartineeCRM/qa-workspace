@@ -6,7 +6,8 @@ import { Panel } from "@/components/app/layout-parts";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/lib/auth";
-import { formatDateTime } from "@/lib/domain";
+import { errorMessage, formatDateTime } from "@/lib/domain";
+import { inferDataType } from "@/lib/checklist-judge";
 import {
   buildMergedTimeline,
   nextChecklistItemId,
@@ -26,7 +27,7 @@ import {
   type QaChecklistItemResult,
   type QaSession,
 } from "@/lib/qa-rounds-queries";
-import { useTaxonomyCustomAttributes, useTaxonomyEvents } from "@/lib/queries";
+import { useAddDiscoveredEventProperty, useTaxonomyCustomAttributes, useTaxonomyEvents } from "@/lib/queries";
 
 const VERDICT_STYLE = {
   passed: { border: "#cfe8d8", bg: "#f2faf5", fg: "#16a34a" },
@@ -58,6 +59,7 @@ export function QaItemView({
   const setDisposition = useSetDisposition(session.id);
   const carryOver = useCarryOverItems(environmentId);
   const addComment = useAddDiscussionComment(result?.id ?? "");
+  const addProperty = useAddDiscoveredEventProperty(projectId);
   const [commentBody, setCommentBody] = useState("");
 
   // "이전/다음 항목" links only change the :itemId path param, so this component
@@ -95,6 +97,33 @@ export function QaItemView({
           .filter((v): v is string => Boolean(v))
       : [],
   );
+  const unknownEventProperties =
+    item.target_type === "event" && result?.judged_by === "rule" && Array.isArray(result?.ai_evidence)
+      ? (
+          result.ai_evidence as Array<{
+            property: string;
+            kind?: string;
+            sampleValue?: unknown;
+          }>
+        ).filter((v) => v.kind === "unknown_property")
+      : [];
+
+  function addToTaxonomy(property: string, sampleValue: unknown) {
+    if (!user) return;
+    addProperty.mutate(
+      {
+        eventId: item.target_id,
+        technicalName: property,
+        dataType: inferDataType(sampleValue),
+        sampleValue,
+        userId: user.id,
+      },
+      {
+        onSuccess: () => toast.success(`"${property}"을(를) 택소노미에 추가했어요`),
+        onError: (error) => toast.error(errorMessage(error)),
+      },
+    );
+  }
 
   const orderedIds = checklistItems.map((i) => i.id);
 
@@ -184,6 +213,33 @@ export function QaItemView({
               {result?.ai_reasoning ?? "판단 이유가 없어요."}
             </p>
           </div>
+
+          {unknownEventProperties.length > 0 ? (
+            <div className="space-y-2 rounded-[14px] border border-[#f0dfc0] bg-[#fdf9f1] px-[18px] py-4">
+              <p className="text-xs font-bold text-[#b45309]">택소노미에 없는 프로퍼티</p>
+              {unknownEventProperties.map((v) => (
+                <div
+                  key={v.property}
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-white/70 px-3 py-2"
+                >
+                  <div className="min-w-0">
+                    <p className="mono-token truncate text-[13px] font-semibold">{v.property}</p>
+                    <p className="text-[11.5px] text-[#8b97a8]">
+                      예시 값: {JSON.stringify(v.sampleValue)} ({inferDataType(v.sampleValue)} 추정)
+                    </p>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={addProperty.isPending}
+                    onClick={() => addToTaxonomy(v.property, v.sampleValue)}
+                  >
+                    택소노미에 추가
+                  </Button>
+                </div>
+              ))}
+            </div>
+          ) : null}
 
           <Panel
             title="근거 로그"
