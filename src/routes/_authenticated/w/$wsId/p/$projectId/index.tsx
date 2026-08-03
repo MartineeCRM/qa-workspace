@@ -6,18 +6,21 @@ import { CoverageBar } from "@/components/app/coverage";
 import { Pill } from "@/components/app/badges";
 import {
   buildCoverageItems,
-  environmentCoverage,
-  statusKey,
   useActivity,
   useEnvironments,
   useProject,
-  useProjectItemStatuses,
   useRules,
   useTaxonomyCustomAttributes,
   useTaxonomyEventProperties,
   useTaxonomyEvents,
   type QaEnvironment,
 } from "@/lib/queries";
+import { useProjectChecklistCoverageRows } from "@/lib/qa-rounds-queries";
+import {
+  checklistCoverageIssues,
+  checklistCoverageItems,
+  environmentChecklistCoverage,
+} from "@/lib/qa-workflow";
 import { formatDateTime } from "@/lib/domain";
 
 export const Route = createFileRoute("/_authenticated/w/$wsId/p/$projectId/")({
@@ -49,24 +52,30 @@ function ProjectOverview() {
   const { data: customAttributes = [] } = useTaxonomyCustomAttributes(projectId);
   const { data: rules = [] } = useRules(projectId);
   const { data: stages = [] } = useEnvironments(projectId);
-  const { data: statuses = [] } = useProjectItemStatuses(projectId);
+  const { data: coverageRows = [] } = useProjectChecklistCoverageRows(projectId);
   const { data: activity = [] } = useActivity({ projectId, limit: 12 });
 
   const items = buildCoverageItems(events, eventProperties, customAttributes);
   const activeEvents = events.filter((e) => e.is_active).length;
   const activeAttributes = items.length - activeEvents;
 
-  const itemByKey = new Map(items.map((i) => [i.key, i]));
+  // See checklistCoverageItems in qa-workflow.ts: the checklist schema only
+  // tracks events/custom attributes, so this is a narrower set than `items`.
+  const checklistItems = checklistCoverageItems(items);
+  const itemByKey = new Map(checklistItems.map((i) => [i.key, i]));
   const environmentById = new Map(stages.map((s) => [s.id, s]));
-  const issues = statuses
-    .filter((s) => s.status === "failed" || s.status === "blocked")
-    .map((s) => ({
-      id: s.id,
-      stage: environmentById.get(s.qa_environment_id),
-      item: itemByKey.get(statusKey(s)),
-      status: s.status,
-      notes: s.notes,
-      updatedAt: s.updated_at,
+  const issues = checklistCoverageIssues(
+    coverageRows,
+    stages.map((s) => s.id),
+  )
+    .map((issue) => ({
+      id: issue.checklistItemId,
+      stage: environmentById.get(issue.environmentId),
+      item: itemByKey.get(issue.itemKey),
+      status: issue.status,
+      roundId: issue.roundId,
+      sessionId: issue.sessionId,
+      checklistItemId: issue.checklistItemId,
     }))
     .filter((i) => i.stage && i.item)
     .sort((a, b) => (a.status === b.status ? 0 : a.status === "failed" ? -1 : 1));
@@ -80,7 +89,7 @@ function ProjectOverview() {
       <div className="grid gap-3 sm:grid-cols-3">
         <Stat icon={ListTree} label="이벤트" value={activeEvents} />
         <Stat icon={Layers} label="속성" value={activeAttributes} />
-        <Stat icon={ShieldCheck} label="전체 커버리지 항목" value={items.length} />
+        <Stat icon={ShieldCheck} label="전체 커버리지 항목" value={checklistItems.length} />
       </div>
 
       <Panel
@@ -104,7 +113,7 @@ function ProjectOverview() {
         ) : (
           <ul className="divide-y">
             {stages.map((stage: QaEnvironment) => {
-              const cov = environmentCoverage(items, statuses, stage.id);
+              const cov = environmentChecklistCoverage(checklistItems, coverageRows, stage.id);
               return (
                 <li key={stage.id} className="px-4 py-3">
                   <div className="flex items-center justify-between gap-4">
@@ -135,13 +144,13 @@ function ProjectOverview() {
       <div className="grid gap-4 lg:grid-cols-2">
         <Panel
           title="팔로업이 필요한 QA 이슈"
-          description="실패했거나 막혀 있는 항목이에요. 위에서부터 처리하면 커버리지가 올라가요."
+          description="실패했거나 논의 중인 항목이에요. 위에서부터 처리하면 커버리지가 올라가요."
         >
           {issues.length === 0 ? (
             <EmptyState
               icon={ShieldCheck}
               title="지금 팔로업할 이슈가 없어요"
-              description="실패나 차단으로 표시된 항목이 생기면 여기에 모여요."
+              description="실패나 논의중으로 표시된 항목이 생기면 여기에 모여요."
             />
           ) : (
             <ul className="divide-y">
@@ -158,21 +167,22 @@ function ProjectOverview() {
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <Link
-                          to="/w/$wsId/p/$projectId/qa/$stageSlug"
-                          params={{ wsId, projectId, stageSlug: issue.stage!.slug }}
+                          to="/w/$wsId/p/$projectId/qa/$stageSlug/$roundId/$sessionId/$itemId"
+                          params={{
+                            wsId,
+                            projectId,
+                            stageSlug: issue.stage!.slug,
+                            roundId: issue.roundId,
+                            sessionId: issue.sessionId,
+                            itemId: issue.checklistItemId,
+                          }}
                           className="mono-token truncate text-sm font-medium hover:underline"
                         >
                           {issue.item!.label}
                         </Link>
                         <Pill>{issue.stage!.name}</Pill>
-                        <Pill>{issue.status === "failed" ? "실패" : "차단"}</Pill>
+                        <Pill>{issue.status === "failed" ? "실패" : "논의중"}</Pill>
                       </div>
-                      {issue.notes ? (
-                        <p className="mt-0.5 text-xs text-muted-foreground">{issue.notes}</p>
-                      ) : null}
-                      <p className="text-xs text-muted-foreground">
-                        {formatDateTime(issue.updatedAt)}
-                      </p>
                     </div>
                   </div>
                 </li>
