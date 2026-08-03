@@ -82,25 +82,25 @@ function QaIssuesPage() {
                   <div className="flex flex-wrap items-start gap-2">
                     <AlertTriangle className="mt-0.5 size-4 text-[#b45309]" />
                     <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-start justify-between gap-2">
-                        <div className="min-w-0">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
                           <code className="mono-token text-sm font-semibold">
                             {event?.technical_name ?? issue.event_id}.{issue.target_label}
                           </code>
-                          <p className="mt-1 text-[11px] text-muted-foreground">
-                            {[environment?.name, channel?.name ?? "채널 미지정", issue.session_name]
-                              .filter(Boolean)
-                              .join(" · ")}
-                          </p>
+                          <span
+                            className={cn(
+                              "inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold",
+                              STATUS_STYLE[issue.workflow_status],
+                            )}
+                          >
+                            {STATUS_LABEL[issue.workflow_status]}
+                          </span>
                         </div>
-                        <span
-                          className={cn(
-                            "inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold",
-                            STATUS_STYLE[issue.workflow_status],
-                          )}
-                        >
-                          {STATUS_LABEL[issue.workflow_status]}
-                        </span>
+                        <p className="mt-1 text-[11px] text-muted-foreground">
+                          {[environment?.name, channel?.name ?? "채널 미지정", issue.session_name]
+                            .filter(Boolean)
+                            .join(" · ")}
+                        </p>
                       </div>
                       <Link
                         to="/w/$wsId/p/$projectId/qa/$stageSlug/$roundId/$sessionId/$itemId"
