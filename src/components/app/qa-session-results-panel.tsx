@@ -85,11 +85,7 @@ export function QaSessionResultsPanel({
                 {
                   items: unresolvedFailures.map((i) => ({
                     id: i.id,
-                    qa_session_id: i.qa_session_id,
-                    target_type: i.target_type,
-                    target_id: i.target_id,
                   })),
-                  userId: user.id,
                   assigneeId: null,
                 },
                 { onSuccess: () => toast.success("다음 차수로 이월했어요") },

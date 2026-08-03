@@ -125,29 +125,6 @@ export type QaEnvironment = {
   updated_at: string;
 };
 
-export type QaUpload = {
-  id: string;
-  project_id: string;
-  qa_environment_id: string;
-  file_name: string;
-  row_count: number;
-  notes: string | null;
-  uploaded_by: string;
-  created_at: string;
-};
-
-export type QaAnalysisRun = {
-  id: string;
-  project_id: string;
-  qa_environment_id: string;
-  upload_id: string | null;
-  status: string;
-  summary: Record<string, unknown>;
-  started_at: string;
-  completed_at: string | null;
-  created_at: string;
-};
-
 export type ActivityLog = {
   id: string;
   workspace_id: string;
@@ -423,36 +400,6 @@ export function useEnvironments(projectId: string) {
           .select("*")
           .eq("project_id", projectId)
           .order("sort_order"),
-      ),
-  });
-}
-
-export function useUploads(environmentId: string) {
-  return useQuery({
-    queryKey: ["uploads", environmentId],
-    enabled: Boolean(environmentId),
-    queryFn: async () =>
-      unwrap<QaUpload[]>(
-        await db
-          .from("qa_uploads")
-          .select("*")
-          .eq("qa_environment_id", environmentId)
-          .order("created_at", { ascending: false }),
-      ),
-  });
-}
-
-export function useRuns(environmentId: string) {
-  return useQuery({
-    queryKey: ["runs", environmentId],
-    enabled: Boolean(environmentId),
-    queryFn: async () =>
-      unwrap<QaAnalysisRun[]>(
-        await db
-          .from("qa_analysis_runs")
-          .select("*")
-          .eq("qa_environment_id", environmentId)
-          .order("created_at", { ascending: false }),
       ),
   });
 }
