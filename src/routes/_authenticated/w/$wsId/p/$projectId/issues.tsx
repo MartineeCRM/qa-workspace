@@ -4,7 +4,6 @@ import { AlertTriangle, CheckCircle2, Clock3 } from "lucide-react";
 import { toast } from "sonner";
 
 import { EmptyState, Panel } from "@/components/app/layout-parts";
-import { Pill } from "@/components/app/badges";
 import { QaIssueDeleteButton } from "@/components/app/qa-issue-delete-button";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -18,6 +17,7 @@ import {
   useUpdateQaIssue,
 } from "@/lib/qa-rounds-queries";
 import { useEnvironments, useTaxonomyEvents } from "@/lib/queries";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/w/$wsId/p/$projectId/issues")({
   component: QaIssuesPage,
@@ -30,6 +30,14 @@ const STATUS_LABEL = {
   dismissed: "오탐·종료",
   verified: "검증 완료",
 } as const;
+
+const STATUS_STYLE: Record<keyof typeof STATUS_LABEL, string> = {
+  needs_review: "border-amber-200 bg-amber-50 text-amber-700",
+  still_issue: "border-red-200 bg-red-50 text-red-700",
+  next_validation: "border-indigo-200 bg-indigo-50 text-indigo-700",
+  dismissed: "border-slate-200 bg-slate-50 text-slate-600",
+  verified: "border-emerald-200 bg-emerald-50 text-emerald-700",
+};
 
 function QaIssuesPage() {
   const { wsId, projectId } = useParams({ from: "/_authenticated/w/$wsId/p/$projectId/issues" });
@@ -74,14 +82,25 @@ function QaIssuesPage() {
                   <div className="flex flex-wrap items-start gap-2">
                     <AlertTriangle className="mt-0.5 size-4 text-[#b45309]" />
                     <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <code className="mono-token text-sm font-semibold">
-                          {event?.technical_name ?? issue.event_id}.{issue.target_label}
-                        </code>
-                        {environment ? <Pill>{environment.name}</Pill> : null}
-                        <Pill>{channel?.name ?? "채널 미지정"}</Pill>
-                        <Pill>{issue.session_name}</Pill>
-                        <Pill>{STATUS_LABEL[issue.workflow_status]}</Pill>
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <code className="mono-token text-sm font-semibold">
+                            {event?.technical_name ?? issue.event_id}.{issue.target_label}
+                          </code>
+                          <p className="mt-1 text-[11px] text-muted-foreground">
+                            {[environment?.name, channel?.name ?? "채널 미지정", issue.session_name]
+                              .filter(Boolean)
+                              .join(" · ")}
+                          </p>
+                        </div>
+                        <span
+                          className={cn(
+                            "inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold",
+                            STATUS_STYLE[issue.workflow_status],
+                          )}
+                        >
+                          {STATUS_LABEL[issue.workflow_status]}
+                        </span>
                       </div>
                       <Link
                         to="/w/$wsId/p/$projectId/qa/$stageSlug/$roundId/$sessionId/$itemId"
