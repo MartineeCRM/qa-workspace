@@ -109,7 +109,7 @@ export function QaSessionCollectionPanel({
   return (
     <Panel
       title="수집 타임라인"
-      description="attribute가 바뀌었을 시점마다 스냅샷을 찍고, 마지막에 활동 로그 CSV를 올리면 세션이 닫힙니다."
+      description="attribute가 바뀌었을 시점마다 스냅샷을 찍고, 활동 로그 CSV를 올리세요. CSV는 여러 번 나눠 올리고 그때마다 다시 분석해도 돼요."
       actions={
         <>
           <Input
@@ -196,15 +196,18 @@ export function QaSessionCollectionPanel({
       <div className="px-5 pb-4">
         <Button
           className="w-full bg-[#1c2431] hover:bg-[#2c3648]"
-          disabled={runEvents.length === 0 || endSession.isPending}
+          disabled={runEvents.length === 0 || endSession.isPending || Boolean(session.ended_at)}
           onClick={() =>
             endSession.mutate(session.id, {
-              onSuccess: () => toast.success("세션을 종료했어요 — 분석 단계로 넘어가요"),
+              onSuccess: () => toast.success("수집을 완료로 표시했어요"),
             })
           }
         >
-          세션 종료하고 분석으로
+          {session.ended_at ? "수집 완료 표시됨" : "수집 완료로 표시"}
         </Button>
+        <p className="mt-1.5 text-center text-[11px] text-[#8b97a8]">
+          분석은 CSV를 올리는 즉시 언제든 돌릴 수 있어요 — 이건 이 세션의 수집이 끝났다는 표시일 뿐이에요.
+        </p>
       </div>
     </Panel>
   );
