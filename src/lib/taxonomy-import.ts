@@ -28,8 +28,9 @@ function str(value: unknown): string {
   return typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
 }
 
-function toBool(value: unknown): boolean {
+function toBool(value: unknown, defaultValue: boolean): boolean {
   const v = str(value).toLowerCase();
+  if (!v) return defaultValue;
   return v === "true" || v === "y" || v === "yes" || v === "1" || v === "required" || v === "필수";
 }
 
@@ -47,7 +48,10 @@ function toList(value: unknown): string[] | null {
   return list.length ? list : null;
 }
 
-function normaliseAttribute(input: Record<string, unknown>): ImportedAttribute | null {
+function normaliseAttribute(
+  input: Record<string, unknown>,
+  requiredByDefault: boolean,
+): ImportedAttribute | null {
   const technical = str(input.technical_name ?? input.name ?? input.attribute);
   if (!technical) return null;
   const type = str(input.data_type ?? input.type).toLowerCase() || "string";
@@ -56,7 +60,7 @@ function normaliseAttribute(input: Record<string, unknown>): ImportedAttribute |
     display_name: str(input.display_name ?? input.label) || null,
     description: str(input.description) || null,
     data_type: DATA_TYPES.has(type) ? type : "string",
-    is_required: toBool(input.is_required ?? input.required),
+    is_required: toBool(input.is_required ?? input.required, requiredByDefault),
     allowed_values: toList(input.allowed_values ?? input.allowed ?? input.enum),
   };
 }
@@ -123,7 +127,7 @@ function parseCsvTaxonomy(text: string): ImportedTaxonomy {
         str(row.trigger_description ?? row.trigger) || ev.trigger_description;
       continue;
     }
-    const attr = normaliseAttribute(row);
+    const attr = normaliseAttribute(row, Boolean(eventName));
     if (!attr) continue;
     if (kind === "user_attribute" || (!eventName && kind !== "attribute")) {
       userAttributes.push(attr);
@@ -157,7 +161,7 @@ function parseStructured(value: unknown): ImportedTaxonomy {
       if (Array.isArray(attrsRaw)) {
         for (const a of attrsRaw) {
           if (!a || typeof a !== "object") continue;
-          const attr = normaliseAttribute(a as Record<string, unknown>);
+          const attr = normaliseAttribute(a as Record<string, unknown>, true);
           if (attr) attributes.push(attr);
         }
       }
@@ -175,7 +179,7 @@ function parseStructured(value: unknown): ImportedTaxonomy {
   if (Array.isArray(rawUserAttrs)) {
     for (const a of rawUserAttrs) {
       if (!a || typeof a !== "object") continue;
-      const attr = normaliseAttribute(a as Record<string, unknown>);
+      const attr = normaliseAttribute(a as Record<string, unknown>, false);
       if (attr) userAttributes.push(attr);
     }
   }

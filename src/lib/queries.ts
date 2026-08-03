@@ -329,7 +329,7 @@ export function useAddDiscoveredEventProperty(projectId: string) {
           event_id: input.eventId,
           technical_name: input.technicalName,
           data_type: input.dataType,
-          is_required: false,
+          is_required: true,
           allowed_values: null,
           example_value: input.sampleValue,
           created_by: input.userId,

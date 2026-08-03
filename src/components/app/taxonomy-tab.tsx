@@ -469,7 +469,8 @@ export function TaxonomyTab({
         )}
 
         {(() => {
-          const total = activeTab === "events" ? visibleEvents.length : visibleCustomAttributes.length;
+          const total =
+            activeTab === "events" ? visibleEvents.length : visibleCustomAttributes.length;
           const shown = activeTab === "events" ? pagedEvents.length : pagedCustomAttributes.length;
           const noun = activeTab === "events" ? "이벤트" : "어트리뷰트";
           if (total === 0) return null;
@@ -868,7 +869,7 @@ function AttributeDialog({
   const [displayName, setDisplayName] = useState(attribute?.display_name ?? "");
   const [description, setDescription] = useState(attribute?.description ?? "");
   const [dataType, setDataType] = useState(attribute?.data_type ?? "string");
-  const [required, setRequired] = useState(attribute?.is_required ?? false);
+  const [required, setRequired] = useState(attribute?.is_required ?? eventId !== null);
   const [allowed, setAllowed] = useState(
     Array.isArray(attribute?.allowed_values)
       ? (attribute!.allowed_values as string[]).join(", ")
