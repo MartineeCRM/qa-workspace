@@ -1,4 +1,4 @@
-import { useMemo, useState, type KeyboardEvent } from "react";
+import { useMemo, useState, type ClipboardEvent, type KeyboardEvent } from "react";
 import { X } from "lucide-react";
 import { toast } from "sonner";
 import { EmptyState, Panel } from "@/components/app/layout-parts";
@@ -121,6 +121,51 @@ export function QaSessionChecklistPanel({
     toggleStage(searchTargets[0]);
   }
 
+  // Lets a QA lead paste a newline-separated list (e.g. copied straight out of a
+  // spec spreadsheet) and stage every line that matches a taxonomy name at once,
+  // instead of searching and checking each one individually.
+  function handleSearchPaste(e: ClipboardEvent<HTMLInputElement>) {
+    const text = e.clipboardData.getData("text");
+    if (!text.includes("\n")) return; // single value: let it paste into the search box as usual
+
+    e.preventDefault();
+    const lines = Array.from(
+      new Set(
+        text
+          .split("\n")
+          .map((line) => line.trim())
+          .filter(Boolean),
+      ),
+    );
+
+    const matched: SearchTarget[] = [];
+    for (const line of lines) {
+      const q = line.toLowerCase();
+      const hit =
+        availableTargets.find((t) => t.label.toLowerCase() === q) ??
+        availableTargets.find((t) => t.label.toLowerCase().includes(q));
+      if (hit && !matched.some((m) => m.kind === hit.kind && m.id === hit.id)) {
+        matched.push(hit);
+      }
+    }
+
+    if (matched.length === 0) {
+      toast.error("붙여넣은 텍스트와 일치하는 항목을 못 찾았어요");
+      return;
+    }
+
+    setStaged((prev) => {
+      const seen = new Set(prev.map((t) => `${t.kind}:${t.id}`));
+      return [...prev, ...matched.filter((t) => !seen.has(`${t.kind}:${t.id}`))];
+    });
+    setSearch("");
+    toast.success(
+      lines.length > matched.length
+        ? `${matched.length}개 선택했어요 (${lines.length - matched.length}개는 못 찾음)`
+        : `${matched.length}개 선택했어요`,
+    );
+  }
+
   function commitAdd(targets: SearchTarget[]) {
     const eventIds = targets.filter((t) => t.kind === "event").map((t) => t.id);
     const customAttributeIds = targets
@@ -177,7 +222,8 @@ export function QaSessionChecklistPanel({
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           onKeyDown={handleSearchKeyDown}
-          placeholder="이벤트·attribute 이름 검색 후 엔터"
+          onPaste={handleSearchPaste}
+          placeholder="이벤트·attribute 이름 검색 후 엔터 (줄바꿈 텍스트 붙여넣기도 가능)"
           className="min-w-[220px] flex-1"
         />
         {pendingCarryOver.length > 0 ? (
