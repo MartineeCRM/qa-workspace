@@ -73,6 +73,7 @@ export function QaItemView({
   const analyze = useAnalyzeChecklist(session.id);
   const [commentBody, setCommentBody] = useState("");
   const [openRounds, setOpenRounds] = useState<Record<number, boolean>>({});
+  const [evidenceExpanded, setEvidenceExpanded] = useState(false);
 
   // "이전/다음 항목" links only change the :itemId path param, so this component
   // doesn't remount between items (same pattern that caused the session-view stepper
@@ -80,6 +81,7 @@ export function QaItemView({
   // silently carry over into the next item's textarea.
   useEffect(() => {
     setCommentBody("");
+    setEvidenceExpanded(false);
   }, [item.id]);
 
   const label =
@@ -101,6 +103,12 @@ export function QaItemView({
           .map((row) => row.key),
   );
   const evidenceRows = timeline.filter((row) => relevantKeys.has(row.key));
+  const evidenceIsLong =
+    evidenceRows.length > 6 ||
+    evidenceRows.reduce(
+      (length, row) => length + JSON.stringify(row.raw ?? row.change ?? "").length,
+      0,
+    ) > 3_000;
   const violatingProperties = new Set(
     result?.judged_by === "rule" && result?.ai_reasoning
       ? result.ai_reasoning
@@ -264,32 +272,54 @@ export function QaItemView({
               </button>
             }
           >
-            <div className="space-y-1 overflow-x-auto bg-[#0d1117] p-4 font-mono text-[12px] leading-[1.7]">
-              {evidenceRows.length === 0 ? (
-                <p className="text-[#6e7681]">관련된 로그가 없어요.</p>
-              ) : (
-                evidenceRows.map((row) => (
-                  <div key={row.key} className="text-[#c9d1d9]">
-                    <div className="whitespace-pre">
-                      <span>{row.name}</span>
-                      <span className="text-[#6e7681]"> | </span>
-                      <span className="text-[#7ee787]">
-                        {row.source === "snapshot" ? "스냅샷" : "이벤트"}
-                      </span>
-                      <span className="text-[#6e7681]"> | </span>
-                      <span className="text-[#6e7681]">{formatRawLogTime(row.occurredAt)}</span>
-                      {row.source === "snapshot" ? (
-                        <>
-                          <span> </span>
-                          {renderSnapshotChange(row)}
-                        </>
-                      ) : null}
-                    </div>
-                    {row.source === "event" ? renderRawJson(row) : null}
-                  </div>
-                ))
-              )}
+            <div className="relative bg-[#0d1117]">
+              <div
+                className={cn(
+                  evidenceIsLong && !evidenceExpanded ? "max-h-[360px] overflow-hidden" : "",
+                )}
+              >
+                <div className="space-y-1 overflow-x-auto p-4 font-mono text-[12px] leading-[1.7]">
+                  {evidenceRows.length === 0 ? (
+                    <p className="text-[#6e7681]">관련된 로그가 없어요.</p>
+                  ) : (
+                    evidenceRows.map((row) => (
+                      <div key={row.key} className="text-[#c9d1d9]">
+                        <div className="whitespace-pre">
+                          <span>{row.name}</span>
+                          <span className="text-[#6e7681]"> | </span>
+                          <span className="text-[#7ee787]">
+                            {row.source === "snapshot" ? "스냅샷" : "이벤트"}
+                          </span>
+                          <span className="text-[#6e7681]"> | </span>
+                          <span className="text-[#6e7681]">{formatRawLogTime(row.occurredAt)}</span>
+                          {row.source === "snapshot" ? (
+                            <>
+                              <span> </span>
+                              {renderSnapshotChange(row)}
+                            </>
+                          ) : null}
+                        </div>
+                        {row.source === "event" ? renderRawJson(row) : null}
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+              {evidenceIsLong && !evidenceExpanded ? (
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-b from-transparent to-[#0d1117]" />
+              ) : null}
             </div>
+            {evidenceIsLong ? (
+              <button
+                type="button"
+                onClick={() => setEvidenceExpanded((expanded) => !expanded)}
+                className="w-full border-t border-[#202938] bg-[#111821] px-4 py-2 text-center text-xs font-semibold text-[#9fb2c8] hover:text-white"
+              >
+                {evidenceExpanded
+                  ? "근거 로그 접기 ↑"
+                  : `전체 근거 로그 펼치기 (${evidenceRows.length}건) ↓`}
+              </button>
+            ) : null}
           </Panel>
 
           {item.target_type === "event" ? (
