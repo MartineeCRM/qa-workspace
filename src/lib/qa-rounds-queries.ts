@@ -107,6 +107,19 @@ export function useCreateQaSession(roundId: string) {
   });
 }
 
+export function useDeleteQaSession(roundId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (sessionId: string) => {
+      const { error } = await db.from("qa_sessions").delete().eq("id", sessionId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["qa-sessions", roundId] });
+    },
+  });
+}
+
 export function useQaChecklistItems(sessionId: string) {
   return useQuery({
     queryKey: ["qa-checklist-items", sessionId],

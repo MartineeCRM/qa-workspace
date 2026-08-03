@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { MoreHorizontal } from "lucide-react";
+import { MoreHorizontal, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,11 +39,13 @@ import {
   useCreateQaRound,
   useCreateQaSession,
   useDeleteQaRound,
+  useDeleteQaSession,
   useQaRounds,
   useQaSessions,
   useRenameQaRound,
   useRoundDispositionSummary,
   type QaRound,
+  type QaSession,
 } from "@/lib/qa-rounds-queries";
 
 function SessionProgressBar({ step }: { step: number }) {
@@ -114,12 +116,14 @@ export function QaRoundView({
   const createRound = useCreateQaRound(projectId, environmentId);
   const renameRound = useRenameQaRound(environmentId);
   const deleteRound = useDeleteQaRound(environmentId);
+  const deleteSession = useDeleteQaSession(roundId);
   const latestRound = rounds[rounds.length - 1];
   const { data: summary = { passed: 0, unresolvedErrors: 0, carriedOver: 0 } } =
     useRoundDispositionSummary(roundId);
   const [renamingRound, setRenamingRound] = useState<QaRound | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [deletingRound, setDeletingRound] = useState<QaRound | null>(null);
+  const [deletingSession, setDeletingSession] = useState<QaSession | null>(null);
 
   if (!round) return null;
 
@@ -156,6 +160,17 @@ export function QaRoundView({
             params: { wsId, projectId, stageSlug },
           });
         }
+      },
+    });
+  }
+
+  function confirmDeleteSession() {
+    if (!deletingSession) return;
+    deleteSession.mutate(deletingSession.id, {
+      onError: (error) => toast.error(errorMessage(error)),
+      onSuccess: () => {
+        toast.success("세션을 삭제했어요");
+        setDeletingSession(null);
       },
     });
   }
@@ -295,6 +310,25 @@ export function QaRoundView({
         </AlertDialogContent>
       </AlertDialog>
 
+      <AlertDialog
+        open={!!deletingSession}
+        onOpenChange={(v) => (v ? null : setDeletingSession(null))}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>“{deletingSession?.name}” 세션을 삭제할까요?</AlertDialogTitle>
+            <AlertDialogDescription>
+              이 세션의 체크리스트·수집한 스냅샷/CSV·판정 결과·논의가 모두 함께 사라져요. 되돌릴 수
+              없어요.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>취소</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDeleteSession}>삭제</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <div className="mb-[18px] grid grid-cols-[repeat(auto-fit,minmax(160px,1fr))] gap-2.5">
         <RoundMetricCard
           label="세션"
@@ -328,21 +362,39 @@ export function QaRoundView({
 
       <div className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-3">
         {sessions.map((s) => (
-          <Link
+          <div
             key={s.id}
-            from="/w/$wsId/p/$projectId/qa/$stageSlug/$roundId"
-            to="/w/$wsId/p/$projectId/qa/$stageSlug/$roundId/$sessionId"
-            params={(prev) => ({ ...prev, sessionId: s.id })}
-            className="rounded-[14px] border border-[#e3e8ef] bg-white p-4 hover:border-[#2b6a9c] hover:shadow-[0_2px_10px_rgba(28,36,49,0.06)]"
+            className="group relative rounded-[14px] border border-[#e3e8ef] bg-white hover:border-[#2b6a9c] hover:shadow-[0_2px_10px_rgba(28,36,49,0.06)]"
           >
-            <div className="flex items-center justify-between">
-              <span className="text-[15px] font-semibold tracking-[-0.2px]">{s.name}</span>
-            </div>
-            <SessionProgressBar step={s.ended_at ? 3 : 2} />
-            <p className="mt-2 text-[11.5px] text-[#8b97a8]">
-              {s.ended_at ? "3/4 · 분석 단계" : "2/4 · 수집 단계"}
-            </p>
-          </Link>
+            <Link
+              from="/w/$wsId/p/$projectId/qa/$stageSlug/$roundId"
+              to="/w/$wsId/p/$projectId/qa/$stageSlug/$roundId/$sessionId"
+              params={(prev) => ({ ...prev, sessionId: s.id })}
+              className="block p-4"
+            >
+              <div className="flex items-center justify-between pr-6">
+                <span className="text-[15px] font-semibold tracking-[-0.2px]">{s.name}</span>
+              </div>
+              <SessionProgressBar step={s.ended_at ? 3 : 2} />
+              <p className="mt-2 text-[11.5px] text-[#8b97a8]">
+                {s.ended_at ? "3/4 · 분석 단계" : "2/4 · 수집 단계"}
+              </p>
+            </Link>
+            {canDeleteRounds ? (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setDeletingSession(s);
+                }}
+                aria-label={`${s.name} 세션 삭제`}
+                className="absolute right-3 top-4 rounded-md p-1 text-[#c3ccd8] opacity-0 hover:text-destructive group-hover:opacity-100"
+              >
+                <Trash2 className="size-3.5" />
+              </button>
+            ) : null}
+          </div>
         ))}
         <NewSessionCard roundId={roundId} />
       </div>
