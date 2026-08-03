@@ -303,37 +303,6 @@ export function useDeleteQaRound(environmentId: string) {
   });
 }
 
-export function useOverrideChecklistResult() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async ({
-      resultId,
-      finalStatus,
-      overriddenBy,
-      overrideReason,
-    }: {
-      resultId: string;
-      finalStatus: "passed" | "failed" | "not_collected";
-      overriddenBy: string;
-      overrideReason: string;
-    }) => {
-      const { error } = await db
-        .from("qa_checklist_item_results")
-        .update({
-          final_status: finalStatus,
-          overridden_by: overriddenBy,
-          overridden_at: new Date().toISOString(),
-          override_reason: overrideReason,
-        })
-        .eq("id", resultId);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["qa-checklist-items"] });
-    },
-  });
-}
-
 export type QaRunEvent = {
   id: string;
   qa_session_id: string;

@@ -1,8 +1,8 @@
 import { createFileRoute, useParams } from "@tanstack/react-router";
 import { QaBreadcrumb } from "@/components/app/qa-breadcrumb";
 import { QaItemView } from "@/components/app/qa-item-view";
-import { useQaChecklistItems, useQaSessions } from "@/lib/qa-rounds-queries";
-import { useEnvironments } from "@/lib/queries";
+import { useQaChecklistItems, useQaRounds, useQaSessions } from "@/lib/qa-rounds-queries";
+import { useEnvironments, useTaxonomyCustomAttributes, useTaxonomyEvents } from "@/lib/queries";
 
 export const Route = createFileRoute(
   "/_authenticated/w/$wsId/p/$projectId/qa/$stageSlug/$roundId/$sessionId/$itemId",
@@ -16,12 +16,21 @@ function ItemPage() {
   });
   const { data: stages = [] } = useEnvironments(projectId);
   const stage = stages.find((s) => s.slug === stageSlug);
+  const { data: rounds = [] } = useQaRounds(stage?.id ?? "");
+  const round = rounds.find((r) => r.id === roundId);
   const { data: sessions = [] } = useQaSessions(roundId);
   const session = sessions.find((s) => s.id === sessionId);
   const { data: checklistItems = [] } = useQaChecklistItems(sessionId);
   const item = checklistItems.find((i) => i.id === itemId);
+  const { data: events = [] } = useTaxonomyEvents(projectId);
+  const { data: customAttributes = [] } = useTaxonomyCustomAttributes(projectId);
 
-  if (!stage || !session || !item) return null;
+  if (!stage || !round || !session || !item) return null;
+
+  const itemLabel =
+    item.target_type === "event"
+      ? events.find((e) => e.id === item.target_id)?.technical_name
+      : customAttributes.find((a) => a.id === item.target_id)?.technical_name;
 
   return (
     <div className="space-y-3">
@@ -33,7 +42,7 @@ function ItemPage() {
             params: { wsId, projectId, stageSlug },
           },
           {
-            label: "라운드",
+            label: round.name?.trim() ? round.name : `${round.round_number}차`,
             to: "/w/$wsId/p/$projectId/qa/$stageSlug/$roundId",
             params: { wsId, projectId, stageSlug, roundId },
           },
@@ -42,7 +51,7 @@ function ItemPage() {
             to: "/w/$wsId/p/$projectId/qa/$stageSlug/$roundId/$sessionId",
             params: { wsId, projectId, stageSlug, roundId, sessionId },
           },
-          { label: itemId },
+          { label: itemLabel ?? itemId },
         ]}
       />
       <QaItemView

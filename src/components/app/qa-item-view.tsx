@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { Panel } from "@/components/app/layout-parts";
@@ -57,6 +57,14 @@ export function QaItemView({
   const carryOver = useCarryOverItems(environmentId);
   const addComment = useAddDiscussionComment(result?.id ?? "");
   const [commentBody, setCommentBody] = useState("");
+
+  // "이전/다음 항목" links only change the :itemId path param, so this component
+  // doesn't remount between items (same pattern that caused the session-view stepper
+  // to go stale) — without this, a half-typed draft comment about one item would
+  // silently carry over into the next item's textarea.
+  useEffect(() => {
+    setCommentBody("");
+  }, [item.id]);
 
   const label =
     item.target_type === "event"
