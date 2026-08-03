@@ -6,6 +6,15 @@ import {
   previousChecklistItemId,
 } from "@/lib/qa-workflow";
 import type { QaAttributeSnapshot, QaRunEvent } from "@/lib/qa-rounds-queries";
+import {
+  checklistCoverageIssues,
+  checklistTargetKey,
+  environmentChecklistCoverage,
+  flattenChecklistCoverageRounds,
+  latestRoundChecklistRows,
+  type ChecklistCoverageRow,
+} from "@/lib/qa-workflow";
+import type { CoverageItem } from "@/lib/queries";
 
 describe("deriveSessionStep", () => {
   it("returns 1 when the session has no checklist items", () => {
@@ -226,5 +235,256 @@ describe("checklist item navigation", () => {
   it("moves to the adjacent id otherwise", () => {
     expect(nextChecklistItemId(ids, "a")).toBe("b");
     expect(previousChecklistItemId(ids, "c")).toBe("b");
+  });
+});
+
+describe("flattenChecklistCoverageRounds", () => {
+  it("flattens nested rounds/sessions/items/results into rows", () => {
+    const raw = [
+      {
+        id: "round-1",
+        qa_environment_id: "env-1",
+        round_number: 1,
+        qa_sessions: [
+          {
+            id: "session-1",
+            qa_round_checklist_items: [
+              {
+                id: "item-1",
+                target_type: "event" as const,
+                target_id: "ev-1",
+                disposition: "unresolved" as const,
+                qa_checklist_item_results: [
+                  { final_status: "passed" as const, updated_at: "2026-08-01T00:00:00Z" },
+                ],
+              },
+              {
+                id: "item-2",
+                target_type: "custom_attribute" as const,
+                target_id: "attr-1",
+                disposition: "unresolved" as const,
+                qa_checklist_item_results: [],
+              },
+            ],
+          },
+        ],
+      },
+    ];
+
+    expect(flattenChecklistCoverageRounds(raw)).toEqual([
+      {
+        qa_environment_id: "env-1",
+        qa_round_id: "round-1",
+        round_number: 1,
+        qa_session_id: "session-1",
+        checklist_item_id: "item-1",
+        target_type: "event",
+        target_id: "ev-1",
+        disposition: "unresolved",
+        final_status: "passed",
+        result_updated_at: "2026-08-01T00:00:00Z",
+      },
+      {
+        qa_environment_id: "env-1",
+        qa_round_id: "round-1",
+        round_number: 1,
+        qa_session_id: "session-1",
+        checklist_item_id: "item-2",
+        target_type: "custom_attribute",
+        target_id: "attr-1",
+        disposition: "unresolved",
+        final_status: null,
+        result_updated_at: null,
+      },
+    ]);
+  });
+});
+
+describe("checklistTargetKey", () => {
+  it("prefixes event targets with 'event:'", () => {
+    expect(checklistTargetKey({ target_type: "event", target_id: "ev-1" })).toBe("event:ev-1");
+  });
+
+  it("prefixes custom_attribute targets with 'attribute:' to match CoverageItem.key", () => {
+    expect(checklistTargetKey({ target_type: "custom_attribute", target_id: "attr-1" })).toBe(
+      "attribute:attr-1",
+    );
+  });
+});
+
+function row(overrides: Partial<ChecklistCoverageRow>): ChecklistCoverageRow {
+  return {
+    qa_environment_id: "env-1",
+    qa_round_id: "round-1",
+    round_number: 1,
+    qa_session_id: "session-1",
+    checklist_item_id: "item-1",
+    target_type: "event",
+    target_id: "ev-1",
+    disposition: "unresolved",
+    final_status: null,
+    result_updated_at: null,
+    ...overrides,
+  };
+}
+
+describe("latestRoundChecklistRows", () => {
+  it("only returns rows from the highest round_number for that environment", () => {
+    const rows = [
+      row({ round_number: 1, checklist_item_id: "old", final_status: "failed" }),
+      row({ round_number: 2, checklist_item_id: "new", final_status: "passed" }),
+    ];
+    const result = latestRoundChecklistRows(rows, "env-1");
+    expect(result.map((r) => r.checklist_item_id)).toEqual(["new"]);
+  });
+
+  it("ignores rows from other environments", () => {
+    const rows = [
+      row({ qa_environment_id: "env-2", round_number: 5 }),
+      row({ qa_environment_id: "env-1", round_number: 1 }),
+    ];
+    expect(latestRoundChecklistRows(rows, "env-1")).toHaveLength(1);
+  });
+
+  it("returns an empty array when the environment has no rows at all", () => {
+    expect(latestRoundChecklistRows([], "env-1")).toEqual([]);
+  });
+
+  it("dedupes a target that appears twice in the same round (two sessions), keeping the most recently judged row", () => {
+    const rows = [
+      row({
+        checklist_item_id: "stale",
+        qa_session_id: "session-1",
+        final_status: "failed",
+        result_updated_at: "2026-08-01T00:00:00Z",
+      }),
+      row({
+        checklist_item_id: "fresh",
+        qa_session_id: "session-2",
+        final_status: "passed",
+        result_updated_at: "2026-08-02T00:00:00Z",
+      }),
+    ];
+    const result = latestRoundChecklistRows(rows, "env-1");
+    expect(result).toHaveLength(1);
+    expect(result[0].checklist_item_id).toBe("fresh");
+  });
+});
+
+describe("environmentChecklistCoverage", () => {
+  const items: CoverageItem[] = [
+    { key: "event:ev-1", kind: "event", id: "ev-1", label: "cart_item_added", eventName: null },
+    { key: "event:ev-2", kind: "event", id: "ev-2", label: "checkout_started", eventName: null },
+    { key: "attribute:attr-1", kind: "attribute", id: "attr-1", label: "email", eventName: null },
+  ];
+
+  it("counts passed/failed/not-collected targets from the latest round only", () => {
+    const rows = [
+      row({ target_type: "event", target_id: "ev-1", final_status: "passed" }),
+      row({
+        checklist_item_id: "item-2",
+        target_type: "event",
+        target_id: "ev-2",
+        final_status: "failed",
+      }),
+      row({
+        checklist_item_id: "item-3",
+        target_type: "custom_attribute",
+        target_id: "attr-1",
+        final_status: "not_collected",
+      }),
+    ];
+    expect(environmentChecklistCoverage(items, rows, "env-1")).toEqual({
+      total: 3,
+      verified: 1,
+      failed: 1,
+      notStarted: 1,
+      ratio: 1 / 3,
+    });
+  });
+
+  it("counts passed_override disposition as verified even when final_status is failed", () => {
+    const rows = [
+      row({
+        target_type: "event",
+        target_id: "ev-1",
+        disposition: "passed_override",
+        final_status: "failed",
+      }),
+    ];
+    const result = environmentChecklistCoverage(items, rows, "env-1");
+    expect(result.verified).toBe(1);
+    expect(result.failed).toBe(0);
+  });
+
+  it("ignores older rounds — a failure two rounds ago doesn't count if the item passed since", () => {
+    const rows = [
+      row({ round_number: 1, target_type: "event", target_id: "ev-1", final_status: "failed" }),
+      row({
+        checklist_item_id: "item-2",
+        round_number: 2,
+        target_type: "event",
+        target_id: "ev-1",
+        final_status: "passed",
+      }),
+    ];
+    const result = environmentChecklistCoverage(items, rows, "env-1");
+    expect(result.verified).toBe(1);
+    expect(result.failed).toBe(0);
+  });
+
+  it("treats an environment with no rounds at all as fully not-started", () => {
+    expect(environmentChecklistCoverage(items, [], "env-1")).toEqual({
+      total: 3,
+      verified: 0,
+      failed: 0,
+      notStarted: 3,
+      ratio: 0,
+    });
+  });
+});
+
+describe("checklistCoverageIssues", () => {
+  it("surfaces unresolved+failed items as 'failed' issues", () => {
+    const rows = [row({ disposition: "unresolved", final_status: "failed" })];
+    expect(checklistCoverageIssues(rows, ["env-1"])).toEqual([
+      {
+        itemKey: "event:ev-1",
+        environmentId: "env-1",
+        roundId: "round-1",
+        sessionId: "session-1",
+        checklistItemId: "item-1",
+        status: "failed",
+      },
+    ]);
+  });
+
+  it("surfaces 'discussing' items regardless of final_status", () => {
+    const rows = [row({ disposition: "discussing", final_status: "not_collected" })];
+    const result = checklistCoverageIssues(rows, ["env-1"]);
+    expect(result).toHaveLength(1);
+    expect(result[0].status).toBe("discussing");
+  });
+
+  it("does not surface passed, passed_override, or carried_over items as issues", () => {
+    const rows = [
+      row({ checklist_item_id: "a", disposition: "unresolved", final_status: "passed" }),
+      row({ checklist_item_id: "b", disposition: "passed_override", final_status: "failed" }),
+      row({ checklist_item_id: "c", disposition: "carried_over", final_status: "failed" }),
+    ];
+    expect(checklistCoverageIssues(rows, ["env-1"])).toEqual([]);
+  });
+
+  it("only looks at each environment's latest round", () => {
+    const rows = [
+      row({ round_number: 1, disposition: "unresolved", final_status: "failed" }),
+      row({
+        checklist_item_id: "item-2",
+        round_number: 2,
+        disposition: "unresolved",
+        final_status: "passed",
+      }),
+    ];
+    expect(checklistCoverageIssues(rows, ["env-1"])).toEqual([]);
   });
 });
