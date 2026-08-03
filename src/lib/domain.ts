@@ -153,6 +153,7 @@ export function formatDate(value: string | null | undefined) {
     year: "numeric",
     month: "short",
     day: "2-digit",
+    timeZone: "Asia/Seoul",
   }).format(new Date(value));
 }
 
@@ -161,6 +162,7 @@ export function formatDateTime(value: string | null | undefined) {
   return new Intl.DateTimeFormat("ko-KR", {
     dateStyle: "medium",
     timeStyle: "short",
+    timeZone: "Asia/Seoul",
   }).format(new Date(value));
 }
 
