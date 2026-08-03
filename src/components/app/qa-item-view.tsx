@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { Copy, Trash2 } from "lucide-react";
+import { Copy } from "lucide-react";
 import { toast } from "sonner";
 import { Panel } from "@/components/app/layout-parts";
 import { QaItemSpecDiffTable } from "@/components/app/qa-item-spec-diff";
+import { QaIssueDeleteButton } from "@/components/app/qa-issue-delete-button";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/lib/auth";
@@ -522,18 +523,11 @@ export function QaItemView({
                         <p className="truncate font-mono text-[12px] font-semibold text-[#4b4f8a]">
                           {label}.{selectedIssue.target_label}
                         </p>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-7 text-[#dc2626] hover:text-[#dc2626]"
-                          disabled={deleteIssue.isPending}
-                          onClick={() => {
-                            if (
-                              !window.confirm(
-                                `${label}.${selectedIssue.target_label} 이슈와 댓글을 삭제할까요?`,
-                              )
-                            )
-                              return;
+                        <QaIssueDeleteButton
+                          compact
+                          targetLabel={`${label}.${selectedIssue.target_label}`}
+                          pending={deleteIssue.isPending}
+                          onDelete={() => {
                             deleteIssue.mutate(selectedIssue.id, {
                               onSuccess: () => {
                                 setSelectedIssueId(null);
@@ -543,9 +537,7 @@ export function QaItemView({
                               onError: (error) => toast.error(errorMessage(error)),
                             });
                           }}
-                        >
-                          <Trash2 className="size-3.5" /> 삭제
-                        </Button>
+                        />
                       </div>
                       {selectedIssue.qa_discussion_comments.length > 0 ? (
                         <div className="max-h-52 space-y-2 overflow-y-auto rounded-lg bg-[#f8fafc] p-3">

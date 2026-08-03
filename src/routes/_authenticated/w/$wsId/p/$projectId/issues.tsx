@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { createFileRoute, Link, useParams } from "@tanstack/react-router";
-import { AlertTriangle, CheckCircle2, Clock3, Trash2 } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Clock3 } from "lucide-react";
 import { toast } from "sonner";
 
 import { EmptyState, Panel } from "@/components/app/layout-parts";
 import { Pill } from "@/components/app/badges";
+import { QaIssueDeleteButton } from "@/components/app/qa-issue-delete-button";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/lib/auth";
@@ -74,6 +75,7 @@ function QaIssuesPage() {
                           {event?.technical_name ?? issue.event_id}.{issue.target_label}
                         </code>
                         {environment ? <Pill>{environment.name}</Pill> : null}
+                        <Pill>세션 · {issue.session_name}</Pill>
                         <Pill>{STATUS_LABEL[issue.workflow_status]}</Pill>
                       </div>
                       <Link
@@ -173,26 +175,16 @@ function QaIssuesPage() {
                     >
                       오탐·종료
                     </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="text-[#dc2626] hover:text-[#dc2626]"
-                      disabled={deleteIssue.isPending}
-                      onClick={() => {
-                        if (
-                          !window.confirm(
-                            `${event?.technical_name ?? issue.event_id}.${issue.target_label} 이슈와 댓글을 삭제할까요?`,
-                          )
-                        )
-                          return;
+                    <QaIssueDeleteButton
+                      targetLabel={`${event?.technical_name ?? issue.event_id}.${issue.target_label}`}
+                      pending={deleteIssue.isPending}
+                      onDelete={() => {
                         deleteIssue.mutate(issue.id, {
                           onSuccess: () => toast.success("이슈를 삭제했어요"),
                           onError: (error) => toast.error(errorMessage(error)),
                         });
                       }}
-                    >
-                      <Trash2 className="size-4" /> 이슈 삭제
-                    </Button>
+                    />
                   </div>
                 </li>
               );

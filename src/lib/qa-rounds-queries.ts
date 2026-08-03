@@ -703,6 +703,7 @@ export type ProjectQaIssue = QaDiscussion & {
   checklist_item_id: string;
   event_id: string;
   qa_session_id: string;
+  session_name: string;
   qa_environment_id: string;
   round_id: string;
 };
@@ -718,7 +719,7 @@ export function useProjectQaIssues(projectId: string) {
         .eq("project_id", projectId);
       if (roundsError) throw roundsError;
       type IssueRoundRow = { id: string; qa_environment_id: string };
-      type IssueSessionRow = { id: string; qa_round_id: string };
+      type IssueSessionRow = { id: string; qa_round_id: string; name: string };
       type IssueItemRow = { id: string; qa_session_id: string; target_id: string };
       type IssueResultRow = { id: string; checklist_item_id: string };
       const roundById = new Map<string, IssueRoundRow>(
@@ -728,11 +729,11 @@ export function useProjectQaIssues(projectId: string) {
 
       const { data: sessions, error: sessionsError } = await db
         .from("qa_sessions")
-        .select("id, qa_round_id")
+        .select("id, qa_round_id, name")
         .in("qa_round_id", [...roundById.keys()]);
       if (sessionsError) throw sessionsError;
       const sessionById = new Map<string, IssueSessionRow>(
-        (sessions ?? []).map((s: { id: string; qa_round_id: string }) => [s.id, s]),
+        (sessions ?? []).map((s: IssueSessionRow) => [s.id, s]),
       );
       if (sessionById.size === 0) return [];
 
@@ -779,6 +780,7 @@ export function useProjectQaIssues(projectId: string) {
             checklist_item_id: item.id,
             event_id: item.target_id,
             qa_session_id: session.id,
+            session_name: session.name,
             qa_environment_id: round.qa_environment_id,
             round_id: session.qa_round_id,
           },

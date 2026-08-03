@@ -162,6 +162,7 @@ function ProjectOverview() {
                             {event?.technical_name ?? issue.event_id}.{issue.target_label}
                           </Link>
                           {stage ? <Pill>{stage.name}</Pill> : null}
+                          <Pill>세션 · {issue.session_name}</Pill>
                           <Pill>
                             {issue.workflow_status === "next_validation"
                               ? "다음 검증 대기"
