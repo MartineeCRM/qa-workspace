@@ -156,7 +156,7 @@ export function QaItemSpecDiffTable({
       return [];
     }
     if (row.verdict === "missing_required") {
-      return [{ key: "optional", label: "택소노미에서 선택값으로" }];
+      return [{ key: "optional", label: "필수 수집 → 선택 수집 변경" }];
     }
     if (row.verdict === "type_mismatch") {
       const observedTaxonomyType = OBSERVED_TYPE_TO_TAXONOMY_TYPE[row.observedType];
@@ -179,7 +179,7 @@ export function QaItemSpecDiffTable({
     }
     actions.push({
       key: "add",
-      label: row.typoCandidate ? "새 프로퍼티로 추가" : "택소노미에 추가",
+      label: "택소노미에 추가",
     });
     return actions;
   }
@@ -346,6 +346,18 @@ export function QaItemSpecDiffTable({
                       </span>
                     </div>
                     <div className="flex flex-col gap-1">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          onCreateIssue({
+                            id: row.propertyId ?? `observed:${row.name}`,
+                            label: row.name,
+                          })
+                        }
+                        className="rounded-md border border-[#f0dfc0] bg-[#fdf9f1] px-2 py-1 text-left text-[11.5px] font-semibold leading-tight text-[#b45309]"
+                      >
+                        이슈 있음
+                      </button>
                       {row.propertyId ? (
                         <Link
                           from="/w/$wsId/p/$projectId/qa/$stageSlug/$roundId/$sessionId/$itemId"
@@ -356,20 +368,6 @@ export function QaItemSpecDiffTable({
                         >
                           택소노미에서 수정
                         </Link>
-                      ) : null}
-                      {row.verdict !== "pass" ? (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            onCreateIssue({
-                              id: row.propertyId ?? `observed:${row.name}`,
-                              label: row.name,
-                            })
-                          }
-                          className="rounded-md border border-[#f0dfc0] bg-[#fdf9f1] px-2 py-1 text-left text-[11.5px] font-semibold leading-tight text-[#b45309]"
-                        >
-                          이슈 있음
-                        </button>
                       ) : null}
                       {actionsFor(row).map((a) => (
                         <button
@@ -444,7 +442,7 @@ export function QaItemSpecDiffTable({
                 action === "type"
                   ? `${name} : ${row?.expectedType} → ${OBSERVED_TYPE_TO_TAXONOMY_TYPE[row?.observedType ?? ""] ?? row?.observedType}`
                   : action === "optional"
-                    ? `${name} : 필수 → 선택`
+                    ? `${name} : 필수 수집 → 선택 수집`
                     : action === "allow_value"
                       ? `${name} : 허용값 + ${JSON.stringify(row?.observedSample)}`
                       : action === "rename"

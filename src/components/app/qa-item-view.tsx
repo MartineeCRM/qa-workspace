@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Panel } from "@/components/app/layout-parts";
 import { QaItemSpecDiffTable } from "@/components/app/qa-item-spec-diff";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 import { errorMessage, formatDateTime, formatRawLogTime } from "@/lib/domain";
@@ -17,11 +18,13 @@ import {
   type MergedTimelineRow,
 } from "@/lib/qa-workflow";
 import {
+  useAddDiscussionComment,
   useAnalyzeChecklist,
   useChecklistItemRoundHistory,
   useCreateQaIssue,
   useQaAttributeSnapshots,
   useQaChecklistItems,
+  useQaDiscussions,
   useQaRunEvents,
   type QaChecklistItemWithDisposition,
   type QaChecklistItemResult,
@@ -62,8 +65,12 @@ export function QaItemView({
   const { data: runEvents = [] } = useQaRunEvents(session.id);
   const { data: snapshots = [] } = useQaAttributeSnapshots(session.id);
   const { data: history = [] } = useChecklistItemRoundHistory(item.id);
+  const { data: discussions = [] } = useQaDiscussions(result?.id ?? "");
   const createIssue = useCreateQaIssue(result?.id ?? "", user?.id);
+  const addComment = useAddDiscussionComment(result?.id ?? "");
   const analyze = useAnalyzeChecklist(session.id);
+  const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null);
+  const [commentBody, setCommentBody] = useState("");
   const [openRounds, setOpenRounds] = useState<Record<number, boolean>>({});
   const [evidenceExpanded, setEvidenceExpanded] = useState(false);
 
@@ -71,6 +78,8 @@ export function QaItemView({
   // doesn't remount between items.
   useEffect(() => {
     setEvidenceExpanded(false);
+    setSelectedIssueId(null);
+    setCommentBody("");
   }, [item.id]);
 
   const label =
@@ -79,6 +88,8 @@ export function QaItemView({
       : customAttributes.find((a) => a.id === item.target_id)?.technical_name;
   const finalStatus = result?.final_status ?? "not_collected";
   const verdictStyle = VERDICT_STYLE[finalStatus];
+  const selectedIssue =
+    discussions.find((discussion) => discussion.id === selectedIssueId) ?? discussions[0] ?? null;
 
   const timeline = buildMergedTimeline(runEvents, snapshots);
   // Scope the evidence log to this item's own target — never fall back to showing
@@ -307,8 +318,11 @@ export function QaItemView({
                 createIssue.mutate(
                   { type: "property", id, label: propertyLabel },
                   {
-                    onSuccess: () =>
-                      toast.success(`${propertyLabel}을(를) 이슈 모아보기에 추가했어요`),
+                    onSuccess: (issue) => {
+                      setSelectedIssueId(issue.id);
+                      setCommentBody("");
+                      toast.success(`${label}.${propertyLabel} 이슈를 추가했어요`);
+                    },
                   },
                 );
               }}
@@ -470,18 +484,92 @@ export function QaItemView({
           ) : null}
           <Panel
             title="이슈 처리"
-            description="이 화면에서는 이슈만 등록합니다. 논의와 다음 차수 이월은 이슈 모아보기에서 결정해요."
+            description="스펙 대조에서 선택한 프로퍼티별로 댓글을 남겨요. 상태 변경과 이월은 이슈 모아보기에서 합니다."
           >
-            <div className="p-4">
-              <Button asChild variant="outline" className="w-full">
-                <Link
-                  from="/w/$wsId/p/$projectId/qa/$stageSlug/$roundId/$sessionId/$itemId"
-                  to="/w/$wsId/p/$projectId/issues"
-                  params={(prev) => ({ wsId: prev.wsId, projectId: prev.projectId })}
-                >
-                  이슈 모아보기
-                </Link>
-              </Button>
+            <div className="space-y-3 p-4">
+              {discussions.length === 0 ? (
+                <p className="rounded-lg border border-dashed px-3 py-5 text-center text-[12.5px] text-[#8b97a8]">
+                  스펙 대조에서 이슈 있음을 누르면 여기에 추가돼요.
+                </p>
+              ) : (
+                <>
+                  <div className="flex flex-wrap gap-1.5">
+                    {discussions.map((discussion) => (
+                      <button
+                        key={discussion.id}
+                        type="button"
+                        onClick={() => {
+                          setSelectedIssueId(discussion.id);
+                          setCommentBody("");
+                        }}
+                        className={cn(
+                          "rounded-md border px-2 py-1 font-mono text-[11.5px]",
+                          selectedIssue?.id === discussion.id
+                            ? "border-[#4b4f8a] bg-[#f6f7fd] font-semibold text-[#4b4f8a]"
+                            : "border-[#e3e8ef] text-[#64748b]",
+                        )}
+                      >
+                        {label}.{discussion.target_label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {selectedIssue ? (
+                    <div className="space-y-3">
+                      {selectedIssue.qa_discussion_comments.length > 0 ? (
+                        <div className="max-h-52 space-y-2 overflow-y-auto rounded-lg bg-[#f8fafc] p-3">
+                          {selectedIssue.qa_discussion_comments.map((comment) => (
+                            <div key={comment.id}>
+                              <p className="text-[11px] text-[#8b97a8]">
+                                {formatDateTime(comment.created_at)}
+                              </p>
+                              <p className="text-[12.5px] leading-relaxed text-[#4a5666]">
+                                {comment.body}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
+                      <Textarea
+                        value={commentBody}
+                        onChange={(event) => setCommentBody(event.target.value)}
+                        placeholder={`${label}.${selectedIssue.target_label}에 대한 원인·수정 내용을 남겨보세요`}
+                        className="min-h-[68px]"
+                      />
+                      <Button
+                        className="w-full"
+                        disabled={!user || !commentBody.trim() || addComment.isPending}
+                        onClick={() => {
+                          if (!user || !commentBody.trim()) return;
+                          addComment.mutate(
+                            {
+                              discussionId: selectedIssue.id,
+                              body: commentBody.trim(),
+                              authorId: user.id,
+                            },
+                            {
+                              onSuccess: () => {
+                                setCommentBody("");
+                                toast.success("댓글을 남겼어요");
+                              },
+                            },
+                          );
+                        }}
+                      >
+                        댓글 남기기
+                      </Button>
+                    </div>
+                  ) : null}
+                </>
+              )}
+              <Link
+                from="/w/$wsId/p/$projectId/qa/$stageSlug/$roundId/$sessionId/$itemId"
+                to="/w/$wsId/p/$projectId/issues"
+                params={(prev) => ({ wsId: prev.wsId, projectId: prev.projectId })}
+                className="block text-center text-[12px] font-medium text-[#4b4f8a] hover:underline"
+              >
+                전체 이슈 모아보기
+              </Link>
             </div>
           </Panel>
         </div>

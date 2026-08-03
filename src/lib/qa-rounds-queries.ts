@@ -591,6 +591,15 @@ export function useCreateQaIssue(resultId: string, userId: string | undefined) {
         { onConflict: "checklist_item_result_id,target_type,target_id", ignoreDuplicates: true },
       );
       if (error) throw error;
+      const { data, error: readError } = await db
+        .from("qa_discussions")
+        .select("*, qa_discussion_comments(*)")
+        .eq("checklist_item_result_id", resultId)
+        .eq("target_type", target.type)
+        .eq("target_id", target.id)
+        .single();
+      if (readError) throw readError;
+      return data as QaDiscussion;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["qa-discussions", resultId] });
