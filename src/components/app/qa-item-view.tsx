@@ -119,7 +119,10 @@ export function QaItemView({
         userId: user.id,
       },
       {
-        onSuccess: () => toast.success(`"${property}"을(를) 택소노미에 추가했어요`),
+        onSuccess: () =>
+          toast.success(
+            `"${property}"을(를) 택소노미에 반영했어요 — 이 항목은 다음 분석부터 반영돼요`,
+          ),
         onError: (error) => toast.error(errorMessage(error)),
       },
     );

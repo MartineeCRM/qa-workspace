@@ -355,15 +355,23 @@ export function useAddDiscoveredEventProperty(projectId: string) {
       sampleValue: unknown;
       userId: string;
     }) => {
-      const { error } = await db.from("taxonomy_event_properties").insert({
-        event_id: input.eventId,
-        technical_name: input.technicalName,
-        data_type: input.dataType,
-        is_required: false,
-        allowed_values: null,
-        example_value: input.sampleValue,
-        created_by: input.userId,
-      });
+      // Taxonomy is shared across every round/session, so the same undefined
+      // property can surface from more than one checklist item (e.g. a stale
+      // result from before this property was added elsewhere). Upsert with
+      // ignoreDuplicates so re-adding an already-known property is a no-op
+      // instead of a unique_violation error.
+      const { error } = await db.from("taxonomy_event_properties").upsert(
+        {
+          event_id: input.eventId,
+          technical_name: input.technicalName,
+          data_type: input.dataType,
+          is_required: false,
+          allowed_values: null,
+          example_value: input.sampleValue,
+          created_by: input.userId,
+        },
+        { onConflict: "event_id,technical_name", ignoreDuplicates: true },
+      );
       if (error) throw error;
     },
     onSuccess: () => {
