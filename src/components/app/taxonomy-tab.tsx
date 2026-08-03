@@ -884,6 +884,9 @@ function AttributeDialog({
   const [technicalName, setTechnicalName] = useState(attribute?.technical_name ?? "");
   const [displayName, setDisplayName] = useState(attribute?.display_name ?? "");
   const [description, setDescription] = useState(attribute?.description ?? "");
+  const [exampleValue, setExampleValue] = useState(
+    attribute?.example_value == null ? "" : String(attribute.example_value),
+  );
   const [dataType, setDataType] = useState(attribute?.data_type ?? "string");
   const [required, setRequired] = useState(attribute?.is_required ?? eventId !== null);
   const [allowed, setAllowed] = useState(
@@ -904,6 +907,7 @@ function AttributeDialog({
       technical_name: technicalName.trim(),
       display_name: displayName.trim() || null,
       description: description.trim() || null,
+      example_value: exampleValue.trim() || null,
       data_type: dataType,
       is_required: required,
       allowed_values: allowedValues.length ? allowedValues : null,
@@ -1032,6 +1036,18 @@ function AttributeDialog({
             </p>
           </div>
           <div className="space-y-1.5">
+            <Label htmlFor="at-example">예시값</Label>
+            <Input
+              id="at-example"
+              value={exampleValue}
+              onChange={(e) => setExampleValue(e.target.value)}
+              placeholder="2026-01-01T00:00:00.000+09:00"
+            />
+            <p className="text-xs text-muted-foreground">
+              기대하는 값의 형식과 의미를 보여주세요. AI가 실제 수신값과 비교해요.
+            </p>
+          </div>
+          <div className="space-y-1.5">
             <Label htmlFor="at-desc">설명</Label>
             <Textarea
               id="at-desc"
@@ -1118,6 +1134,9 @@ function CustomAttributePropertyDialog({
   const [technicalName, setTechnicalName] = useState(property?.technical_name ?? "");
   const [displayName, setDisplayName] = useState(property?.display_name ?? "");
   const [description, setDescription] = useState(property?.description ?? "");
+  const [exampleValue, setExampleValue] = useState(
+    property?.example_value == null ? "" : String(property.example_value),
+  );
   const [dataType, setDataType] = useState(property?.data_type ?? "string");
   const [required, setRequired] = useState(property?.is_required ?? false);
   const [allowed, setAllowed] = useState(
@@ -1138,6 +1157,7 @@ function CustomAttributePropertyDialog({
       technical_name: technicalName.trim(),
       display_name: displayName.trim() || null,
       description: description.trim() || null,
+      example_value: exampleValue.trim() || null,
       data_type: dataType,
       is_required: required,
       allowed_values: allowedValues.length ? allowedValues : null,
@@ -1201,6 +1221,18 @@ function CustomAttributePropertyDialog({
             <p className="text-xs text-muted-foreground">
               여기 적은 값 외의 것이 들어오면 검증 시 오류로 처리돼요. 비워두면 값 자체는 제한하지
               않아요.
+            </p>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="cap-example">예시값</Label>
+            <Input
+              id="cap-example"
+              value={exampleValue}
+              onChange={(e) => setExampleValue(e.target.value)}
+              placeholder="2026-01-01T00:00:00.000+09:00"
+            />
+            <p className="text-xs text-muted-foreground">
+              기대하는 값의 형식과 의미를 보여주세요. AI가 실제 수신값과 비교해요.
             </p>
           </div>
           <div className="space-y-1.5">
