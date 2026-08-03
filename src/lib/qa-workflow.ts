@@ -238,7 +238,7 @@ export function environmentChecklistCoverage(
     if (!current) continue;
     if (current.disposition === "passed_override" || current.final_status === "passed")
       verified += 1;
-    else if (current.final_status === "failed") failed += 1;
+    else if (current.disposition === "unresolved" && current.final_status === "failed") failed += 1;
   }
   const total = items.length;
   return {
@@ -322,7 +322,8 @@ export function findTypoCandidate(
     if (Math.abs(known.technical_name.length - unknownName.length) > 2) continue;
     const distance = levenshteinDistance(unknownName, known.technical_name);
     if (distance > 2) continue;
-    if (!best || distance < best.distance) best = { id: known.id, name: known.technical_name, distance };
+    if (!best || distance < best.distance)
+      best = { id: known.id, name: known.technical_name, distance };
   }
   return best;
 }
@@ -345,7 +346,9 @@ export function parseReasonLines(reasoning: string | null): ParsedReasonLine[] {
       const idx = line.indexOf(":");
       const property = idx === -1 ? line.trim() : line.slice(0, idx).trim();
       const reason = idx === -1 ? "" : line.slice(idx + 1).trim();
-      const kind: ParsedReasonLine["kind"] = reason.includes("택소노미에 정의되지 않은 프로퍼티입니다")
+      const kind: ParsedReasonLine["kind"] = reason.includes(
+        "택소노미에 정의되지 않은 프로퍼티입니다",
+      )
         ? "undefined_property"
         : reason.startsWith("타입이")
           ? "type_mismatch"
@@ -370,14 +373,19 @@ export function compressRoundHistory(history: RoundHistoryEntry[]): CompressedRo
   const counts = history.map((h) => {
     const lines = parseReasonLines(h.reasoning);
     return {
-      typeMismatchProperties: lines.filter((l) => l.kind === "type_mismatch").map((l) => l.property),
-      undefinedProperties: lines.filter((l) => l.kind === "undefined_property").map((l) => l.property),
+      typeMismatchProperties: lines
+        .filter((l) => l.kind === "type_mismatch")
+        .map((l) => l.property),
+      undefinedProperties: lines
+        .filter((l) => l.kind === "undefined_property")
+        .map((l) => l.property),
       lines,
     };
   });
   return history.map((h, i) => {
     const current = counts[i];
-    const structuredCount = current.typeMismatchProperties.length + current.undefinedProperties.length;
+    const structuredCount =
+      current.typeMismatchProperties.length + current.undefinedProperties.length;
     const otherReason = structuredCount === 0 ? h.reasoning : null;
     const prev = counts[i + 1];
     const delta =
@@ -398,7 +406,8 @@ export function compressRoundHistory(history: RoundHistoryEntry[]): CompressedRo
 // ---------------- Item detail: 스펙 대조 (spec diff) table rows ----------------
 // AS-IS = what actually arrived in the log. TO-BE = what the taxonomy expects.
 
-export type SpecDiffVerdict = "pass" | "type_mismatch" | "undefined_property";
+export type SpecDiffVerdict =
+  "pass" | "missing_required" | "type_mismatch" | "value_mismatch" | "undefined_property";
 
 export type SpecDiffRow = {
   // null for a property that isn't in the taxonomy yet (undefined_property row) —
@@ -445,15 +454,23 @@ export function buildEventSpecDiffRows(input: {
       .map((raw) => raw[prop.technical_name])
       .filter((v) => v !== undefined && v !== null);
     const mismatchingValue = values.find((v) => !matchesDataType(v, prop.data_type));
-    const observedValue = mismatchingValue !== undefined ? mismatchingValue : values[0];
+    const invalidAllowedValue = values.find(
+      (v) =>
+        matchesDataType(v, prop.data_type) &&
+        prop.allowed_values !== null &&
+        !prop.allowed_values.includes(String(v)),
+    );
+    const observedValue = mismatchingValue ?? invalidAllowedValue ?? values[0];
     const verdict: SpecDiffVerdict =
       values.length === 0
         ? prop.is_required
-          ? "type_mismatch"
+          ? "missing_required"
           : "pass"
         : mismatchingValue !== undefined
           ? "type_mismatch"
-          : "pass";
+          : invalidAllowedValue !== undefined
+            ? "value_mismatch"
+            : "pass";
     rows.push({
       propertyId: prop.id,
       name: prop.technical_name,

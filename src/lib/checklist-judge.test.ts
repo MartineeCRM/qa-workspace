@@ -113,6 +113,40 @@ describe("judgeEventStructural", () => {
     ]);
   });
 
+  it("flags a required property missing from any individual event occurrence", () => {
+    const repeatedEvents: RunEvent[] = [
+      runEvents[0],
+      {
+        ...runEvents[0],
+        occurred_at: "2026-07-28T18:01:00Z",
+        raw_properties: { order_no: "20260728-9002" },
+      },
+    ];
+    const violations = judgeEventStructural(repeatedEvents, [
+      {
+        id: "p-occurrence",
+        event_id: "evt-1",
+        technical_name: "payment_method",
+        data_type: "string",
+        is_required: true,
+        allowed_values: null,
+      },
+      {
+        id: "p-order",
+        event_id: "evt-1",
+        technical_name: "order_no",
+        data_type: "string",
+        is_required: true,
+        allowed_values: null,
+      },
+    ]);
+
+    expect(violations).toContainEqual({
+      property: "payment_method",
+      reason: "전체 2건 중 1건에서 필수 프로퍼티가 없거나 비어 있습니다",
+    });
+  });
+
   it("returns no violations when everything matches", () => {
     const violations = judgeEventStructural(runEvents, [
       {

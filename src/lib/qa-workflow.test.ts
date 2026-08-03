@@ -40,15 +40,15 @@ describe("deriveSessionStep", () => {
   });
 
   it("returns 4 once results exist, regardless of whether more run events keep arriving", () => {
-    expect(
-      deriveSessionStep({ checklistItemCount: 3, hasRunEvents: true, hasResults: true }),
-    ).toBe(4);
+    expect(deriveSessionStep({ checklistItemCount: 3, hasRunEvents: true, hasResults: true })).toBe(
+      4,
+    );
   });
 
   it("returns 1 when the checklist is empty even if results somehow exist", () => {
-    expect(
-      deriveSessionStep({ checklistItemCount: 0, hasRunEvents: true, hasResults: true }),
-    ).toBe(1);
+    expect(deriveSessionStep({ checklistItemCount: 0, hasRunEvents: true, hasResults: true })).toBe(
+      1,
+    );
   });
 });
 
@@ -519,6 +519,21 @@ describe("environmentChecklistCoverage", () => {
     expect(result.failed).toBe(0);
   });
 
+  it("does not count a carried-over failure as a current-round failure", () => {
+    const rows = [
+      row({
+        target_type: "event",
+        target_id: "ev-1",
+        disposition: "carried_over",
+        final_status: "failed",
+      }),
+    ];
+    const result = environmentChecklistCoverage(items, rows, "env-1");
+    expect(result.verified).toBe(0);
+    expect(result.failed).toBe(0);
+    expect(result.notStarted).toBe(3);
+  });
+
   it("ignores older rounds — a failure two rounds ago doesn't count if the item passed since", () => {
     const rows = [
       row({ round_number: 1, target_type: "event", target_id: "ev-1", final_status: "failed" }),
@@ -653,7 +668,11 @@ describe("parseReasonLines", () => {
 describe("compressRoundHistory", () => {
   it("marks the oldest entry's delta as null (첫 발견, nothing to compare against)", () => {
     const history: RoundHistoryEntry[] = [
-      { roundNumber: 1, reasoning: "a: 택소노미에 정의되지 않은 프로퍼티입니다", finalStatus: "failed" },
+      {
+        roundNumber: 1,
+        reasoning: "a: 택소노미에 정의되지 않은 프로퍼티입니다",
+        finalStatus: "failed",
+      },
     ];
     const [entry] = compressRoundHistory(history);
     expect(entry.delta).toBeNull();
@@ -740,16 +759,28 @@ describe("buildEventSpecDiffRows", () => {
     expect(rows.find((r) => r.name === "platform")).toMatchObject({ verdict: "pass" });
   });
 
-  it("treats a missing required property as a mismatch, but lets an absent optional one pass", () => {
+  it("distinguishes a missing required property, but lets an absent optional one pass", () => {
     const rows = buildEventSpecDiffRows({
       properties,
       rawPropertiesList: [{ item_final_price_krw: "15661" }], // platform (required) absent
     });
     expect(rows.find((r) => r.name === "platform")).toMatchObject({
-      verdict: "type_mismatch",
+      verdict: "missing_required",
       observedType: "없음",
     });
     expect(rows.find((r) => r.name === "item_final_price_krw")).toMatchObject({ verdict: "pass" });
+  });
+
+  it("distinguishes an allowed-value mismatch from a type mismatch", () => {
+    const rows = buildEventSpecDiffRows({
+      properties: [{ ...properties[1], allowed_values: ["android_app", "ios_app"] }],
+      rawPropertiesList: [{ platform: "ANDROID" }],
+    });
+    expect(rows[0]).toMatchObject({
+      verdict: "value_mismatch",
+      observedSample: "ANDROID",
+      allowedValues: ["android_app", "ios_app"],
+    });
   });
 
   it("flags a mismatch if ANY matched occurrence is wrong, even when others are fine", () => {
@@ -769,9 +800,7 @@ describe("buildEventSpecDiffRows", () => {
   it("surfaces a raw log key that isn't in the taxonomy as undefined_property, with a typo candidate when one is close", () => {
     const rows = buildEventSpecDiffRows({
       properties,
-      rawPropertiesList: [
-        { platform: "android_app", refferal_source: "https://example.com" },
-      ],
+      rawPropertiesList: [{ platform: "android_app", refferal_source: "https://example.com" }],
     });
     const undef = rows.find((r) => r.name === "refferal_source");
     expect(undef).toBeDefined();

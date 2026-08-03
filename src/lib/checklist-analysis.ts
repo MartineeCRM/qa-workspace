@@ -83,7 +83,9 @@ export async function judgeChecklistItem(
   }
 
   const attribute = ctx.customAttributes.find((a) => a.id === item.target_id);
-  const value = attribute ? matchLatestSnapshotValue(attribute.technical_name, ctx.snapshots) : undefined;
+  const value = attribute
+    ? matchLatestSnapshotValue(attribute.technical_name, ctx.snapshots)
+    : undefined;
   // A single snapshot only tells us the attribute's *current* value — it can't tell
   // us whether that value was actually produced by this session's test actions or
   // was just carried over from before the session started (e.g. an existing user's
@@ -141,9 +143,10 @@ async function judgeQualitative(
     snapshots: AttributeSnapshot[];
   },
 ): Promise<ChecklistItemVerdict> {
-  const rule = ctx.rules.find((r) => {
-    if (!r.is_enabled) return false;
-    return r.validation_rule_targets.some((t) => {
+  const rules = ctx.rules.filter((rule) => {
+    if (!rule.is_enabled) return false;
+    if (rule.validation_rule_targets.length === 0) return true;
+    return rule.validation_rule_targets.some((t) => {
       if (t.target_type === targetType && t.target_id === targetId) return true;
       if (targetType === "event" && t.target_type === "property") {
         const property = ctx.eventProperties.find((p) => p.id === t.target_id);
@@ -153,7 +156,7 @@ async function judgeQualitative(
     });
   });
 
-  if (!rule) {
+  if (rules.length === 0) {
     return {
       checklist_item_id: checklistItemId,
       ai_verdict: "passed",
@@ -165,7 +168,8 @@ async function judgeQualitative(
     };
   }
 
-  const targets = rule.validation_rule_targets
+  const targets = rules
+    .flatMap((rule) => rule.validation_rule_targets)
     .map((t) => {
       if (t.target_type === "event") {
         const label = ctx.events.find((e) => e.id === t.target_id)?.technical_name ?? t.target_id;
@@ -189,17 +193,42 @@ async function judgeQualitative(
     })
     .filter((t): t is NonNullable<typeof t> => t !== null);
 
+  if (rules.some((rule) => rule.validation_rule_targets.length === 0)) {
+    if (targetType === "event") {
+      const event = ctx.events.find((candidate) => candidate.id === targetId);
+      targets.push({
+        kind: "event",
+        id: targetId,
+        technicalName: event?.technical_name ?? targetId,
+      });
+    } else {
+      const attribute = ctx.customAttributes.find((candidate) => candidate.id === targetId);
+      targets.push({
+        kind: "custom_attribute",
+        id: targetId,
+        technicalName: attribute?.technical_name ?? targetId,
+      });
+    }
+  }
+
   const dedupedTargets = Array.from(new Map(targets.map((t) => [`${t.kind}:${t.id}`, t])).values());
 
   const bundle = collectRuleEvidence(
-    { description: rule.description, targets: dedupedTargets },
+    { description: "", targets: dedupedTargets },
     { runEvents: ctx.runEvents, snapshots: ctx.snapshots },
   );
 
   let result: Awaited<ReturnType<typeof judgeChecklistItemWithAI>>;
   try {
     result = await judgeChecklistItemWithAI({
-      data: { ruleDescription: bundle.ruleDescription, targets: bundle.targets },
+      data: {
+        rules: rules.map((rule) => ({
+          id: rule.id,
+          name: rule.name,
+          description: rule.description?.trim() || rule.name,
+        })),
+        targets: bundle.targets,
+      },
     });
   } catch (error) {
     return {

@@ -105,17 +105,26 @@ export function judgeEventStructural(
 ): StructuralViolation[] {
   const violations: StructuralViolation[] = [];
   for (const prop of properties) {
-    const values = matchedEvents
-      .map((e) => e.raw_properties[prop.technical_name])
-      .filter((v) => v !== undefined && v !== null);
-    if (prop.is_required && values.length === 0) {
-      const keyPresent = matchedEvents.some((e) => prop.technical_name in e.raw_properties);
+    const observed = matchedEvents.map((event) => event.raw_properties[prop.technical_name]);
+    const missingCount = observed.filter((value) => value === undefined || value === null).length;
+    if (prop.is_required && missingCount > 0) {
+      const emptyCount = matchedEvents.filter(
+        (event) =>
+          prop.technical_name in event.raw_properties &&
+          (event.raw_properties[prop.technical_name] === undefined ||
+            event.raw_properties[prop.technical_name] === null),
+      ).length;
       violations.push({
         property: prop.technical_name,
-        reason: keyPresent ? "필수 프로퍼티 값이 비어 있습니다" : "필수 프로퍼티가 로그에 없습니다",
+        reason:
+          missingCount === matchedEvents.length
+            ? emptyCount > 0
+              ? "필수 프로퍼티 값이 비어 있습니다"
+              : "필수 프로퍼티가 로그에 없습니다"
+            : `전체 ${matchedEvents.length}건 중 ${missingCount}건에서 필수 프로퍼티가 없거나 비어 있습니다`,
       });
-      continue;
     }
+    const values = observed.filter((value) => value !== undefined && value !== null);
     for (const value of values) {
       const violation = checkValue(value, prop.technical_name, prop.data_type, prop.allowed_values);
       if (violation) violations.push(violation);

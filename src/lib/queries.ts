@@ -329,7 +329,7 @@ export function useAddDiscoveredEventProperty(projectId: string) {
           event_id: input.eventId,
           technical_name: input.technicalName,
           data_type: input.dataType,
-          is_required: false,
+          is_required: true,
           allowed_values: null,
           example_value: input.sampleValue,
           created_by: input.userId,
@@ -354,6 +354,38 @@ export function useUpdateEventPropertyDataType(projectId: string) {
       const { error } = await db
         .from("taxonomy_event_properties")
         .update({ data_type: input.dataType })
+        .eq("id", input.propertyId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["taxonomy-event-properties", projectId] });
+    },
+  });
+}
+
+export function useUpdateEventPropertyRequired(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { propertyId: string; isRequired: boolean }) => {
+      const { error } = await db
+        .from("taxonomy_event_properties")
+        .update({ is_required: input.isRequired })
+        .eq("id", input.propertyId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["taxonomy-event-properties", projectId] });
+    },
+  });
+}
+
+export function useUpdateEventPropertyAllowedValues(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { propertyId: string; allowedValues: string[] }) => {
+      const { error } = await db
+        .from("taxonomy_event_properties")
+        .update({ allowed_values: input.allowedValues })
         .eq("id", input.propertyId);
       if (error) throw error;
     },

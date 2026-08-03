@@ -6,20 +6,18 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 import { errorMessage } from "@/lib/domain";
-import {
-  buildEventSpecDiffRows,
-  type SpecDiffRow,
-  type SpecDiffVerdict,
-} from "@/lib/qa-workflow";
+import { buildEventSpecDiffRows, type SpecDiffRow, type SpecDiffVerdict } from "@/lib/qa-workflow";
 import {
   useAddDiscoveredEventProperty,
   useRenameEventProperty,
+  useUpdateEventPropertyAllowedValues,
   useUpdateEventPropertyDataType,
+  useUpdateEventPropertyRequired,
   type TaxonomyEventProperty,
 } from "@/lib/queries";
 
 type FilterKey = "불일치" | "타입" | "미정의" | "전체";
-type FixAction = "type" | "add" | "rename" | "impl";
+type FixAction = "type" | "optional" | "allow_value" | "add" | "rename" | "impl";
 
 const OBSERVED_TYPE_TO_TAXONOMY_TYPE: Record<string, string> = {
   string: "string",
@@ -39,8 +37,14 @@ function formatExampleValue(value: unknown): string {
 }
 
 function verdictBadge(verdict: SpecDiffVerdict) {
+  if (verdict === "missing_required") {
+    return { label: "필수 누락", className: "bg-[#fdecec] text-[#dc2626]" };
+  }
   if (verdict === "type_mismatch") {
     return { label: "타입", className: "bg-[#fdecec] text-[#dc2626]" };
+  }
+  if (verdict === "value_mismatch") {
+    return { label: "값", className: "bg-[#fdecec] text-[#dc2626]" };
   }
   if (verdict === "undefined_property") {
     return { label: "미정의", className: "bg-[#fdf3e3] text-[#b45309]" };
@@ -69,14 +73,20 @@ export function QaItemSpecDiffTable({
   eventId,
   properties,
   rawPropertiesList,
+  onReanalyze,
+  onCarryOver,
 }: {
   projectId: string;
   eventId: string;
   properties: TaxonomyEventProperty[];
   rawPropertiesList: Record<string, unknown>[];
+  onReanalyze: () => Promise<void>;
+  onCarryOver: () => void;
 }) {
   const { user } = useAuth();
   const updateDataType = useUpdateEventPropertyDataType(projectId);
+  const updateRequired = useUpdateEventPropertyRequired(projectId);
+  const updateAllowedValues = useUpdateEventPropertyAllowedValues(projectId);
   const renameProperty = useRenameEventProperty(projectId);
   const addProperty = useAddDiscoveredEventProperty(projectId);
   const [filter, setFilter] = useState<FilterKey>("불일치");
@@ -105,7 +115,8 @@ export function QaItemSpecDiffTable({
 
   const typeMismatchRows = rows.filter((r) => r.verdict === "type_mismatch");
   const undefinedRows = rows.filter((r) => r.verdict === "undefined_property");
-  const mismatchTotal = typeMismatchRows.length + undefinedRows.length;
+  const mismatchRows = rows.filter((r) => r.verdict !== "pass");
+  const mismatchTotal = mismatchRows.length;
 
   const filters: Array<{ key: FilterKey; label: string }> = [
     { key: "불일치", label: `불일치 ${mismatchTotal}` },
@@ -121,7 +132,7 @@ export function QaItemSpecDiffTable({
         ? typeMismatchRows
         : filter === "미정의"
           ? undefinedRows
-          : [...typeMismatchRows, ...undefinedRows];
+          : mismatchRows;
 
   function actionsFor(row: SpecDiffRow): Array<{ key: FixAction; label: string }> {
     // Passing here only means the structural check (type + presence) found no
@@ -133,6 +144,12 @@ export function QaItemSpecDiffTable({
     if (row.verdict === "pass") {
       return [{ key: "impl", label: "구현 수정 요청 · 이월" }];
     }
+    if (row.verdict === "missing_required") {
+      return [
+        { key: "optional", label: "택소노미에서 선택값으로" },
+        { key: "impl", label: "구현 수정 요청 · 이월" },
+      ];
+    }
     if (row.verdict === "type_mismatch") {
       const observedTaxonomyType = OBSERVED_TYPE_TO_TAXONOMY_TYPE[row.observedType];
       const actions: Array<{ key: FixAction; label: string }> = [];
@@ -142,12 +159,21 @@ export function QaItemSpecDiffTable({
       actions.push({ key: "impl", label: "구현 수정 요청 · 이월" });
       return actions;
     }
+    if (row.verdict === "value_mismatch") {
+      return [
+        { key: "allow_value", label: `${JSON.stringify(row.observedSample)} 허용값 추가` },
+        { key: "impl", label: "구현 수정 요청 · 이월" },
+      ];
+    }
     // undefined_property
     const actions: Array<{ key: FixAction; label: string }> = [];
     if (row.typoCandidate) {
       actions.push({ key: "rename", label: `이름 매핑 · ${row.typoCandidate.name} 수정` });
     }
-    actions.push({ key: "add", label: row.typoCandidate ? "새 프로퍼티로 추가" : "택소노미에 추가" });
+    actions.push({
+      key: "add",
+      label: row.typoCandidate ? "새 프로퍼티로 추가" : "택소노미에 추가",
+    });
     actions.push({ key: "impl", label: "구현 수정 요청 · 이월" });
     return actions;
   }
@@ -156,9 +182,13 @@ export function QaItemSpecDiffTable({
     setFixes((prev) => ({ ...prev, [name]: prev[name] === action ? null : action }));
   }
 
+  // pass rows carry their own "impl" entry too (flagging a false-negative for
+  // implementation follow-up), so scope this to rows still structurally wrong —
+  // a pass-row impl flag shouldn't drive the resolved/remaining counter or the
+  // carry-over banner meant for real violations.
   const activeMismatchNames = useMemo(
-    () => new Set([...typeMismatchRows, ...undefinedRows].map((r) => r.name)),
-    [typeMismatchRows, undefinedRows],
+    () => new Set(mismatchRows.map((r) => r.name)),
+    [mismatchRows],
   );
   const resolvedCount = Object.entries(fixes).filter(
     ([name, action]) => Boolean(action) && activeMismatchNames.has(name),
@@ -179,6 +209,15 @@ export function QaItemSpecDiffTable({
           const dataType = OBSERVED_TYPE_TO_TAXONOMY_TYPE[row.observedType];
           if (!row.propertyId || !dataType) continue;
           await updateDataType.mutateAsync({ propertyId: row.propertyId, dataType });
+        } else if (action === "optional") {
+          if (!row.propertyId) continue;
+          await updateRequired.mutateAsync({ propertyId: row.propertyId, isRequired: false });
+        } else if (action === "allow_value") {
+          if (!row.propertyId) continue;
+          await updateAllowedValues.mutateAsync({
+            propertyId: row.propertyId,
+            allowedValues: [...(row.allowedValues ?? []), String(row.observedSample)],
+          });
         } else if (action === "rename" && row.typoCandidate) {
           await renameProperty.mutateAsync({
             propertyId: row.typoCandidate.id,
@@ -194,9 +233,8 @@ export function QaItemSpecDiffTable({
           });
         }
       }
-      toast.success(
-        `택소노미에 ${pendingEntries.length}건 반영했어요 — 이 항목은 다음 분석부터 반영돼요`,
-      );
+      await onReanalyze();
+      toast.success(`택소노미에 ${pendingEntries.length}건 반영하고 다시 판정했어요`);
       setFixes((prev) => {
         const next = { ...prev };
         for (const [name] of pendingEntries) delete next[name];
@@ -208,6 +246,10 @@ export function QaItemSpecDiffTable({
       setApplying(false);
     }
   }
+
+  const hasImplementationFix = Object.entries(fixes).some(
+    ([name, action]) => action === "impl" && activeMismatchNames.has(name),
+  );
 
   return (
     <Panel
@@ -238,122 +280,124 @@ export function QaItemSpecDiffTable({
           column (min-width:0 on the row grid alone isn't enough to fix that; the
           columns themselves have a floor via minmax(...)). */}
       <div className="overflow-x-auto">
-      <div className="grid min-w-[700px] grid-cols-[minmax(150px,1fr)_minmax(110px,1fr)_minmax(150px,1.2fr)_66px_170px] gap-3 bg-[#fbfcfd] px-4 py-2 text-[11px] tracking-wide text-[#64748b]">
-        <div>프로퍼티</div>
-        <div>AS-IS · 실제 수신</div>
-        <div>TO-BE · 택소노미 정의</div>
-        <div>판정</div>
-        <div>해소 방향</div>
-      </div>
+        <div className="grid min-w-[700px] grid-cols-[minmax(150px,1fr)_minmax(110px,1fr)_minmax(150px,1.2fr)_66px_170px] gap-3 bg-[#fbfcfd] px-4 py-2 text-[11px] tracking-wide text-[#64748b]">
+          <div>프로퍼티</div>
+          <div>AS-IS · 실제 수신</div>
+          <div>TO-BE · 택소노미 정의</div>
+          <div>판정</div>
+          <div>해소 방향</div>
+        </div>
 
-      {shown.length === 0 ? (
-        <p className="min-w-[700px] px-4 py-6 text-center text-[12.5px] text-[#8b97a8]">
-          이 필터에 해당하는 프로퍼티가 없어요.
-        </p>
-      ) : (
-        <ul className="min-w-[700px]">
-          {shown.map((row) => {
-            const chosen = fixes[row.name] ?? null;
-            const badge = verdictBadge(row.verdict);
-            return (
-              <li
-                key={row.name}
-                className={cn("border-b border-[#f4f6f9]", chosen ? "bg-[#fbfdfb]" : "bg-white")}
-              >
-                <div className="grid grid-cols-[minmax(150px,1fr)_minmax(110px,1fr)_minmax(150px,1.2fr)_66px_170px] items-start gap-3 px-4 py-2.5">
-                  <div className="min-w-0">
-                    <code className="mono-token break-all text-[12.5px]">{row.name}</code>
-                    {row.typoCandidate ? (
-                      <p className="mt-0.5 text-[11px] font-semibold text-[#4b4f8a]">
-                        택소노미에 {row.typoCandidate.name} 있음
-                      </p>
-                    ) : null}
-                  </div>
-                  <div className="min-w-0">
-                    {typeChip(
-                      row.observedType,
-                      row.verdict === "type_mismatch" ? "mismatch" : "as-is",
-                    )}
-                    {row.observedSample !== undefined ? (
-                      <p className="mt-0.5 truncate text-[11px] text-[#a3adbb]">
-                        수신 값: {JSON.stringify(row.observedSample)}
-                      </p>
-                    ) : null}
-                  </div>
-                  <div className="min-w-0">
-                    {row.expectedType ? (
-                      typeChip(row.expectedType, row.verdict === "pass" ? "pass" : "as-is")
-                    ) : (
-                      <code className="rounded-md bg-[#f1f4f8] px-1.5 py-0.5 text-[12.5px] text-[#a3adbb]">
-                        정의 없음
-                      </code>
-                    )}
-                    <p className="mt-0.5 truncate text-[11px] text-[#a3adbb]">
-                      {!row.expectedType
-                        ? "스펙에 누락"
-                        : row.expectedExample !== null && row.expectedExample !== undefined
-                          ? `예: ${formatExampleValue(row.expectedExample)}`
-                          : "예시값 없음 · 택소노미에 추가해주세요"}
-                    </p>
-                  </div>
-                  <div>
-                    <span
-                      className={cn(
-                        "inline-block whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold",
-                        badge.className,
+        {shown.length === 0 ? (
+          <p className="min-w-[700px] px-4 py-6 text-center text-[12.5px] text-[#8b97a8]">
+            이 필터에 해당하는 프로퍼티가 없어요.
+          </p>
+        ) : (
+          <ul className="min-w-[700px]">
+            {shown.map((row) => {
+              const chosen = fixes[row.name] ?? null;
+              const badge = verdictBadge(row.verdict);
+              return (
+                <li
+                  key={row.name}
+                  className={cn("border-b border-[#f4f6f9]", chosen ? "bg-[#fbfdfb]" : "bg-white")}
+                >
+                  <div className="grid grid-cols-[minmax(150px,1fr)_minmax(110px,1fr)_minmax(150px,1.2fr)_66px_170px] items-start gap-3 px-4 py-2.5">
+                    <div className="min-w-0">
+                      <code className="mono-token break-all text-[12.5px]">{row.name}</code>
+                      {row.typoCandidate ? (
+                        <p className="mt-0.5 text-[11px] font-semibold text-[#4b4f8a]">
+                          택소노미에 {row.typoCandidate.name} 있음
+                        </p>
+                      ) : null}
+                    </div>
+                    <div className="min-w-0">
+                      {typeChip(
+                        row.observedType,
+                        row.verdict === "type_mismatch" ? "mismatch" : "as-is",
                       )}
-                    >
-                      {badge.label}
-                    </span>
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    {row.verdict === "pass" && row.propertyId ? (
-                      <Link
-                        from="/w/$wsId/p/$projectId/qa/$stageSlug/$roundId/$sessionId/$itemId"
-                        to="/w/$wsId/p/$projectId/taxonomy"
-                        params={(prev) => ({ wsId: prev.wsId, projectId: prev.projectId })}
-                        search={{ propertyId: row.propertyId }}
-                        className="rounded-md border border-[#e3e8ef] px-2 py-1 text-left text-[11.5px] leading-tight text-[#64748b] hover:border-[#2b6a9c] hover:text-[#2b6a9c]"
-                      >
-                        택소노미에서 수정
-                      </Link>
-                    ) : null}
-                    {actionsFor(row).map((a) => (
-                      <button
-                        key={a.key}
-                        type="button"
-                        onClick={() => toggleFix(row.name, a.key)}
+                      {row.observedSample !== undefined ? (
+                        <p className="mt-0.5 truncate text-[11px] text-[#a3adbb]">
+                          수신 값: {JSON.stringify(row.observedSample)}
+                        </p>
+                      ) : null}
+                    </div>
+                    <div className="min-w-0">
+                      {row.expectedType ? (
+                        typeChip(row.expectedType, row.verdict === "pass" ? "pass" : "as-is")
+                      ) : (
+                        <code className="rounded-md bg-[#f1f4f8] px-1.5 py-0.5 text-[12.5px] text-[#a3adbb]">
+                          정의 없음
+                        </code>
+                      )}
+                      <p className="mt-0.5 truncate text-[11px] text-[#a3adbb]">
+                        {!row.expectedType
+                          ? "스펙에 누락"
+                          : row.expectedExample !== null && row.expectedExample !== undefined
+                            ? `예: ${formatExampleValue(row.expectedExample)}`
+                            : "예시값 없음 · 택소노미에 추가해주세요"}
+                      </p>
+                    </div>
+                    <div>
+                      <span
                         className={cn(
-                          "rounded-md px-2 py-1 text-left text-[11.5px] leading-tight",
-                          chosen === a.key
-                            ? a.key === "impl"
-                              ? "border border-[#2b6a9c] bg-[#eaf1f8] font-semibold text-[#2b6a9c]"
-                              : "border border-[#4b4f8a] bg-[#f6f7fd] font-semibold text-[#4b4f8a]"
-                            : "border border-[#e3e8ef] text-[#64748b]",
+                          "inline-block whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold",
+                          badge.className,
                         )}
                       >
-                        {a.label}
-                      </button>
-                    ))}
+                        {badge.label}
+                      </span>
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      {row.verdict === "pass" && row.propertyId ? (
+                        <Link
+                          from="/w/$wsId/p/$projectId/qa/$stageSlug/$roundId/$sessionId/$itemId"
+                          to="/w/$wsId/p/$projectId/taxonomy"
+                          params={(prev) => ({ wsId: prev.wsId, projectId: prev.projectId })}
+                          search={{ propertyId: row.propertyId }}
+                          className="rounded-md border border-[#e3e8ef] px-2 py-1 text-left text-[11.5px] leading-tight text-[#64748b] hover:border-[#2b6a9c] hover:text-[#2b6a9c]"
+                        >
+                          택소노미에서 수정
+                        </Link>
+                      ) : null}
+                      {actionsFor(row).map((a) => (
+                        <button
+                          key={a.key}
+                          type="button"
+                          onClick={() => toggleFix(row.name, a.key)}
+                          className={cn(
+                            "rounded-md px-2 py-1 text-left text-[11.5px] leading-tight",
+                            chosen === a.key
+                              ? a.key === "impl"
+                                ? "border border-[#2b6a9c] bg-[#eaf1f8] font-semibold text-[#2b6a9c]"
+                                : "border border-[#4b4f8a] bg-[#f6f7fd] font-semibold text-[#4b4f8a]"
+                              : "border border-[#e3e8ef] text-[#64748b]",
+                          )}
+                        >
+                          {a.label}
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                </div>
-                {chosen === "rename" && row.typoCandidate ? (
-                  <div className="mx-4 mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-[#d9dcf3] bg-[#f6f7fd] px-3 py-2.5">
-                    <p className="text-[11.5px] font-semibold text-[#4b4f8a]">택소노미 이름 변경</p>
-                    <code className="rounded-md border border-[#d9dcf3] bg-white px-2 py-1 font-mono text-[12.5px] text-[#8b97a8] line-through">
-                      {row.typoCandidate.name}
-                    </code>
-                    <span className="text-[#8b97a8]">→</span>
-                    <code className="rounded-md border border-[#4b4f8a] bg-white px-2 py-1 font-mono text-[12.5px] font-semibold">
-                      {row.name}
-                    </code>
-                  </div>
-                ) : null}
-              </li>
-            );
-          })}
-        </ul>
-      )}
+                  {chosen === "rename" && row.typoCandidate ? (
+                    <div className="mx-4 mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-[#d9dcf3] bg-[#f6f7fd] px-3 py-2.5">
+                      <p className="text-[11.5px] font-semibold text-[#4b4f8a]">
+                        택소노미 이름 변경
+                      </p>
+                      <code className="rounded-md border border-[#d9dcf3] bg-white px-2 py-1 font-mono text-[12.5px] text-[#8b97a8] line-through">
+                        {row.typoCandidate.name}
+                      </code>
+                      <span className="text-[#8b97a8]">→</span>
+                      <code className="rounded-md border border-[#4b4f8a] bg-white px-2 py-1 font-mono text-[12.5px] font-semibold">
+                        {row.name}
+                      </code>
+                    </div>
+                  ) : null}
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </div>
 
       <div className="flex flex-wrap items-center gap-3 border-t border-[#eef1f5] bg-[#fbfcfd] px-4 py-3">
@@ -371,13 +415,18 @@ export function QaItemSpecDiffTable({
               택소노미 변경 예정 {pendingEntries.length}건
             </p>
             <div className="flex-1" />
-            <Button size="sm" disabled={applying} onClick={applyPending} className="bg-[#4b4f8a] hover:bg-[#3e4275]">
+            <Button
+              size="sm"
+              disabled={applying}
+              onClick={applyPending}
+              className="bg-[#4b4f8a] hover:bg-[#3e4275]"
+            >
               택소노미에 반영
             </Button>
           </div>
           <p className="mt-2 text-[12px] leading-relaxed text-[#5c6878]">
-            택소노미 수정은 프로젝트 전체에 영향을 줘요. 반영 버튼을 눌러야 실제로 저장되고,
-            이 항목은 다음 분석부터 반영돼요.
+            택소노미 수정은 프로젝트 전체에 영향을 줘요. 반영 버튼을 눌러야 실제로 저장되고, 저장
+            직후 이 세션을 다시 분석해 판정을 갱신해요.
           </p>
           <div className="mt-2.5 flex flex-wrap gap-1.5">
             {pendingEntries.map(([name, action]) => {
@@ -385,9 +434,13 @@ export function QaItemSpecDiffTable({
               const label =
                 action === "type"
                   ? `${name} : ${row?.expectedType} → ${OBSERVED_TYPE_TO_TAXONOMY_TYPE[row?.observedType ?? ""] ?? row?.observedType}`
-                  : action === "rename"
-                    ? `${row?.typoCandidate?.name} → ${name}`
-                    : `+ ${name} (${row?.observedType})`;
+                  : action === "optional"
+                    ? `${name} : 필수 → 선택`
+                    : action === "allow_value"
+                      ? `${name} : 허용값 + ${JSON.stringify(row?.observedSample)}`
+                      : action === "rename"
+                        ? `${row?.typoCandidate?.name} → ${name}`
+                        : `+ ${name} (${row?.observedType})`;
               return (
                 <span
                   key={name}
@@ -398,6 +451,17 @@ export function QaItemSpecDiffTable({
               );
             })}
           </div>
+        </div>
+      ) : null}
+
+      {hasImplementationFix ? (
+        <div className="m-4 flex flex-wrap items-center gap-3 rounded-[14px] border border-[#cddcec] bg-[#f3f7fb] px-4 py-3.5">
+          <p className="flex-1 text-[12.5px] text-[#46647e]">
+            실제 구현과 새 로그가 필요하므로 지금 통과시킬 수 없어요.
+          </p>
+          <Button size="sm" variant="outline" onClick={onCarryOver}>
+            구현 수정 항목으로 다음 차수 이월
+          </Button>
         </div>
       ) : null}
     </Panel>
