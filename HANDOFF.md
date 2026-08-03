@@ -1,55 +1,32 @@
-# 핸드오프 — 개발 QA 탭 라운드/세션/항목 워크플로우 재구성 (2026-08-03)
+# 핸드오프 — 개발 QA 탭 라운드/세션/항목 워크플로우 재구성 (2026-08-03, 완료)
 
 작업 위치: `/Users/aimed/Projects/qa-workspace/.worktrees/dev-qa-workflow-redesign`
 브랜치: `feature/dev-qa-workflow-redesign` (origin에는 아직 안 올라감, main엔 아직 머지 안 됨)
-플랜: `docs/superpowers/plans/2026-08-03-dev-qa-workflow-redesign.md` (13개 Task, self-review 포함)
-실행 방식: superpowers:subagent-driven-development — Task마다 (구현 subagent → spec 준수 리뷰 subagent → 코드 품질 리뷰 subagent) 3단계
+플랜: `docs/superpowers/plans/2026-08-03-dev-qa-workflow-redesign.md` (13개 Task, 전부 완료)
 
-이 파일은 이전에 `feature/taxonomy-qa-redesign` 작업용 핸드오프였다가 그 브랜치가 main에 머지되면서 이 새 워크트리에도 그대로 딸려온 파일이다 — 아래 내용으로 완전히 덮어썼다. 그 작업(택소노미 화면 재구성)은 이미 끝나서 main에 들어가 있으니 신경 쓸 필요 없다.
+## 상태: 13개 태스크 전부 구현 + 코드 리뷰 + 실제 로그인 E2E 검증까지 완료
 
-배경: `~/Downloads/design_handoff_dev_qa_workflow 2/README.md` + `QA 워크플로우 v3.dc.html` 디자인 핸드오프를 받아서, 개발 QA 탭의 평행한 3탭(라운드/업로드·분석 기록/검증 결과)을 라운드 › 세션 › 항목 3단 드릴다운 + 브레드크럼 구조로 재구성하는 작업. 사용자가 "서브에이전트 기반(옵션 1)"으로 진행하기로 확정한 상태에서 시작함.
+`개발 QA`/`운영 QA` 탭을 평행한 3탭(라운드/업로드·분석 기록/검증 결과) 구조에서 라운드 › 세션 › 항목 3단 드릴다운 + 브레드크럼 구조로 재구성하는 작업. 전체 흐름(라운드 생성 → 세션 생성 → 체크리스트 추가 → 스냅샷/CSV 수집 → 분석 → 판정 결과 → 항목별 처리·논의 → 다음 차수 이월)을 실제 로그인해서 눈으로 확인했고, 전부 정상 동작한다.
 
----
+## 구현 과정에서 찾아서 고친 실제 버그 3개
 
-## 지금까지 한 일
+1. **라우트 경로 컨벤션 실수 (Task 6에서 발견)** — 플랜의 `<Link>`/`redirect` 예시 코드가 TanStack Router의 route-ID 형태(`/_authenticated/w/$wsId/...`)를 `to` 값으로 썼는데, 실제로는 fullPath 형태(`/w/$wsId/...`, `_authenticated` 접두사 없음)여야 한다. 이미 커밋된 Task 5 코드에도 같은 실수가 있어서 같이 고쳤다(`8c13fa5`). 플랜 문서 자체도 Task 11/12 예시까지 전부 고쳐놨다(`da756cc`, `1c51daf`).
+2. **`viewingStep` stale 버그 (Task 7, Critical)** — 세션 전환 시 컴포넌트가 리마운트되지 않아 스텝퍼가 이미 끝난 세션의 이전 단계를 보여주거나, 반대로 방금 만든 세션에서 존재하지 않는 단계 패널이 렌더링될 수 있었다. `useEffect` 동기화 + 렌더 시점 clamp(`Math.min(viewingStep, currentStep)`)로 고쳤다(`652010b`, 코드 리뷰에서 정확한 시나리오까지 재현 검증함).
+3. **"분석 돌리기" 버튼이 아예 없었음 (Task 13 수동 E2E에서 발견)** — 예전 시스템은 CSV 업로드 시 자동으로 판정까지 돌았는데, 새 설계의 수집 패널(Task 9)은 CSV만 올리고 판정(`useAnalyzeChecklist`)은 아무도 안 불렀다. 디자인 문서엔 이 버튼이 있어야 한다고 적혀 있었는데 Task 7 레퍼런스 코드에 넣는 걸 빠뜨렸었다. 세션 뷰 헤더에 추가해서 고쳤다(`48a8bac`).
 
-### 완료 (Task 1 — DB 마이그레이션)
-- `supabase/migrations/20260803010000_add_checklist_disposition_and_carryover.sql` 커밋 `a11fd9d`.
-- `qa_round_checklist_items`에 `disposition`/`carried_from_item_id`/`assigned_to`/`disposed_by`/`disposed_at` 컬럼 + 인덱스 + 새 UPDATE RLS 정책. `qa_discussions.checklist_item_result_id`에 UNIQUE 제약 추가.
-- spec 준수 리뷰 ✅ 통과, 코드 품질 리뷰 ✅ 통과(Important: 실제 DB에 적용 전 `qa_discussions` 중복 행 있는지 사전 확인 권장 — 코드 변경이 아니라 배포 전 체크리스트 성격, 블로킹 아님. Minor: `ADD CONSTRAINT ... UNIQUE`가 이 저장소의 관례인 `CREATE UNIQUE INDEX ..._uq`와 스타일이 다름 — 기능은 동일, 굳이 안 고쳐도 됨).
-- **다음 작업자가 할 일 없음. 이 태스크는 완결.**
+## 배포 관련 — 반드시 알아야 할 것
 
-### 진행 중, 미해결 버그 있음 (Task 2 — 순수 로직 `qa-workflow.ts`)
-- 커밋 `154d0f3` — `src/lib/qa-workflow.ts`, `src/lib/qa-workflow.test.ts` 생성, `vitest.config.ts`에 `vite-tsconfig-paths` 플러그인 추가(이건 정상적이고 필요한 수정 — 유지할 것).
-- **아직 spec 준수 리뷰도, 코드 품질 리뷰도 안 돌렸음.**
-- **버그: `buildMergedTimeline`의 스냅샷 diff row 타임스탬프 anchoring이 잘못됨.**
-  - 지금 코드(`qa-workflow.ts`의 `buildMergedTimeline` 안, `snapshotRows.push(...)` 부분)는 diff row의 `occurredAt`을 **이전** 스냅샷의 `captured_at`(또는 `requested_at`)에 고정한다.
-  - 이건 내가(플랜 작성자) 플랜에 적어준 테스트(`qa-workflow.test.ts`)가 자체 모순이었기 때문에 생긴 일이다: 테스트는 `["cart_item_count", "cart_item_added"]` 순서(diff row가 이벤트보다 먼저)를 기대했는데, 정작 디자인 문서(README "2-3. 분석 패널" 목업 데이터)의 실제 예시 순서는 반대다:
-    ```
-    22:03:11 스냅샷 cart_item_count `0`
-    22:04:02 이벤트 cart_viewed
-    22:05:18 이벤트 cart_item_added   ← 이게 22:06:52보다 먼저 와야 정상
-    22:06:52 스냅샷 cart_item_count `0 → 1`   ← diff row는 "현재(나중)" 스냅샷 시각에 찍힘
-    ```
-  - 즉 **올바른 anchoring은 "현재(나중) 스냅샷의 captured_at"**이다 (최초 플랜 Step 3 레퍼런스 코드가 실은 맞았음). Task 2 구현 subagent는 내가 준 틀린 테스트를 통과시키려고 구현을 반대 방향(이전 스냅샷 anchoring)으로 "고쳐서" 커밋했고, 본인도 이 anchoring 선택이 다른 사람 검토가 필요하다고 스스로 리포트에 남겼다(정확한 우려였음, 실제로 문제가 있었다).
-  - 내가 그 구현 subagent에게 정정 지시(이어서: 현재 스냅샷 anchoring으로 되돌리고, 테스트 기대값을 `["cart_item_added", "cart_item_count"]`로 고치라는 내용)를 보내려던 참에 **사용자가 그 도구 호출을 취소**했고, 그 상태로 대화가 끊겼다. **정정은 아직 반영 안 됐다.**
+**Task 1의 마이그레이션 파일은 작성만 되고 실제 Supabase DB엔 한동안 적용이 안 돼 있었다.** `supabase db push --dry-run`이 "프로젝트 연결 안 됨" 에러를 냈던 걸 그때는 "샌드박스 환경이라 그런가보다" 하고 넘어갔는데, 실은 진짜 문제였다. 이것 때문에 라운드 지표(통과/미해결 오류/다음 차수 이월)가 항상 0으로 보이고, 항목 뷰의 "라운드 이력"이 항상 비어있고, "이 항목 처리" 버튼들이 조용히(에러 토스트도 없이) 실패하는 상태였다.
 
----
+**세션 도중에 사용자가 새 Supabase 개인 액세스 토큰을 발급해서 `~/.supabase/access-token`에 저장했고, 그걸로 Supabase Management API(`https://api.supabase.com/v1/projects/{ref}/database/query`)를 직접 호출해서 두 마이그레이션(`20260803010000_add_checklist_disposition_and_carryover.sql`, `20260803020000_add_qa_sessions_round_name_uq.sql`)을 실제 DB(`ilciucbaonbzikghfebk`, qa-workspace 프로젝트)에 적용 완료했다.** `supabase link`는 이 토큰으로도 "Unauthorized" 에러가 나서 안 됐지만(권한 범위 문제로 추정), Management API 직접 호출은 됐다 — 나중에 비슷한 상황이면 이 방법을 참고할 것. 컬럼/인덱스/정책 전부 SQL로 직접 조회해서 존재 확인했고, 그 뒤 로그인해서 라운드 지표·라운드 이력·처리 버튼·이월 자동 생성·논의 댓글까지 전부 실제로 동작하는 걸 확인했다.
 
-## 다음에 할 일 (순서대로)
+## 남은 일 (선택)
 
-1. **Task 2 버그부터 고친다.** `src/lib/qa-workflow.ts`의 `buildMergedTimeline`에서 diff row의 `occurredAt`을 `previous.captured_at ?? previous.requested_at` 대신 `snapshot.captured_at`(현재/나중 스냅샷)으로 되돌린다. `src/lib/qa-workflow.test.ts`의 `"orders rows chronologically..."` 테스트에서 `rows.map((r) => r.name)`의 기대값을 `["cart_item_count", "cart_item_added"]` → `["cart_item_added", "cart_item_count"]`로, 그 아래 `rows[0]`/`rows[1]` 매칭도 순서에 맞게 수정한다. `npx vitest run` 전체와 `npx tsc --noEmit`으로 재검증 후 커밋(기존 `154d0f3`에 amend하거나 새 fix 커밋 — 아직 리뷰 전이라 amend가 더 깔끔함).
-2. 고친 뒤 **Task 2의 spec 준수 리뷰 → 코드 품질 리뷰**를 순서대로 돌린다 (Task 1 때와 동일한 2단계 프로세스, `subagent-driven-development` 스킬의 `spec-reviewer-prompt.md`/`code-quality-reviewer-prompt.md` 템플릿 사용).
-3. Task 3~13을 플랜 문서(`docs/superpowers/plans/2026-08-03-dev-qa-workflow-redesign.md`) 순서대로 이어서 진행한다. 각 Task마다: 구현 subagent 디스패치(플랜에서 해당 Task 전문 + Context 섹션을 복사해 프롬프트로 제공, subagent가 플랜 파일을 직접 읽게 하지 말 것) → 완료되면 spec 준수 리뷰 subagent → 통과하면 코드 품질 리뷰 subagent(품질 리뷰는 `superpowers:code-reviewer` subagent type 사용) → 둘 다 통과하면 TodoWrite에서 해당 Task를 completed로 표시하고 다음 Task로.
-   - Task 7(세션 뷰 셸)은 Task 8~10(체크리스트/수집/분석 패널)이 끝나야 실제로 컴파일된다 — 플랜에 이미 명시돼 있음, 순서대로 진행하면 문제없음.
-   - Task 11에서 Task 6의 라운드 지표 카드(세션 하나만 있던 것)를 4장으로 복원한다 — 플랜에 이미 반영돼 있음.
-4. Task 13(레거시 컴포넌트 삭제 + 전체 회귀 확인)까지 끝나면, 플랜엔 명시 안 돼 있지만 `subagent-driven-development` 스킬 자체의 마지막 단계로 **전체 구현에 대한 최종 코드 리뷰 subagent**를 한 번 더 돌리고, 그다음 **`superpowers:finishing-a-development-branch`** 스킬로 넘어가 merge/PR 여부를 사용자와 정한다.
-
-## 진행 상황 추적
-
-이 세션의 TodoWrite에 13개 Task가 등록돼 있고 Task 1은 completed, Task 2는 in_progress로 표시돼 있었다(대화가 끊기기 전 상태) — 세션이 이어지면 이 목록을 그대로 참고하되, 위 "다음에 할 일"의 버그 수정이 Task 2 완료의 전제 조건이라는 걸 반영해서 갱신할 것.
+- 플랜의 `subagent-driven-development` 실행 방식은 전체 구현 끝나면 "최종 코드 리뷰 subagent 1회 → `finishing-a-development-branch` 스킬로 merge/PR 결정"을 제안한다. 아직 이 두 단계는 안 밟았다 — 사용자와 다음 대화에서 이어서 하면 된다.
+- 개요 탭의 프로젝트 전체 커버리지 숫자는 이번 작업으로 더 이상 갱신되지 않는다(사용자가 사전에 승인한 트레이드오프, 회귀 아님).
+- `docs/design-reference/`, `~/Downloads/design_handoff_dev_qa_workflow 2/` 원본 디자인 파일은 참고용으로 그대로 둠, 코드에 영향 없음.
 
 ## 참고
 
-- 로그인 정보(테스트용 워크스페이스 CRM / 프로젝트 신세계 DF)는 사용자에게 직접 물어볼 것 — 하드코딩 금지.
-- 이 브랜치는 아직 origin에 push 안 됐고 main에도 안 합쳐졌다. 다른 브랜치/워크트리는 이전 세션에서 이미 다 정리됐고 지금은 main + 이 워크트리만 존재한다.
+- 로그인 정보는 사용자에게 직접 물어볼 것 — 하드코딩 금지. 테스트는 워크스페이스 "CRM" / 프로젝트 "신세계 DF"(SSG_DF, 테스트용 프로젝트로 사용자 확인됨)에서 함.
+- 이 브랜치는 아직 origin에 push 안 됐고 main에도 안 합쳐졌다.
