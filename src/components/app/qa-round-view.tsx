@@ -1,0 +1,391 @@
+import { useState } from "react";
+import { Link, useNavigate } from "@tanstack/react-router";
+import { MoreHorizontal } from "lucide-react";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { EmptyState } from "@/components/app/layout-parts";
+import { QaBreadcrumb } from "@/components/app/qa-breadcrumb";
+import { useAuth } from "@/lib/auth";
+import { canAdmin, canEdit, errorMessage } from "@/lib/domain";
+import { useWorkspaceContext } from "@/lib/workspace-context";
+import { cn } from "@/lib/utils";
+import {
+  useCreateQaRound,
+  useCreateQaSession,
+  useDeleteQaRound,
+  useQaRounds,
+  useQaSessions,
+  useRenameQaRound,
+  useRoundDispositionSummary,
+  type QaRound,
+} from "@/lib/qa-rounds-queries";
+
+function SessionProgressBar({ step }: { step: number }) {
+  return (
+    <div className="mt-3.5 flex gap-[5px]">
+      {[1, 2, 3, 4].map((n) => (
+        <div
+          key={n}
+          className="h-1 flex-1 rounded-full"
+          style={{
+            backgroundColor: n < step ? "#16a34a" : n === step ? "#2b6a9c" : "#e8edf3",
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+function RoundMetricCard({
+  label,
+  value,
+  sub,
+  tone,
+}: {
+  label: string;
+  value: number;
+  sub: string;
+  tone: "neutral" | "success" | "danger" | "purple";
+}) {
+  const styles =
+    tone === "success"
+      ? "border-[#cfe8d8] bg-[#f2faf5] text-[#16a34a]"
+      : tone === "danger"
+        ? "border-[#f4d0d0] bg-[#fdf5f5] text-[#dc2626]"
+        : tone === "purple"
+          ? "border-[#d9dcf3] bg-[#f6f7fd] text-[#5b5fc7]"
+          : "border-[#e3e8ef] bg-white text-[#1c2431]";
+  return (
+    <div className={`rounded-xl border px-4 py-3.5 ${styles}`}>
+      <p className="text-xs font-semibold">{label}</p>
+      <p className="text-2xl font-bold tabular-nums">{value}</p>
+      <p className="text-[11.5px] opacity-75">{sub}</p>
+    </div>
+  );
+}
+
+export function QaRoundView({
+  wsId,
+  projectId,
+  stageSlug,
+  environmentId,
+  roundId,
+}: {
+  wsId: string;
+  projectId: string;
+  stageSlug: string;
+  environmentId: string;
+  roundId: string;
+}) {
+  const { user } = useAuth();
+  const { role } = useWorkspaceContext();
+  const editable = canEdit(role);
+  const canDeleteRounds = canAdmin(role);
+  const navigate = useNavigate();
+  const { data: rounds = [] } = useQaRounds(environmentId);
+  const round = rounds.find((r) => r.id === roundId);
+  const { data: sessions = [] } = useQaSessions(roundId);
+  const createRound = useCreateQaRound(projectId, environmentId);
+  const renameRound = useRenameQaRound(environmentId);
+  const deleteRound = useDeleteQaRound(environmentId);
+  const latestRound = rounds[rounds.length - 1];
+  const { data: summary = { passed: 0, unresolvedErrors: 0, carriedOver: 0 } } =
+    useRoundDispositionSummary(roundId);
+  const [renamingRound, setRenamingRound] = useState<QaRound | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  const [deletingRound, setDeletingRound] = useState<QaRound | null>(null);
+
+  if (!round) return null;
+
+  function startRename(r: QaRound) {
+    setRenamingRound(r);
+    setRenameValue(r.name ?? "");
+  }
+
+  function submitRename() {
+    if (!renamingRound) return;
+    renameRound.mutate(
+      { roundId: renamingRound.id, name: renameValue.trim() || null },
+      {
+        onError: (error) => toast.error(errorMessage(error)),
+        onSuccess: () => {
+          toast.success("라운드 이름을 수정했어요");
+          setRenamingRound(null);
+        },
+      },
+    );
+  }
+
+  function confirmDelete() {
+    if (!deletingRound) return;
+    const deletedRoundId = deletingRound.id;
+    deleteRound.mutate(deletedRoundId, {
+      onError: (error) => toast.error(errorMessage(error)),
+      onSuccess: () => {
+        toast.success("라운드를 삭제했어요");
+        setDeletingRound(null);
+        if (deletedRoundId === roundId) {
+          navigate({
+            to: "/w/$wsId/p/$projectId/qa/$stageSlug",
+            params: { wsId, projectId, stageSlug },
+          });
+        }
+      },
+    });
+  }
+
+  return (
+    <div className="space-y-4">
+      <QaBreadcrumb
+        items={[
+          {
+            label: "개발 QA",
+            to: "/w/$wsId/p/$projectId/qa/$stageSlug",
+            params: { wsId, projectId, stageSlug },
+          },
+          { label: round.name?.trim() ? round.name : `${round.round_number}차` },
+        ]}
+      />
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h2 className="text-[21px] font-bold tracking-[-0.4px]">
+            {round.name?.trim() ? round.name : `${round.round_number}차`} 라운드
+          </h2>
+          <p className="text-[13px] text-[#8b97a8]">
+            세션 하나가 체크리스트 → 수집 → 분석 → 결과의 한 사이클이에요.
+          </p>
+        </div>
+        <Button
+          onClick={() =>
+            user &&
+            createRound.mutate(
+              { userId: user.id, previousRoundId: latestRound?.id ?? null },
+              { onError: (error) => toast.error(errorMessage(error)) },
+            )
+          }
+          disabled={createRound.isPending}
+        >
+          + 새 라운드 시작
+        </Button>
+      </div>
+
+      <div className="my-[18px] flex flex-wrap gap-2">
+        {rounds.map((r) => (
+          <div
+            key={r.id}
+            className={cn(
+              "group flex items-center gap-1 rounded-lg border pl-[13px] pr-1 py-1",
+              r.id === roundId
+                ? "border-[#1c2431] bg-[#1c2431] text-white"
+                : "border-[#e3e8ef] bg-white text-[#64748b]",
+            )}
+          >
+            <Link
+              from="/w/$wsId/p/$projectId/qa/$stageSlug/$roundId"
+              to="/w/$wsId/p/$projectId/qa/$stageSlug/$roundId"
+              params={(prev) => ({ ...prev, roundId: r.id })}
+              className={cn("text-[13px]", r.id === roundId ? "font-semibold" : "font-medium")}
+            >
+              {r.name?.trim() ? r.name : `${r.round_number}차`}
+            </Link>
+            {editable ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="size-5 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
+                    aria-label={`${r.round_number}차 라운드 작업 메뉴`}
+                  >
+                    <MoreHorizontal className="size-3.5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-36">
+                  <DropdownMenuItem onSelect={() => startRename(r)}>이름 수정</DropdownMenuItem>
+                  {canDeleteRounds ? (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        className="text-destructive focus:bg-destructive/10 focus:text-destructive"
+                        onSelect={() => setDeletingRound(r)}
+                      >
+                        삭제
+                      </DropdownMenuItem>
+                    </>
+                  ) : null}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : null}
+          </div>
+        ))}
+      </div>
+
+      {renamingRound ? (
+        <Dialog open onOpenChange={(v) => (v ? null : setRenamingRound(null))}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>라운드 이름 수정</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-1.5">
+              <Label htmlFor="round-name">이름</Label>
+              <Input
+                id="round-name"
+                value={renameValue}
+                onChange={(e) => setRenameValue(e.target.value)}
+                placeholder={`${renamingRound.round_number}차`}
+              />
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setRenamingRound(null)}>
+                취소
+              </Button>
+              <Button onClick={submitRename} disabled={renameRound.isPending}>
+                저장
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      ) : null}
+
+      <AlertDialog open={!!deletingRound} onOpenChange={(v) => (v ? null : setDeletingRound(null))}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              “
+              {deletingRound?.name?.trim()
+                ? deletingRound.name
+                : `${deletingRound?.round_number}차`}
+              ” 라운드를 삭제할까요?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              이 라운드에 속한 세션·체크리스트·검증 결과·스냅샷이 모두 함께 사라져요. 되돌릴 수
+              없어요.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>취소</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete}>삭제</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <div className="mb-[18px] grid grid-cols-[repeat(auto-fit,minmax(160px,1fr))] gap-2.5">
+        <RoundMetricCard
+          label="세션"
+          value={sessions.length}
+          sub={`수집 중 ${sessions.filter((s) => !s.ended_at).length} · 완료 ${sessions.filter((s) => s.ended_at).length}`}
+          tone="neutral"
+        />
+        <RoundMetricCard
+          label="통과"
+          value={summary.passed}
+          sub="이번 라운드 확정"
+          tone="success"
+        />
+        <RoundMetricCard
+          label="미해결 오류"
+          value={summary.unresolvedErrors}
+          sub="처리 대기 중"
+          tone="danger"
+        />
+        <RoundMetricCard
+          label="다음 차수 이월"
+          value={summary.carriedOver}
+          sub="다음 라운드로 넘어감"
+          tone="purple"
+        />
+      </div>
+
+      {sessions.length === 0 ? (
+        <EmptyState title="아직 세션이 없어요" description="아래에서 첫 세션을 만들어보세요." />
+      ) : null}
+
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-3">
+        {sessions.map((s) => (
+          <Link
+            key={s.id}
+            from="/w/$wsId/p/$projectId/qa/$stageSlug/$roundId"
+            to="/w/$wsId/p/$projectId/qa/$stageSlug/$roundId/$sessionId"
+            params={(prev) => ({ ...prev, sessionId: s.id })}
+            className="rounded-[14px] border border-[#e3e8ef] bg-white p-4 hover:border-[#2b6a9c] hover:shadow-[0_2px_10px_rgba(28,36,49,0.06)]"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[15px] font-semibold tracking-[-0.2px]">{s.name}</span>
+            </div>
+            <SessionProgressBar step={s.ended_at ? 3 : 2} />
+            <p className="mt-2 text-[11.5px] text-[#8b97a8]">
+              {s.ended_at ? "3/4 · 분석 단계" : "2/4 · 수집 단계"}
+            </p>
+          </Link>
+        ))}
+        <NewSessionCard roundId={roundId} />
+      </div>
+    </div>
+  );
+}
+
+function NewSessionCard({ roundId }: { roundId: string }) {
+  const { user } = useAuth();
+  const [name, setName] = useState("");
+  const createSession = useCreateQaSession(roundId);
+
+  function submit() {
+    if (!user || !name.trim()) return;
+    createSession.mutate(
+      { userId: user.id, name: name.trim() },
+      {
+        onSuccess: () => setName(""),
+        onError: (error) =>
+          toast.error(errorMessage(error, "이 라운드에 같은 이름의 세션이 이미 있어요")),
+      },
+    );
+  }
+
+  return (
+    <div className="flex min-h-[160px] flex-col items-center justify-center gap-1 rounded-[14px] border border-dashed border-[#c8d1dc] p-5 text-center text-[#64748b]">
+      <input
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        placeholder="장바구니 검증, AOS 검증처럼 자유롭게 그룹핑"
+        className="w-full rounded-md border border-[#dbe2ea] px-2 py-1.5 text-[13.5px]"
+        onKeyDown={(e) => {
+          if (e.key === "Enter") submit();
+        }}
+      />
+      <button
+        type="button"
+        disabled={!user || !name.trim() || createSession.isPending}
+        onClick={submit}
+        className="mt-1 text-[13.5px] hover:text-[#2b6a9c]"
+      >
+        + 새 세션
+      </button>
+    </div>
+  );
+}
