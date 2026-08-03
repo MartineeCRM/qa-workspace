@@ -110,8 +110,10 @@ export function QaSessionCollectionPanel({
     <Panel
       title="수집 타임라인"
       description="attribute가 바뀌었을 시점마다 스냅샷을 찍고, 활동 로그 CSV를 올리세요. CSV는 여러 번 나눠 올리고 그때마다 다시 분석해도 돼요."
-      actions={
-        <>
+    >
+      <div className="flex flex-wrap gap-3 border-b border-[#eef1f5] bg-[#fbfcfd] px-5 py-3.5">
+        <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-[#e3e8ef] bg-white px-2.5 py-1.5">
+          <span className="mr-0.5 text-[11px] font-semibold text-[#8b97a8]">스냅샷</span>
           <Input
             value={brazeId}
             onChange={(e) => setBrazeId(e.target.value)}
@@ -127,6 +129,9 @@ export function QaSessionCollectionPanel({
           <Button size="sm" variant="outline" onClick={handleCapture} disabled={capture.isPending}>
             스냅샷 찍기
           </Button>
+        </div>
+        <div className="flex items-center gap-1.5 rounded-lg border border-[#e3e8ef] bg-white px-2.5 py-1.5">
+          <span className="mr-0.5 text-[11px] font-semibold text-[#8b97a8]">CSV</span>
           <input
             ref={fileRef}
             type="file"
@@ -145,9 +150,9 @@ export function QaSessionCollectionPanel({
           >
             CSV 업로드
           </Button>
-        </>
-      }
-    >
+        </div>
+      </div>
+
       <ul className="px-5 py-4">
         {timeline.map((entry, index) => (
           <li

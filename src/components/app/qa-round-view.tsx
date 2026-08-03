@@ -42,11 +42,14 @@ import {
   useDeleteQaSession,
   useQaRounds,
   useQaSessions,
+  useQaSessionSteps,
   useRenameQaRound,
   useRoundDispositionSummary,
   type QaRound,
   type QaSession,
 } from "@/lib/qa-rounds-queries";
+
+const SESSION_STEP_LABELS = ["체크리스트", "수집", "분석", "결과"] as const;
 
 function SessionProgressBar({ step }: { step: number }) {
   return (
@@ -113,6 +116,7 @@ export function QaRoundView({
   const { data: rounds = [] } = useQaRounds(environmentId);
   const round = rounds.find((r) => r.id === roundId);
   const { data: sessions = [] } = useQaSessions(roundId);
+  const { data: sessionSteps } = useQaSessionSteps(roundId);
   const createRound = useCreateQaRound(projectId, environmentId);
   const renameRound = useRenameQaRound(environmentId);
   const deleteRound = useDeleteQaRound(environmentId);
@@ -361,7 +365,9 @@ export function QaRoundView({
       ) : null}
 
       <div className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-3">
-        {sessions.map((s) => (
+        {sessions.map((s) => {
+          const step = sessionSteps?.get(s.id) ?? 1;
+          return (
           <div
             key={s.id}
             className="group relative rounded-[14px] border border-[#e3e8ef] bg-white hover:border-[#2b6a9c] hover:shadow-[0_2px_10px_rgba(28,36,49,0.06)]"
@@ -375,9 +381,9 @@ export function QaRoundView({
               <div className="flex items-center justify-between pr-6">
                 <span className="text-[15px] font-semibold tracking-[-0.2px]">{s.name}</span>
               </div>
-              <SessionProgressBar step={s.ended_at ? 3 : 2} />
+              <SessionProgressBar step={step} />
               <p className="mt-2 text-[11.5px] text-[#8b97a8]">
-                {s.ended_at ? "3/4 · 분석 단계" : "2/4 · 수집 단계"}
+                {step}/4 · {SESSION_STEP_LABELS[step - 1]} 단계
               </p>
             </Link>
             {canDeleteRounds ? (
@@ -395,7 +401,8 @@ export function QaRoundView({
               </button>
             ) : null}
           </div>
-        ))}
+          );
+        })}
         <NewSessionCard roundId={roundId} />
       </div>
     </div>

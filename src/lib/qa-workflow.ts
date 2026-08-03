@@ -16,6 +16,25 @@ export function deriveSessionStep(input: {
   return 2;
 }
 
+// Same derivation as deriveSessionStep, but sourced straight from the nested
+// qa_sessions select the round view uses to summarize every session at once
+// (a per-session useQaChecklistItems/useQaRunEvents pair per card would be a
+// query per card instead of one query for the whole round).
+export type RawSessionForStep = {
+  id: string;
+  qa_round_checklist_items: Array<{ qa_checklist_item_results: unknown[] | null }> | null;
+  qa_run_events: unknown[] | null;
+};
+
+export function deriveSessionStepFromRow(row: RawSessionForStep): 1 | 2 | 3 | 4 {
+  const items = row.qa_round_checklist_items ?? [];
+  return deriveSessionStep({
+    checklistItemCount: items.length,
+    hasRunEvents: (row.qa_run_events ?? []).length > 0,
+    hasResults: items.some((i) => (i.qa_checklist_item_results ?? []).length > 0),
+  });
+}
+
 export type MergedTimelineRow = {
   key: string;
   occurredAt: string;

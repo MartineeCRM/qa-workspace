@@ -5,12 +5,25 @@ import { EmptyState, Panel } from "@/components/app/layout-parts";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { errorMessage } from "@/lib/domain";
+import { cn } from "@/lib/utils";
+import {
   useAddChecklistItems,
   useAdoptCarryOverItems,
   usePendingCarryOverItems,
   useQaChecklistItems,
   useQaRounds,
   useRemoveChecklistItem,
+  useResetChecklist,
   type QaSession,
 } from "@/lib/qa-rounds-queries";
 import {
@@ -57,8 +70,10 @@ export function QaSessionChecklistPanel({
   const adoptCarryOver = useAdoptCarryOverItems(session.id);
   const addItems = useAddChecklistItems(session.id);
   const removeItem = useRemoveChecklistItem(session.id);
+  const resetChecklist = useResetChecklist(session.id);
   const [search, setSearch] = useState("");
   const [staged, setStaged] = useState<SearchTarget[]>([]);
+  const [confirmingReset, setConfirmingReset] = useState(false);
 
   const existingKeys = useMemo(
     () => new Set(checklistItems.map((i) => `${i.target_type}:${i.target_id}`)),
@@ -79,28 +94,31 @@ export function QaSessionChecklistPanel({
       label: a.technical_name,
       sub: a.display_name ?? null,
     }));
-    return [...eventTargets, ...attrTargets].filter(
-      (t) => !existingKeys.has(`${t.kind}:${t.id}`) && !stagedKeys.has(`${t.kind}:${t.id}`),
-    );
-  }, [events, customAttributes, existingKeys, stagedKeys]);
+    // Staged targets stay in the list (not filtered out) so the dropdown can show
+    // them checked and let a click there un-stage them too.
+    return [...eventTargets, ...attrTargets].filter((t) => !existingKeys.has(`${t.kind}:${t.id}`));
+  }, [events, customAttributes, existingKeys]);
 
   const searchTargets = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return availableTargets;
+    if (!q) return [];
     return availableTargets.filter(
       (t) => t.label.toLowerCase().includes(q) || (t.sub ?? "").toLowerCase().includes(q),
     );
   }, [search, availableTargets]);
 
-  function stageTarget(target: SearchTarget) {
-    setStaged((prev) => [...prev, target]);
-    setSearch("");
+  function toggleStage(target: SearchTarget) {
+    setStaged((prev) =>
+      prev.some((t) => t.kind === target.kind && t.id === target.id)
+        ? prev.filter((t) => !(t.kind === target.kind && t.id === target.id))
+        : [...prev, target],
+    );
   }
 
   function handleSearchKeyDown(e: KeyboardEvent<HTMLInputElement>) {
     if (e.key !== "Enter" || searchTargets.length === 0) return;
     e.preventDefault();
-    stageTarget(searchTargets[0]);
+    toggleStage(searchTargets[0]);
   }
 
   function commitAdd(targets: SearchTarget[]) {
@@ -113,6 +131,16 @@ export function QaSessionChecklistPanel({
       { eventIds, customAttributeIds },
       { onError: (error) => toast.error(error instanceof Error ? error.message : String(error)) },
     );
+  }
+
+  function confirmReset() {
+    resetChecklist.mutate(undefined, {
+      onError: (error) => toast.error(errorMessage(error)),
+      onSuccess: () => {
+        toast.success("체크리스트를 초기화했어요");
+        setConfirmingReset(false);
+      },
+    });
   }
 
   function itemLabel(targetType: "event" | "custom_attribute", targetId: string): string {
@@ -132,6 +160,16 @@ export function QaSessionChecklistPanel({
           <span className="font-semibold text-[#2b6a9c]">여기 담은 항목만</span> 판정됩니다. 지난
           라운드에서 이월된 항목은 자동으로 담겨요.
         </>
+      }
+      actions={
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={checklistItems.length === 0}
+          onClick={() => setConfirmingReset(true)}
+        >
+          체크리스트 초기화
+        </Button>
       }
     >
       <div className="flex flex-wrap items-center gap-2 bg-[#fbfcfd] px-5 py-3.5">
@@ -156,6 +194,46 @@ export function QaSessionChecklistPanel({
           택소노미 전체 추가
         </Button>
       </div>
+
+      {search.trim() ? (
+        searchTargets.length === 0 ? (
+          <p className="border-b px-5 py-3 text-[12.5px] text-[#8b97a8]">일치하는 항목이 없어요.</p>
+        ) : (
+          <ul className="max-h-64 divide-y overflow-y-auto border-b">
+            {searchTargets.map((t) => {
+              const checked = stagedKeys.has(`${t.kind}:${t.id}`);
+              return (
+                <li key={`${t.kind}:${t.id}`}>
+                  <label className="flex cursor-pointer items-center gap-2.5 px-5 py-2 hover:bg-[#f7f9fc]">
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => toggleStage(t)}
+                      className="size-4 shrink-0"
+                    />
+                    <span className="mono-token min-w-0 flex-1 truncate text-[13px]">
+                      {t.label}
+                    </span>
+                    {t.sub ? (
+                      <span className="truncate text-[11.5px] text-[#8b97a8]">{t.sub}</span>
+                    ) : null}
+                    <span
+                      className={cn(
+                        "shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold",
+                        t.kind === "event"
+                          ? "bg-[#eaf1f8] text-[#2b6a9c]"
+                          : "bg-[#eef0fb] text-[#5b5fc7]",
+                      )}
+                    >
+                      {t.kind === "event" ? "이벤트" : "attribute"}
+                    </span>
+                  </label>
+                </li>
+              );
+            })}
+          </ul>
+        )
+      ) : null}
 
       {staged.length > 0 ? (
         <div className="flex flex-wrap items-center gap-2 border-b px-5 py-3">
@@ -219,6 +297,24 @@ export function QaSessionChecklistPanel({
         </ul>
       )}
       <p className="px-5 py-3 text-[12.5px] text-[#8b97a8]">{checklistItems.length}개 담김</p>
+
+      <AlertDialog open={confirmingReset} onOpenChange={setConfirmingReset}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>체크리스트를 초기화할까요?</AlertDialogTitle>
+            <AlertDialogDescription>
+              담긴 항목 {checklistItems.length}개가 모두 빠지고, 이미 판정된 결과·논의가 있다면
+              함께 사라져요. 되돌릴 수 없어요.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>취소</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmReset} disabled={resetChecklist.isPending}>
+              초기화
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Panel>
   );
 }
