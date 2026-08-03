@@ -707,6 +707,7 @@ describe("buildEventSpecDiffRows", () => {
       data_type: "string",
       is_required: false,
       allowed_values: null,
+      example_value: "15661",
     },
     {
       id: "p2",
@@ -714,6 +715,7 @@ describe("buildEventSpecDiffRows", () => {
       data_type: "string",
       is_required: true,
       allowed_values: null,
+      example_value: "android_app",
     },
   ];
 
@@ -786,5 +788,16 @@ describe("buildEventSpecDiffRows", () => {
       ],
     });
     expect(rows.filter((r) => r.name === "is_login")).toHaveLength(1);
+  });
+
+  it("carries the taxonomy's example value through for known properties, and leaves it absent for undefined ones", () => {
+    const rows = buildEventSpecDiffRows({
+      properties,
+      rawPropertiesList: [{ platform: "android_app", refferal_source: "https://example.com" }],
+    });
+    expect(rows.find((r) => r.name === "platform")).toMatchObject({
+      expectedExample: "android_app",
+    });
+    expect(rows.find((r) => r.name === "refferal_source")?.expectedExample).toBeUndefined();
   });
 });
