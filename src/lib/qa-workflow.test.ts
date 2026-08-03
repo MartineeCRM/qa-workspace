@@ -14,6 +14,7 @@ import {
   latestRoundChecklistRows,
   findTypoCandidate,
   parseReasonLines,
+  summarizeRoundValidationItems,
   compressRoundHistory,
   buildEventSpecDiffRows,
   type ChecklistCoverageRow,
@@ -587,6 +588,45 @@ describe("environmentChecklistCoverage", () => {
       failed: 0,
       notStarted: 3,
       ratio: 0,
+    });
+  });
+});
+
+describe("summarizeRoundValidationItems", () => {
+  const item = (
+    targetId: string,
+    finalStatus: "passed" | "failed" | "not_collected",
+    discussionCount = 0,
+    disposition: "unresolved" | "carried_over" | "passed_override" = "unresolved",
+  ) => ({
+    target_type: "event" as const,
+    target_id: targetId,
+    disposition,
+    qa_checklist_item_results: [
+      {
+        final_status: finalStatus,
+        qa_discussions: Array.from({ length: discussionCount }, (_, index) => ({ id: `${index}` })),
+      },
+    ],
+  });
+
+  it("deduplicates targets and classifies failures by whether discussion exists", () => {
+    expect(
+      summarizeRoundValidationItems([
+        item("passed", "passed"),
+        item("unconfirmed", "failed"),
+        item("confirmed", "failed", 1),
+        item("confirmed", "passed"),
+      ]),
+    ).toEqual({ executed: 3, passed: 1, unconfirmedIssues: 1, confirmedIssues: 1 });
+  });
+
+  it("ignores legacy carry-over disposition when classifying the actual verdict", () => {
+    expect(summarizeRoundValidationItems([item("failed", "failed", 0, "carried_over")])).toEqual({
+      executed: 1,
+      passed: 0,
+      unconfirmedIssues: 1,
+      confirmedIssues: 0,
     });
   });
 });

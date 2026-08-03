@@ -80,7 +80,7 @@ function QaIssuesPage() {
                         </code>
                         {environment ? <Pill>{environment.name}</Pill> : null}
                         <Pill>{channel?.name ?? "채널 미지정"}</Pill>
-                        <Pill>실행 · {issue.session_name}</Pill>
+                        <Pill>{issue.session_name}</Pill>
                         <Pill>{STATUS_LABEL[issue.workflow_status]}</Pill>
                       </div>
                       <Link

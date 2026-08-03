@@ -12,6 +12,7 @@ import type {
 import {
   deriveSessionStepFromRow,
   flattenChecklistCoverageRounds,
+  summarizeRoundValidationItems,
   type ChecklistCoverageRow,
 } from "@/lib/qa-workflow";
 
@@ -232,6 +233,20 @@ export function useSetQaSessionChannel(roundId: string) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["qa-sessions", roundId] });
       qc.invalidateQueries({ queryKey: ["project-checklist-coverage"] });
+      qc.invalidateQueries({ queryKey: ["project-qa-issues"] });
+    },
+  });
+}
+
+export function useRenameQaSession(roundId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ sessionId, name }: { sessionId: string; name: string }) => {
+      const { error } = await db.from("qa_sessions").update({ name }).eq("id", sessionId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["qa-sessions", roundId] });
       qc.invalidateQueries({ queryKey: ["project-qa-issues"] });
     },
   });
@@ -696,6 +711,7 @@ export function useCreateQaIssue(resultId: string, userId: string | undefined) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["qa-discussions", resultId] });
       qc.invalidateQueries({ queryKey: ["project-qa-issues"] });
+      qc.invalidateQueries({ queryKey: ["qa-round-validation-summary"] });
     },
   });
 }
@@ -940,13 +956,14 @@ export function useDeleteQaIssue(projectId: string, resultId?: string) {
     onSuccess: () => {
       if (resultId) qc.invalidateQueries({ queryKey: ["qa-discussions", resultId] });
       qc.invalidateQueries({ queryKey: ["project-qa-issues", projectId] });
+      qc.invalidateQueries({ queryKey: ["qa-round-validation-summary"] });
     },
   });
 }
 
-export function useRoundDispositionSummary(roundId: string) {
+export function useRoundValidationSummary(roundId: string) {
   return useQuery({
-    queryKey: ["qa-round-disposition-summary", roundId],
+    queryKey: ["qa-round-validation-summary", roundId],
     enabled: Boolean(roundId),
     queryFn: async () => {
       const { data: sessions, error: sessionsError } = await db
@@ -956,26 +973,18 @@ export function useRoundDispositionSummary(roundId: string) {
       if (sessionsError) throw sessionsError;
       const sessionIds = (sessions ?? []).map((s: { id: string }) => s.id);
       if (sessionIds.length === 0) {
-        return { passed: 0, unresolvedErrors: 0, carriedOver: 0 };
+        return { executed: 0, passed: 0, unconfirmedIssues: 0, confirmedIssues: 0 };
       }
 
       const { data: items, error: itemsError } = await db
         .from("qa_round_checklist_items")
-        .select("id, disposition, qa_checklist_item_results(final_status)")
+        .select(
+          "target_type, target_id, disposition, qa_checklist_item_results(final_status, qa_discussions(id))",
+        )
         .in("qa_session_id", sessionIds);
       if (itemsError) throw itemsError;
 
-      let passed = 0;
-      let unresolvedErrors = 0;
-      let carriedOver = 0;
-      for (const item of items ?? []) {
-        const finalStatus = item.qa_checklist_item_results?.[0]?.final_status ?? "not_collected";
-        if (item.disposition === "carried_over") carriedOver += 1;
-        if (item.disposition === "passed_override" || finalStatus === "passed") passed += 1;
-        else if (item.disposition === "unresolved" && finalStatus !== "passed")
-          unresolvedErrors += 1;
-      }
-      return { passed, unresolvedErrors, carriedOver };
+      return summarizeRoundValidationItems(items ?? []);
     },
   });
 }

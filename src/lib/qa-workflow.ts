@@ -303,6 +303,46 @@ export function checklistCoverageIssues(
   return issues;
 }
 
+export type RoundValidationSummary = {
+  executed: number;
+  passed: number;
+  unconfirmedIssues: number;
+  confirmedIssues: number;
+};
+
+export function summarizeRoundValidationItems(
+  items: Array<{
+    target_type: "event" | "custom_attribute";
+    target_id: string;
+    disposition: ChecklistDisposition;
+    qa_checklist_item_results: Array<{
+      final_status: "passed" | "failed" | "not_collected";
+      qa_discussions: Array<{ id: string }> | null;
+    }> | null;
+  }>,
+): RoundValidationSummary {
+  const rankByTarget = new Map<string, 1 | 2 | 3>();
+  for (const item of items) {
+    const result = item.qa_checklist_item_results?.[0];
+    if (!result) continue;
+    const key = `${item.target_type}:${item.target_id}`;
+    const rank =
+      item.disposition === "passed_override" || result.final_status === "passed"
+        ? 1
+        : (result.qa_discussions?.length ?? 0) > 0
+          ? 3
+          : 2;
+    rankByTarget.set(key, Math.max(rankByTarget.get(key) ?? 0, rank) as 1 | 2 | 3);
+  }
+  const ranks = [...rankByTarget.values()];
+  return {
+    executed: ranks.length,
+    passed: ranks.filter((rank) => rank === 1).length,
+    unconfirmedIssues: ranks.filter((rank) => rank === 2).length,
+    confirmedIssues: ranks.filter((rank) => rank === 3).length,
+  };
+}
+
 // ---------------- Item detail: spec diff & round history compression ----------------
 // Backs the item view's "스펙 대조" table (v4 design handoff): AS-IS is the value that
 // actually arrived in the log, TO-BE is what the taxonomy expects it to be.

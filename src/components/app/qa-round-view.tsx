@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { MoreHorizontal, Trash2 } from "lucide-react";
+import { MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -45,7 +45,8 @@ import {
   useQaSessions,
   useQaSessionSteps,
   useRenameQaRound,
-  useRoundDispositionSummary,
+  useRenameQaSession,
+  useRoundValidationSummary,
   useSetQaSessionChannel,
   type QaRound,
   type QaSession,
@@ -125,13 +126,16 @@ export function QaRoundView({
   const deleteRound = useDeleteQaRound(environmentId);
   const deleteSession = useDeleteQaSession(roundId);
   const setSessionChannel = useSetQaSessionChannel(roundId);
+  const renameSession = useRenameQaSession(roundId);
   const latestRound = rounds[rounds.length - 1];
-  const { data: summary = { passed: 0, unresolvedErrors: 0, carriedOver: 0 } } =
-    useRoundDispositionSummary(roundId);
+  const { data: summary = { executed: 0, passed: 0, unconfirmedIssues: 0, confirmedIssues: 0 } } =
+    useRoundValidationSummary(roundId);
   const [renamingRound, setRenamingRound] = useState<QaRound | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [deletingRound, setDeletingRound] = useState<QaRound | null>(null);
   const [deletingSession, setDeletingSession] = useState<QaSession | null>(null);
+  const [renamingSession, setRenamingSession] = useState<QaSession | null>(null);
+  const [sessionName, setSessionName] = useState("");
 
   if (!round) return null;
 
@@ -181,6 +185,20 @@ export function QaRoundView({
         setDeletingSession(null);
       },
     });
+  }
+
+  function submitSessionRename() {
+    if (!renamingSession || !sessionName.trim()) return;
+    renameSession.mutate(
+      { sessionId: renamingSession.id, name: sessionName.trim() },
+      {
+        onError: (error) => toast.error(errorMessage(error)),
+        onSuccess: () => {
+          toast.success("세션명을 수정했어요");
+          setRenamingSession(null);
+        },
+      },
+    );
   }
 
   return (
@@ -296,6 +314,38 @@ export function QaRoundView({
         </Dialog>
       ) : null}
 
+      {renamingSession ? (
+        <Dialog open onOpenChange={(value) => (value ? null : setRenamingSession(null))}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>세션명 수정</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-1.5">
+              <Label htmlFor="session-name">세션명</Label>
+              <Input
+                id="session-name"
+                value={sessionName}
+                onChange={(event) => setSessionName(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") submitSessionRename();
+                }}
+              />
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setRenamingSession(null)}>
+                취소
+              </Button>
+              <Button
+                onClick={submitSessionRename}
+                disabled={!sessionName.trim() || renameSession.isPending}
+              >
+                저장
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      ) : null}
+
       <AlertDialog open={!!deletingRound} onOpenChange={(v) => (v ? null : setDeletingRound(null))}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -340,26 +390,21 @@ export function QaRoundView({
       <div className="mb-[18px] grid grid-cols-[repeat(auto-fit,minmax(160px,1fr))] gap-2.5">
         <RoundMetricCard
           label="검증 실행"
-          value={sessions.length}
-          sub={`수집 중 ${sessions.filter((s) => !s.ended_at).length} · 완료 ${sessions.filter((s) => s.ended_at).length}`}
+          value={summary.executed}
+          sub="판정한 이벤트·어트리뷰트"
           tone="neutral"
         />
+        <RoundMetricCard label="통과" value={summary.passed} sub="고유 대상 기준" tone="success" />
         <RoundMetricCard
-          label="통과"
-          value={summary.passed}
-          sub="이번 라운드 확정"
-          tone="success"
-        />
-        <RoundMetricCard
-          label="미해결 오류"
-          value={summary.unresolvedErrors}
-          sub="처리 대기 중"
+          label="미확인 이슈"
+          value={summary.unconfirmedIssues}
+          sub="논의에 올리지 않은 오류"
           tone="danger"
         />
         <RoundMetricCard
-          label="다음 차수 이월"
-          value={summary.carriedOver}
-          sub="다음 라운드로 넘어감"
+          label="확인된 이슈"
+          value={summary.confirmedIssues}
+          sub="논의에 등록된 오류"
           tone="purple"
         />
       </div>
@@ -423,18 +468,27 @@ export function QaRoundView({
                 </select>
               </div>
               {canDeleteRounds ? (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    setDeletingSession(s);
-                  }}
-                  aria-label={`${s.name} 검증 실행 삭제`}
-                  className="absolute right-3 top-4 rounded-md p-1 text-[#c3ccd8] opacity-0 hover:text-destructive group-hover:opacity-100"
-                >
-                  <Trash2 className="size-3.5" />
-                </button>
+                <div className="absolute right-3 top-4 flex gap-0.5 opacity-0 group-hover:opacity-100">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRenamingSession(s);
+                      setSessionName(s.name);
+                    }}
+                    aria-label={`${s.name} 세션명 수정`}
+                    className="rounded-md p-1 text-[#8b97a8] hover:text-[#2b6a9c]"
+                  >
+                    <Pencil className="size-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDeletingSession(s)}
+                    aria-label={`${s.name} 검증 실행 삭제`}
+                    className="rounded-md p-1 text-[#c3ccd8] hover:text-destructive"
+                  >
+                    <Trash2 className="size-3.5" />
+                  </button>
+                </div>
               ) : null}
             </div>
           );

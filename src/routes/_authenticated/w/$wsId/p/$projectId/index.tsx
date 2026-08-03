@@ -180,7 +180,7 @@ function ProjectOverview() {
                           </Link>
                           {stage ? <Pill>{stage.name}</Pill> : null}
                           <Pill>{channel?.name ?? "채널 미지정"}</Pill>
-                          <Pill>실행 · {issue.session_name}</Pill>
+                          <Pill>{issue.session_name}</Pill>
                           <Pill>
                             {issue.workflow_status === "next_validation"
                               ? "다음 검증 대기"
