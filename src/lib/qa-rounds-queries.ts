@@ -9,6 +9,7 @@ import type {
   TaxonomyEventProperty,
   ValidationRule,
 } from "@/lib/queries";
+import { flattenChecklistCoverageRounds, type ChecklistCoverageRow } from "@/lib/qa-workflow";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as any;
@@ -760,6 +761,23 @@ export function useChecklistItemRoundHistory(itemId: string) {
         currentId = item.carried_from_item_id;
       }
       return history;
+    },
+  });
+}
+
+export function useProjectChecklistCoverageRows(projectId: string) {
+  return useQuery({
+    queryKey: ["project-checklist-coverage", projectId],
+    enabled: Boolean(projectId),
+    queryFn: async (): Promise<ChecklistCoverageRow[]> => {
+      const { data, error } = await db
+        .from("qa_rounds")
+        .select(
+          "id, qa_environment_id, round_number, qa_sessions(id, qa_round_checklist_items(id, target_type, target_id, disposition, qa_checklist_item_results(final_status, updated_at)))",
+        )
+        .eq("project_id", projectId);
+      if (error) throw error;
+      return flattenChecklistCoverageRounds(data ?? []);
     },
   });
 }
