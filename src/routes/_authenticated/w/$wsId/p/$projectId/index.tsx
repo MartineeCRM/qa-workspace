@@ -9,7 +9,6 @@ import {
   useActivity,
   useEnvironments,
   useProject,
-  useRules,
   useTaxonomyCustomAttributes,
   useTaxonomyEventProperties,
   useTaxonomyEvents,
@@ -50,7 +49,6 @@ function ProjectOverview() {
   const { data: events = [] } = useTaxonomyEvents(projectId);
   const { data: eventProperties = [] } = useTaxonomyEventProperties(projectId);
   const { data: customAttributes = [] } = useTaxonomyCustomAttributes(projectId);
-  const { data: rules = [] } = useRules(projectId);
   const { data: stages = [] } = useEnvironments(projectId);
   const { data: coverageRows = [] } = useProjectChecklistCoverageRows(projectId);
   const { data: activity = [] } = useActivity({ projectId, limit: 12 });
@@ -212,12 +210,6 @@ function ProjectOverview() {
           )}
         </Panel>
       </div>
-
-      <p className="text-xs text-muted-foreground">
-        택소노미에는 이벤트 {events.length}개, 속성{" "}
-        {eventProperties.length + customAttributes.length}개, 검증 규칙 {rules.length}개가 등록돼
-        있어요.
-      </p>
     </div>
   );
 }
