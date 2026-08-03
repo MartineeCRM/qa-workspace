@@ -81,6 +81,10 @@ export function QaItemView({
   const [commentBody, setCommentBody] = useState("");
   const [openRounds, setOpenRounds] = useState<Record<number, boolean>>({});
   const [evidenceExpanded, setEvidenceExpanded] = useState(false);
+  const [evidenceHighlight, setEvidenceHighlight] = useState<{
+    propertyNames: Set<string>;
+    tone: "pass" | "issue";
+  } | null>(null);
 
   // "이전/다음 항목" links only change the :itemId path param, so this component
   // doesn't remount between items.
@@ -88,6 +92,7 @@ export function QaItemView({
     setEvidenceExpanded(false);
     setSelectedIssueId(null);
     setCommentBody("");
+    setEvidenceHighlight(null);
   }, [item.id]);
 
   const label =
@@ -177,13 +182,18 @@ export function QaItemView({
       <div className="pl-4">
         <div>{"{"}</div>
         {entries.map(([k, v], i) => {
+          const selected = evidenceHighlight?.propertyNames.has(k) ?? false;
           const highlighted = violatingProperties.has(k);
           return (
             <div key={k} className="pl-4">
               <span
-                className={
-                  highlighted ? "rounded-sm bg-[#4a3f00] px-0.5 text-[#f2d675]" : undefined
-                }
+                className={cn(
+                  selected &&
+                    (evidenceHighlight?.tone === "pass"
+                      ? "rounded-sm bg-[#dff4e6] px-0.5 text-[#166534]"
+                      : "rounded-sm bg-[#fff3c4] px-0.5 text-[#854d0e]"),
+                  !selected && highlighted && "rounded-sm bg-[#4a3f00] px-0.5 text-[#f2d675]",
+                )}
               >
                 {JSON.stringify(k)}: {JSON.stringify(v)}
               </span>
@@ -333,6 +343,9 @@ export function QaItemView({
               rawPropertiesList={matchedRawPropertiesList}
               aiFailedPropertyIds={aiFailedPropertyIds}
               onReanalyze={reanalyzeAfterTaxonomyChange}
+              onHighlightChange={(propertyNames, tone) =>
+                setEvidenceHighlight(tone ? { propertyNames: new Set(propertyNames), tone } : null)
+              }
               onCreateIssue={({ id, label: propertyLabel }) => {
                 if (!result) return toast.error("분석 결과가 있어야 이슈로 등록할 수 있어요");
                 createIssue.mutate(

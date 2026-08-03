@@ -79,6 +79,7 @@ export function QaItemSpecDiffTable({
   aiFailedPropertyIds,
   onReanalyze,
   onCreateIssue,
+  onHighlightChange,
 }: {
   projectId: string;
   eventId: string;
@@ -87,6 +88,7 @@ export function QaItemSpecDiffTable({
   aiFailedPropertyIds: Set<string>;
   onReanalyze: () => Promise<void>;
   onCreateIssue: (target: { id: string; label: string }) => void;
+  onHighlightChange: (propertyNames: string[], tone: "pass" | "issue" | null) => void;
 }) {
   const { user } = useAuth();
   const updateDataType = useUpdateEventPropertyDataType(projectId);
@@ -100,6 +102,7 @@ export function QaItemSpecDiffTable({
 
   useEffect(() => {
     setFixes({});
+    setFilter("전체");
   }, [eventId]);
 
   const rows = useMemo(
@@ -150,6 +153,26 @@ export function QaItemSpecDiffTable({
             : filter === "값·형식"
               ? valueRows
               : passedRows;
+
+  function selectFilter(nextFilter: FilterKey) {
+    setFilter(nextFilter);
+    const selectedRows =
+      nextFilter === "전체"
+        ? []
+        : nextFilter === "필수 누락"
+          ? missingRows
+          : nextFilter === "타입"
+            ? typeMismatchRows
+            : nextFilter === "미정의"
+              ? undefinedRows
+              : nextFilter === "값·형식"
+                ? valueRows
+                : passedRows;
+    onHighlightChange(
+      selectedRows.map((row) => row.name),
+      nextFilter === "전체" ? null : nextFilter === "통과" ? "pass" : "issue",
+    );
+  }
 
   function actionsFor(row: SpecDiffRow): Array<{ key: FixAction; label: string }> {
     if (row.verdict === "pass") {
@@ -258,7 +281,7 @@ export function QaItemSpecDiffTable({
             <button
               key={f.key}
               type="button"
-              onClick={() => setFilter(f.key)}
+              onClick={() => selectFilter(f.key)}
               className={cn(
                 "rounded-md px-2.5 py-1 text-xs",
                 filter === f.key
