@@ -1,7 +1,9 @@
+import { matchesDataType } from "@/lib/checklist-judge";
 import type {
   ChecklistDisposition,
   QaAttributeSnapshot,
   QaRunEvent,
+  RoundHistoryEntry,
 } from "@/lib/qa-rounds-queries";
 import type { CoverageItem, EnvironmentCoverage } from "@/lib/queries";
 
@@ -280,4 +282,205 @@ export function checklistCoverageIssues(
     }
   }
   return issues;
+}
+
+// ---------------- Item detail: spec diff & round history compression ----------------
+// Backs the item view's "스펙 대조" table (v4 design handoff): AS-IS is the value that
+// actually arrived in the log, TO-BE is what the taxonomy expects it to be.
+
+function levenshteinDistance(a: string, b: string): number {
+  const rows = a.length + 1;
+  const cols = b.length + 1;
+  const dp: number[][] = Array.from({ length: rows }, () => new Array(cols).fill(0));
+  for (let i = 0; i < rows; i++) dp[i][0] = i;
+  for (let j = 0; j < cols; j++) dp[0][j] = j;
+  for (let i = 1; i < rows; i++) {
+    for (let j = 1; j < cols; j++) {
+      dp[i][j] =
+        a[i - 1] === b[j - 1]
+          ? dp[i - 1][j - 1]
+          : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+    }
+  }
+  return dp[rows - 1][cols - 1];
+}
+
+export type TypoCandidate = { id: string; name: string; distance: number };
+
+// Edit distance <=2 and length difference <=2 → candidate. Distance 1 reads as a
+// near-certain typo; distance 2 as "similar but might genuinely be a different
+// property" — callers should tone the copy down accordingly. Carries the
+// candidate's id (not just its name) since a chosen "rename" resolution needs a
+// concrete taxonomy row to update.
+export function findTypoCandidate(
+  unknownName: string,
+  knownProps: Array<{ id: string; technical_name: string }>,
+): TypoCandidate | null {
+  let best: TypoCandidate | null = null;
+  for (const known of knownProps) {
+    if (known.technical_name === unknownName) continue;
+    if (Math.abs(known.technical_name.length - unknownName.length) > 2) continue;
+    const distance = levenshteinDistance(unknownName, known.technical_name);
+    if (distance > 2) continue;
+    if (!best || distance < best.distance) best = { id: known.id, name: known.technical_name, distance };
+  }
+  return best;
+}
+
+export type ParsedReasonLine = {
+  property: string;
+  kind: "type_mismatch" | "undefined_property" | "other";
+  reason: string;
+};
+
+// ai_reasoning for rule-judged structural violations is a "property: reason" line
+// per violation (see checklist-analysis.ts). Parse it back apart so the round
+// history can group by kind instead of repeating the full sentence every round.
+export function parseReasonLines(reasoning: string | null): ParsedReasonLine[] {
+  if (!reasoning) return [];
+  return reasoning
+    .split("\n")
+    .filter(Boolean)
+    .map((line) => {
+      const idx = line.indexOf(":");
+      const property = idx === -1 ? line.trim() : line.slice(0, idx).trim();
+      const reason = idx === -1 ? "" : line.slice(idx + 1).trim();
+      const kind: ParsedReasonLine["kind"] = reason.includes("택소노미에 정의되지 않은 프로퍼티입니다")
+        ? "undefined_property"
+        : reason.startsWith("타입이")
+          ? "type_mismatch"
+          : "other";
+      return { property, kind, reason };
+    });
+}
+
+export type CompressedRoundHistoryEntry = {
+  roundNumber: number;
+  finalStatus: "passed" | "failed" | "not_collected";
+  typeMismatchProperties: string[];
+  undefinedProperties: string[];
+  otherReason: string | null;
+  delta: number | null;
+};
+
+// history[0] is the most recent round (useChecklistItemRoundHistory walks
+// carried_from_item_id backward), so each entry's delta compares against the
+// NEXT entry in the array — the round that came chronologically before it.
+export function compressRoundHistory(history: RoundHistoryEntry[]): CompressedRoundHistoryEntry[] {
+  const counts = history.map((h) => {
+    const lines = parseReasonLines(h.reasoning);
+    return {
+      typeMismatchProperties: lines.filter((l) => l.kind === "type_mismatch").map((l) => l.property),
+      undefinedProperties: lines.filter((l) => l.kind === "undefined_property").map((l) => l.property),
+      lines,
+    };
+  });
+  return history.map((h, i) => {
+    const current = counts[i];
+    const structuredCount = current.typeMismatchProperties.length + current.undefinedProperties.length;
+    const otherReason = structuredCount === 0 ? h.reasoning : null;
+    const prev = counts[i + 1];
+    const delta =
+      prev === undefined
+        ? null
+        : structuredCount - (prev.typeMismatchProperties.length + prev.undefinedProperties.length);
+    return {
+      roundNumber: h.roundNumber,
+      finalStatus: h.finalStatus,
+      typeMismatchProperties: current.typeMismatchProperties,
+      undefinedProperties: current.undefinedProperties,
+      otherReason,
+      delta,
+    };
+  });
+}
+
+// ---------------- Item detail: 스펙 대조 (spec diff) table rows ----------------
+// AS-IS = what actually arrived in the log. TO-BE = what the taxonomy expects.
+
+export type SpecDiffVerdict = "pass" | "type_mismatch" | "undefined_property";
+
+export type SpecDiffRow = {
+  // null for a property that isn't in the taxonomy yet (undefined_property row) —
+  // there's nothing to type-fix or rename, only "add as new" applies.
+  propertyId: string | null;
+  name: string;
+  observedType: string;
+  observedSample: unknown;
+  expectedType: string | null;
+  allowedValues: string[] | null;
+  verdict: SpecDiffVerdict;
+  typoCandidate: TypoCandidate | null;
+};
+
+function inferObservedType(value: unknown): string {
+  if (value === undefined) return "없음";
+  if (value === null) return "null";
+  if (Array.isArray(value)) return "array";
+  return typeof value;
+}
+
+export function buildEventSpecDiffRows(input: {
+  properties: Array<{
+    id: string;
+    technical_name: string;
+    data_type: string;
+    is_required: boolean;
+    allowed_values: string[] | null;
+  }>;
+  // raw_properties from every matched run event in the session, newest first —
+  // a property only counts as "observed" once some occurrence actually carried it.
+  rawPropertiesList: Array<Record<string, unknown>>;
+}): SpecDiffRow[] {
+  const knownNames = input.properties.map((p) => p.technical_name);
+  const rows: SpecDiffRow[] = [];
+
+  for (const prop of input.properties) {
+    // Check every matched occurrence, not just the first — the same property can
+    // be valid in one log line and wrong in another, and judgeEventStructural
+    // (the actual judging engine) flags a violation if ANY occurrence mismatches.
+    const values = input.rawPropertiesList
+      .map((raw) => raw[prop.technical_name])
+      .filter((v) => v !== undefined && v !== null);
+    const mismatchingValue = values.find((v) => !matchesDataType(v, prop.data_type));
+    const observedValue = mismatchingValue !== undefined ? mismatchingValue : values[0];
+    const verdict: SpecDiffVerdict =
+      values.length === 0
+        ? prop.is_required
+          ? "type_mismatch"
+          : "pass"
+        : mismatchingValue !== undefined
+          ? "type_mismatch"
+          : "pass";
+    rows.push({
+      propertyId: prop.id,
+      name: prop.technical_name,
+      observedType: inferObservedType(observedValue),
+      observedSample: observedValue,
+      expectedType: prop.data_type,
+      allowedValues: prop.allowed_values,
+      verdict,
+      typoCandidate: null,
+    });
+  }
+
+  const seen = new Set<string>();
+  for (const raw of input.rawPropertiesList) {
+    for (const key of Object.keys(raw)) {
+      if (knownNames.includes(key) || seen.has(key)) continue;
+      seen.add(key);
+      rows.push({
+        propertyId: null,
+        name: key,
+        observedType: inferObservedType(raw[key]),
+        observedSample: raw[key],
+        expectedType: null,
+        allowedValues: null,
+        verdict: "undefined_property",
+        typoCandidate: findTypoCandidate(key, input.properties),
+      });
+    }
+  }
+
+  return rows;
 }
