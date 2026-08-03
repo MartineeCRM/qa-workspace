@@ -14,12 +14,8 @@ import {
   useTaxonomyEvents,
   type QaEnvironment,
 } from "@/lib/queries";
-import { useProjectChecklistCoverageRows } from "@/lib/qa-rounds-queries";
-import {
-  checklistCoverageIssues,
-  checklistCoverageItems,
-  environmentChecklistCoverage,
-} from "@/lib/qa-workflow";
+import { useProjectChecklistCoverageRows, useProjectQaIssues } from "@/lib/qa-rounds-queries";
+import { checklistCoverageItems, environmentChecklistCoverage } from "@/lib/qa-workflow";
 import { formatDateTime } from "@/lib/domain";
 
 export const Route = createFileRoute("/_authenticated/w/$wsId/p/$projectId/")({
@@ -51,6 +47,7 @@ function ProjectOverview() {
   const { data: customAttributes = [] } = useTaxonomyCustomAttributes(projectId);
   const { data: stages = [] } = useEnvironments(projectId);
   const { data: coverageRows = [] } = useProjectChecklistCoverageRows(projectId);
+  const { data: qaIssues = [] } = useProjectQaIssues(projectId);
   const { data: activity = [] } = useActivity({ projectId, limit: 12 });
 
   const items = buildCoverageItems(events, eventProperties, customAttributes);
@@ -60,23 +57,11 @@ function ProjectOverview() {
   // See checklistCoverageItems in qa-workflow.ts: the checklist schema only
   // tracks events/custom attributes, so this is a narrower set than `items`.
   const checklistItems = checklistCoverageItems(items);
-  const itemByKey = new Map(checklistItems.map((i) => [i.key, i]));
   const environmentById = new Map(stages.map((s) => [s.id, s]));
-  const issues = checklistCoverageIssues(
-    coverageRows,
-    stages.map((s) => s.id),
-  )
-    .map((issue) => ({
-      id: issue.checklistItemId,
-      stage: environmentById.get(issue.environmentId),
-      item: itemByKey.get(issue.itemKey),
-      status: issue.status,
-      roundId: issue.roundId,
-      sessionId: issue.sessionId,
-      checklistItemId: issue.checklistItemId,
-    }))
-    .filter((i) => i.stage && i.item)
-    .sort((a, b) => (a.status === b.status ? 0 : a.status === "failed" ? -1 : 1));
+  const eventById = new Map(events.map((event) => [event.id, event]));
+  const issues = qaIssues.filter(
+    (issue) => issue.workflow_status !== "dismissed" && issue.workflow_status !== "verified",
+  );
 
   return (
     <div className="space-y-5 p-6">
@@ -151,39 +136,43 @@ function ProjectOverview() {
             />
           ) : (
             <ul className="divide-y">
-              {issues.slice(0, 12).map((issue) => (
-                <li key={issue.id} className="px-4 py-2.5">
-                  <div className="flex items-start gap-2">
-                    <AlertTriangle
-                      className={
-                        issue.status === "failed"
-                          ? "mt-0.5 size-4 text-destructive"
-                          : "mt-0.5 size-4 text-muted-foreground"
-                      }
-                    />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Link
-                          to="/w/$wsId/p/$projectId/qa/$stageSlug/$roundId/$sessionId/$itemId"
-                          params={{
-                            wsId,
-                            projectId,
-                            stageSlug: issue.stage!.slug,
-                            roundId: issue.roundId,
-                            sessionId: issue.sessionId,
-                            itemId: issue.checklistItemId,
-                          }}
-                          className="mono-token truncate text-sm font-medium hover:underline"
-                        >
-                          {issue.item!.label}
-                        </Link>
-                        <Pill>{issue.stage!.name}</Pill>
-                        <Pill>{issue.status === "failed" ? "실패" : "논의중"}</Pill>
+              {issues.slice(0, 12).map((issue) => {
+                const stage = environmentById.get(issue.qa_environment_id);
+                const event = eventById.get(issue.event_id);
+                return (
+                  <li key={issue.id} className="px-4 py-2.5">
+                    <div className="flex items-start gap-2">
+                      <AlertTriangle
+                        className={
+                          issue.workflow_status === "needs_review"
+                            ? "mt-0.5 size-4 text-destructive"
+                            : "mt-0.5 size-4 text-muted-foreground"
+                        }
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Link
+                            to="/w/$wsId/p/$projectId/issues"
+                            params={{
+                              wsId,
+                              projectId,
+                            }}
+                            className="mono-token truncate text-sm font-medium hover:underline"
+                          >
+                            {event?.technical_name ?? issue.event_id}.{issue.target_label}
+                          </Link>
+                          {stage ? <Pill>{stage.name}</Pill> : null}
+                          <Pill>
+                            {issue.workflow_status === "next_validation"
+                              ? "다음 검증 대기"
+                              : "확인 필요"}
+                          </Pill>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </li>
-              ))}
+                  </li>
+                );
+              })}
               {issues.length > 12 ? (
                 <li className="px-4 py-2 text-xs text-muted-foreground">
                   외 {issues.length - 12}건이 더 있어요.

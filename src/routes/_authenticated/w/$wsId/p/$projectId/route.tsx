@@ -101,6 +101,9 @@ function ProjectShell() {
           <TabLink to="/w/$wsId/p/$projectId/taxonomy" params={{ wsId, projectId }}>
             택소노미
           </TabLink>
+          <TabLink to="/w/$wsId/p/$projectId/issues" params={{ wsId, projectId }}>
+            이슈 모아보기
+          </TabLink>
           {(stages ?? []).map((stage: QaEnvironment) => (
             <TabLink
               key={stage.id}

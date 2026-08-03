@@ -389,6 +389,10 @@ export type Database = {
           created_by: string;
           id: string;
           status: string;
+          target_id: string;
+          target_label: string;
+          target_type: string;
+          workflow_status: string;
         };
         Insert: {
           checklist_item_result_id: string;
@@ -396,6 +400,10 @@ export type Database = {
           created_by: string;
           id?: string;
           status?: string;
+          target_id?: string;
+          target_label?: string;
+          target_type?: string;
+          workflow_status?: string;
         };
         Update: {
           checklist_item_result_id?: string;
@@ -403,12 +411,16 @@ export type Database = {
           created_by?: string;
           id?: string;
           status?: string;
+          target_id?: string;
+          target_label?: string;
+          target_type?: string;
+          workflow_status?: string;
         };
         Relationships: [
           {
             foreignKeyName: "qa_discussions_checklist_item_result_id_fkey";
             columns: ["checklist_item_result_id"];
-            isOneToOne: true;
+            isOneToOne: false;
             referencedRelation: "qa_checklist_item_results";
             referencedColumns: ["id"];
           },
@@ -1275,10 +1287,6 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
-      add_qa_discussion_comment: {
-        Args: { _body: string; _result_id: string };
-        Returns: string;
-      };
       carry_over_qa_checklist_items: {
         Args: { _assignee_id?: string | null; _item_ids: string[] };
         Returns: { round_id: string; session_id: string }[];

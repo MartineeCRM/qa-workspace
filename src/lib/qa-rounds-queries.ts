@@ -551,21 +551,50 @@ export type QaDiscussion = {
   status: "open" | "resolved";
   created_by: string;
   created_at: string;
+  target_type: "event" | "property";
+  target_id: string;
+  target_label: string;
+  workflow_status: "needs_review" | "still_issue" | "next_validation" | "dismissed" | "verified";
   qa_discussion_comments: QaDiscussionComment[];
 };
 
-export function useQaDiscussion(resultId: string) {
+export function useQaDiscussions(resultId: string) {
   return useQuery({
-    queryKey: ["qa-discussion", resultId],
+    queryKey: ["qa-discussions", resultId],
     enabled: Boolean(resultId),
     queryFn: async () => {
       const { data, error } = await db
         .from("qa_discussions")
         .select("*, qa_discussion_comments(*)")
         .eq("checklist_item_result_id", resultId)
-        .maybeSingle();
+        .order("created_at", { ascending: true });
       if (error) throw error;
-      return data as QaDiscussion | null;
+      return data as QaDiscussion[];
+    },
+  });
+}
+
+export function useCreateQaIssue(resultId: string, userId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (target: { type: "event" | "property"; id: string; label: string }) => {
+      if (!userId) throw new Error("로그인이 필요해요");
+      const { error } = await db.from("qa_discussions").upsert(
+        {
+          checklist_item_result_id: resultId,
+          target_type: target.type,
+          target_id: target.id,
+          target_label: target.label,
+          workflow_status: "needs_review",
+          created_by: userId,
+        },
+        { onConflict: "checklist_item_result_id,target_type,target_id", ignoreDuplicates: true },
+      );
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["qa-discussions", resultId] });
+      qc.invalidateQueries({ queryKey: ["project-qa-issues"] });
     },
   });
 }
@@ -638,15 +667,147 @@ export function useAdoptCarryOverItems(sessionId: string) {
 export function useAddDiscussionComment(resultId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (body: string) => {
-      const { error } = await db.rpc("add_qa_discussion_comment", {
-        _result_id: resultId,
-        _body: body,
+    mutationFn: async ({
+      discussionId,
+      body,
+      authorId,
+    }: {
+      discussionId: string;
+      body: string;
+      authorId: string;
+    }) => {
+      const { error } = await db.from("qa_discussion_comments").insert({
+        discussion_id: discussionId,
+        author_id: authorId,
+        body,
       });
       if (error) throw error;
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["qa-discussion", resultId] });
+      qc.invalidateQueries({ queryKey: ["qa-discussions", resultId] });
+      qc.invalidateQueries({ queryKey: ["project-qa-issues"] });
+    },
+  });
+}
+
+export type ProjectQaIssue = QaDiscussion & {
+  checklist_item_id: string;
+  event_id: string;
+  qa_session_id: string;
+  qa_environment_id: string;
+  round_id: string;
+};
+
+export function useProjectQaIssues(projectId: string) {
+  return useQuery({
+    queryKey: ["project-qa-issues", projectId],
+    enabled: Boolean(projectId),
+    queryFn: async (): Promise<ProjectQaIssue[]> => {
+      const { data: rounds, error: roundsError } = await db
+        .from("qa_rounds")
+        .select("id, qa_environment_id")
+        .eq("project_id", projectId);
+      if (roundsError) throw roundsError;
+      type IssueRoundRow = { id: string; qa_environment_id: string };
+      type IssueSessionRow = { id: string; qa_round_id: string };
+      type IssueItemRow = { id: string; qa_session_id: string; target_id: string };
+      type IssueResultRow = { id: string; checklist_item_id: string };
+      const roundById = new Map<string, IssueRoundRow>(
+        (rounds ?? []).map((r: { id: string; qa_environment_id: string }) => [r.id, r]),
+      );
+      if (roundById.size === 0) return [];
+
+      const { data: sessions, error: sessionsError } = await db
+        .from("qa_sessions")
+        .select("id, qa_round_id")
+        .in("qa_round_id", [...roundById.keys()]);
+      if (sessionsError) throw sessionsError;
+      const sessionById = new Map<string, IssueSessionRow>(
+        (sessions ?? []).map((s: { id: string; qa_round_id: string }) => [s.id, s]),
+      );
+      if (sessionById.size === 0) return [];
+
+      const { data: items, error: itemsError } = await db
+        .from("qa_round_checklist_items")
+        .select("id, qa_session_id, target_id")
+        .eq("target_type", "event")
+        .in("qa_session_id", [...sessionById.keys()]);
+      if (itemsError) throw itemsError;
+      const itemById = new Map<string, IssueItemRow>(
+        (items ?? []).map((i: { id: string; qa_session_id: string; target_id: string }) => [
+          i.id,
+          i,
+        ]),
+      );
+      if (itemById.size === 0) return [];
+
+      const { data: results, error: resultsError } = await db
+        .from("qa_checklist_item_results")
+        .select("id, checklist_item_id")
+        .in("checklist_item_id", [...itemById.keys()]);
+      if (resultsError) throw resultsError;
+      const resultById = new Map<string, IssueResultRow>(
+        (results ?? []).map((r: { id: string; checklist_item_id: string }) => [r.id, r]),
+      );
+      if (resultById.size === 0) return [];
+
+      const { data: issues, error: issuesError } = await db
+        .from("qa_discussions")
+        .select("*, qa_discussion_comments(*)")
+        .in("checklist_item_result_id", [...resultById.keys()])
+        .order("created_at", { ascending: false });
+      if (issuesError) throw issuesError;
+
+      return (issues ?? []).flatMap((issue: QaDiscussion) => {
+        const result = resultById.get(issue.checklist_item_result_id);
+        const item = result ? itemById.get(result.checklist_item_id) : undefined;
+        const session = item ? sessionById.get(item.qa_session_id) : undefined;
+        const round = session ? roundById.get(session.qa_round_id) : undefined;
+        if (!result || !item || !session || !round) return [];
+        return [
+          {
+            ...issue,
+            checklist_item_id: item.id,
+            event_id: item.target_id,
+            qa_session_id: session.id,
+            qa_environment_id: round.qa_environment_id,
+            round_id: session.qa_round_id,
+          },
+        ];
+      });
+    },
+  });
+}
+
+export function useUpdateQaIssue(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      issueId,
+      status,
+      checklistItemId,
+    }: {
+      issueId: string;
+      status: ProjectQaIssue["workflow_status"];
+      checklistItemId: string;
+    }) => {
+      if (status === "next_validation") {
+        const { error: carryError } = await db.rpc("carry_over_qa_checklist_items", {
+          _item_ids: [checklistItemId],
+          _assignee_id: null,
+        });
+        if (carryError) throw carryError;
+      }
+      const { error } = await db
+        .from("qa_discussions")
+        .update({ workflow_status: status })
+        .eq("id", issueId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["project-qa-issues", projectId] });
+      qc.invalidateQueries({ queryKey: ["qa-checklist-items"] });
+      qc.invalidateQueries({ queryKey: ["project-checklist-coverage"] });
     },
   });
 }

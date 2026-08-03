@@ -5,7 +5,6 @@ import { toast } from "sonner";
 import { Panel } from "@/components/app/layout-parts";
 import { QaItemSpecDiffTable } from "@/components/app/qa-item-spec-diff";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 import { errorMessage, formatDateTime, formatRawLogTime } from "@/lib/domain";
@@ -18,15 +17,12 @@ import {
   type MergedTimelineRow,
 } from "@/lib/qa-workflow";
 import {
-  useAddDiscussionComment,
   useAnalyzeChecklist,
-  useCarryOverItems,
   useChecklistItemRoundHistory,
+  useCreateQaIssue,
   useQaAttributeSnapshots,
   useQaChecklistItems,
-  useQaDiscussion,
   useQaRunEvents,
-  useSetDisposition,
   type QaChecklistItemWithDisposition,
   type QaChecklistItemResult,
   type QaSession,
@@ -46,7 +42,6 @@ const VERDICT_STYLE = {
 
 export function QaItemView({
   projectId,
-  environmentId,
   session,
   item,
   result,
@@ -67,21 +62,14 @@ export function QaItemView({
   const { data: runEvents = [] } = useQaRunEvents(session.id);
   const { data: snapshots = [] } = useQaAttributeSnapshots(session.id);
   const { data: history = [] } = useChecklistItemRoundHistory(item.id);
-  const { data: discussion } = useQaDiscussion(result?.id ?? "");
-  const setDisposition = useSetDisposition(session.id);
-  const carryOver = useCarryOverItems(environmentId);
-  const addComment = useAddDiscussionComment(result?.id ?? "");
+  const createIssue = useCreateQaIssue(result?.id ?? "", user?.id);
   const analyze = useAnalyzeChecklist(session.id);
-  const [commentBody, setCommentBody] = useState("");
   const [openRounds, setOpenRounds] = useState<Record<number, boolean>>({});
   const [evidenceExpanded, setEvidenceExpanded] = useState(false);
 
   // "이전/다음 항목" links only change the :itemId path param, so this component
-  // doesn't remount between items (same pattern that caused the session-view stepper
-  // to go stale) — without this, a half-typed draft comment about one item would
-  // silently carry over into the next item's textarea.
+  // doesn't remount between items.
   useEffect(() => {
-    setCommentBody("");
     setEvidenceExpanded(false);
   }, [item.id]);
 
@@ -193,20 +181,6 @@ export function QaItemView({
     );
   }
 
-  function copyIssue() {
-    const bundle = [
-      `항목: ${label ?? item.target_id}`,
-      `판정: ${finalStatus}`,
-      result?.ai_reasoning ? `판단 이유: ${result.ai_reasoning}` : null,
-    ]
-      .filter(Boolean)
-      .join("\n");
-    navigator.clipboard
-      .writeText(bundle)
-      .then(() => toast.success("이슈 설명을 클립보드에 복사했어요 — 이슈 트래커에 붙여넣으세요"))
-      .catch(() => toast.error("복사에 실패했어요"));
-  }
-
   async function reanalyzeAfterTaxonomyChange() {
     const refreshed = await refetchEventProperties();
     await analyze.mutateAsync({
@@ -218,20 +192,6 @@ export function QaItemView({
       runEvents,
       snapshots,
     });
-  }
-
-  function carryItemOver() {
-    carryOver.mutate(
-      { items: [{ id: item.id }], assigneeId: null },
-      { onSuccess: () => toast.success("구현 수정 항목으로 다음 라운드에 이월했어요") },
-    );
-  }
-
-  function passItemOverride() {
-    setDisposition.mutate(
-      { itemId: item.id, disposition: "passed_override" },
-      { onSuccess: () => toast.success("AI 오탐으로 확인해 항목 전체를 통과 처리했어요") },
-    );
   }
 
   return (
@@ -342,8 +302,16 @@ export function QaItemView({
               rawPropertiesList={matchedRawPropertiesList}
               aiFailedPropertyIds={aiFailedPropertyIds}
               onReanalyze={reanalyzeAfterTaxonomyChange}
-              onCarryOver={carryItemOver}
-              onPassOverride={passItemOverride}
+              onCreateIssue={({ id, label: propertyLabel }) => {
+                if (!result) return toast.error("분석 결과가 있어야 이슈로 등록할 수 있어요");
+                createIssue.mutate(
+                  { type: "property", id, label: propertyLabel },
+                  {
+                    onSuccess: () =>
+                      toast.success(`${propertyLabel}을(를) 이슈 모아보기에 추가했어요`),
+                  },
+                );
+              }}
             />
           ) : (
             <div
@@ -501,104 +469,19 @@ export function QaItemView({
             </Panel>
           ) : null}
           <Panel
-            title="이 항목 처리"
-            description="여기서 정하면 세션 결과와 커버리지에 바로 반영돼요."
+            title="이슈 처리"
+            description="이 화면에서는 이슈만 등록합니다. 논의와 다음 차수 이월은 이슈 모아보기에서 결정해요."
           >
-            <div className="space-y-1.5 p-4">
-              {(
-                [
-                  {
-                    value: "passed_override",
-                    label: "통과로 처리",
-                    desc: "판정을 뒤집고 커버리지에 통과로 반영",
-                    color: "#16a34a",
-                  },
-                  {
-                    value: "carried_over",
-                    label: "다음 차수로 이월",
-                    desc: "다음 라운드 체크리스트에 자동으로 담김",
-                    color: "#5b5fc7",
-                  },
-                  {
-                    value: "discussing",
-                    label: "논의 중으로 두기",
-                    desc: "원인 확인 전까지 미결로 유지",
-                    color: "#b45309",
-                  },
-                ] as const
-              ).map((option) => (
-                <button
-                  key={option.value}
-                  type="button"
-                  className="w-full rounded-[11px] border p-[11px] text-left"
-                  style={{
-                    borderColor: item.disposition === option.value ? option.color : "#e3e8ef",
-                    boxShadow:
-                      item.disposition === option.value ? `0 0 0 3px ${option.color}1a` : "none",
-                  }}
-                  onClick={() => {
-                    if (!user) return;
-                    if (option.value === "carried_over") {
-                      carryItemOver();
-                      return;
-                    }
-                    setDisposition.mutate(
-                      { itemId: item.id, disposition: option.value },
-                      { onSuccess: () => toast.success("처리 상태를 반영했어요") },
-                    );
-                  }}
+            <div className="p-4">
+              <Button asChild variant="outline" className="w-full">
+                <Link
+                  from="/w/$wsId/p/$projectId/qa/$stageSlug/$roundId/$sessionId/$itemId"
+                  to="/w/$wsId/p/$projectId/issues"
+                  params={(prev) => ({ wsId: prev.wsId, projectId: prev.projectId })}
                 >
-                  <p className="text-[13px] font-semibold">{option.label}</p>
-                  <p className="text-[11.5px] text-[#8b97a8]">{option.desc}</p>
-                </button>
-              ))}
-            </div>
-          </Panel>
-
-          <Panel title={`논의 ${discussion?.qa_discussion_comments.length ?? 0}`}>
-            <div className="space-y-3 p-4">
-              {(discussion?.qa_discussion_comments ?? []).map((c) => (
-                <div key={c.id} className="grid grid-cols-[26px_minmax(0,1fr)] gap-2.5">
-                  <span className="flex size-[26px] items-center justify-center rounded-full bg-[#eef1f5] text-[11px] font-bold text-[#64748b]">
-                    {c.author_id.slice(0, 2).toUpperCase()}
-                  </span>
-                  <div>
-                    <p className="text-[12.5px] font-semibold">{formatDateTime(c.created_at)}</p>
-                    <p className="text-[12.5px] leading-[1.6] text-[#4a5666]">{c.body}</p>
-                  </div>
-                </div>
-              ))}
-              <Textarea
-                value={commentBody}
-                onChange={(e) => setCommentBody(e.target.value)}
-                placeholder="원인·재현 조건·담당자 멘션(@)을 남겨보세요"
-                className="min-h-[62px]"
-              />
-              <div className="flex gap-2">
-                <Button variant="outline" className="flex-1" onClick={copyIssue}>
-                  이슈로 내보내기
-                </Button>
-                <Button
-                  className="flex-1 bg-[#1c2431] hover:bg-[#2c3648]"
-                  disabled={!user || !commentBody.trim() || addComment.isPending}
-                  onClick={() => {
-                    if (!user || !commentBody.trim()) return;
-                    addComment.mutate(commentBody.trim(), {
-                      onSuccess: () => {
-                        setCommentBody("");
-                        if (item.disposition === "unresolved" && user) {
-                          setDisposition.mutate({
-                            itemId: item.id,
-                            disposition: "discussing",
-                          });
-                        }
-                      },
-                    });
-                  }}
-                >
-                  코멘트 남기기
-                </Button>
-              </div>
+                  이슈 모아보기
+                </Link>
+              </Button>
             </div>
           </Panel>
         </div>

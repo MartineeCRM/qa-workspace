@@ -20,6 +20,7 @@ import { Route as AuthenticatedWWsIdIndexRouteImport } from './routes/_authentic
 import { Route as AuthenticatedWWsIdSettingsRouteImport } from './routes/_authenticated/w/$wsId/settings'
 import { Route as AuthenticatedWWsIdPProjectIdRouteRouteImport } from './routes/_authenticated/w/$wsId/p/$projectId/route'
 import { Route as AuthenticatedWWsIdPProjectIdIndexRouteImport } from './routes/_authenticated/w/$wsId/p/$projectId/index'
+import { Route as AuthenticatedWWsIdPProjectIdIssuesRouteImport } from './routes/_authenticated/w/$wsId/p/$projectId/issues'
 import { Route as AuthenticatedWWsIdPProjectIdTaxonomyRouteImport } from './routes/_authenticated/w/$wsId/p/$projectId/taxonomy'
 import { Route as AuthenticatedWWsIdPProjectIdQaStageSlugRouteRouteImport } from './routes/_authenticated/w/$wsId/p/$projectId/qa/$stageSlug/route'
 import { Route as AuthenticatedWWsIdPProjectIdQaStageSlugIndexRouteImport } from './routes/_authenticated/w/$wsId/p/$projectId/qa/$stageSlug/index'
@@ -84,6 +85,12 @@ const AuthenticatedWWsIdPProjectIdIndexRoute =
   AuthenticatedWWsIdPProjectIdIndexRouteImport.update({
     id: '/',
     path: '/',
+    getParentRoute: () => AuthenticatedWWsIdPProjectIdRouteRoute,
+  } as any)
+const AuthenticatedWWsIdPProjectIdIssuesRoute =
+  AuthenticatedWWsIdPProjectIdIssuesRouteImport.update({
+    id: '/issues',
+    path: '/issues',
     getParentRoute: () => AuthenticatedWWsIdPProjectIdRouteRoute,
   } as any)
 const AuthenticatedWWsIdPProjectIdTaxonomyRoute =
@@ -155,6 +162,7 @@ export interface FileRoutesByFullPath {
   '/w/$wsId/settings': typeof AuthenticatedWWsIdSettingsRoute
   '/w/$wsId/': typeof AuthenticatedWWsIdIndexRoute
   '/w/$wsId/p/$projectId': typeof AuthenticatedWWsIdPProjectIdRouteRouteWithChildren
+  '/w/$wsId/p/$projectId/issues': typeof AuthenticatedWWsIdPProjectIdIssuesRoute
   '/w/$wsId/p/$projectId/taxonomy': typeof AuthenticatedWWsIdPProjectIdTaxonomyRoute
   '/w/$wsId/p/$projectId/': typeof AuthenticatedWWsIdPProjectIdIndexRoute
   '/w/$wsId/p/$projectId/qa/$stageSlug': typeof AuthenticatedWWsIdPProjectIdQaStageSlugRouteRouteWithChildren
@@ -173,6 +181,7 @@ export interface FileRoutesByTo {
   '/workspaces': typeof AuthenticatedWorkspacesRoute
   '/w/$wsId/settings': typeof AuthenticatedWWsIdSettingsRoute
   '/w/$wsId': typeof AuthenticatedWWsIdIndexRoute
+  '/w/$wsId/p/$projectId/issues': typeof AuthenticatedWWsIdPProjectIdIssuesRoute
   '/w/$wsId/p/$projectId/taxonomy': typeof AuthenticatedWWsIdPProjectIdTaxonomyRoute
   '/w/$wsId/p/$projectId': typeof AuthenticatedWWsIdPProjectIdIndexRoute
   '/w/$wsId/p/$projectId/qa/$stageSlug': typeof AuthenticatedWWsIdPProjectIdQaStageSlugIndexRoute
@@ -192,6 +201,7 @@ export interface FileRoutesById {
   '/_authenticated/w/$wsId/settings': typeof AuthenticatedWWsIdSettingsRoute
   '/_authenticated/w/$wsId/': typeof AuthenticatedWWsIdIndexRoute
   '/_authenticated/w/$wsId/p/$projectId': typeof AuthenticatedWWsIdPProjectIdRouteRouteWithChildren
+  '/_authenticated/w/$wsId/p/$projectId/issues': typeof AuthenticatedWWsIdPProjectIdIssuesRoute
   '/_authenticated/w/$wsId/p/$projectId/taxonomy': typeof AuthenticatedWWsIdPProjectIdTaxonomyRoute
   '/_authenticated/w/$wsId/p/$projectId/': typeof AuthenticatedWWsIdPProjectIdIndexRoute
   '/_authenticated/w/$wsId/p/$projectId/qa/$stageSlug': typeof AuthenticatedWWsIdPProjectIdQaStageSlugRouteRouteWithChildren
@@ -214,6 +224,7 @@ export interface FileRouteTypes {
     | '/w/$wsId/settings'
     | '/w/$wsId/'
     | '/w/$wsId/p/$projectId'
+    | '/w/$wsId/p/$projectId/issues'
     | '/w/$wsId/p/$projectId/taxonomy'
     | '/w/$wsId/p/$projectId/'
     | '/w/$wsId/p/$projectId/qa/$stageSlug'
@@ -232,6 +243,7 @@ export interface FileRouteTypes {
     | '/workspaces'
     | '/w/$wsId/settings'
     | '/w/$wsId'
+    | '/w/$wsId/p/$projectId/issues'
     | '/w/$wsId/p/$projectId/taxonomy'
     | '/w/$wsId/p/$projectId'
     | '/w/$wsId/p/$projectId/qa/$stageSlug'
@@ -250,6 +262,7 @@ export interface FileRouteTypes {
     | '/_authenticated/w/$wsId/settings'
     | '/_authenticated/w/$wsId/'
     | '/_authenticated/w/$wsId/p/$projectId'
+    | '/_authenticated/w/$wsId/p/$projectId/issues'
     | '/_authenticated/w/$wsId/p/$projectId/taxonomy'
     | '/_authenticated/w/$wsId/p/$projectId/'
     | '/_authenticated/w/$wsId/p/$projectId/qa/$stageSlug'
@@ -345,6 +358,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/w/$wsId/p/$projectId/'
       preLoaderRoute: typeof AuthenticatedWWsIdPProjectIdIndexRouteImport
+      parentRoute: typeof AuthenticatedWWsIdPProjectIdRouteRoute
+    }
+    '/_authenticated/w/$wsId/p/$projectId/issues': {
+      id: '/_authenticated/w/$wsId/p/$projectId/issues'
+      path: '/issues'
+      fullPath: '/w/$wsId/p/$projectId/issues'
+      preLoaderRoute: typeof AuthenticatedWWsIdPProjectIdIssuesRouteImport
       parentRoute: typeof AuthenticatedWWsIdPProjectIdRouteRoute
     }
     '/_authenticated/w/$wsId/p/$projectId/taxonomy': {
@@ -461,6 +481,7 @@ const AuthenticatedWWsIdPProjectIdQaStageSlugRouteRouteWithChildren =
   )
 
 interface AuthenticatedWWsIdPProjectIdRouteRouteChildren {
+  AuthenticatedWWsIdPProjectIdIssuesRoute: typeof AuthenticatedWWsIdPProjectIdIssuesRoute
   AuthenticatedWWsIdPProjectIdTaxonomyRoute: typeof AuthenticatedWWsIdPProjectIdTaxonomyRoute
   AuthenticatedWWsIdPProjectIdIndexRoute: typeof AuthenticatedWWsIdPProjectIdIndexRoute
   AuthenticatedWWsIdPProjectIdQaStageSlugRouteRoute: typeof AuthenticatedWWsIdPProjectIdQaStageSlugRouteRouteWithChildren
@@ -468,6 +489,8 @@ interface AuthenticatedWWsIdPProjectIdRouteRouteChildren {
 
 const AuthenticatedWWsIdPProjectIdRouteRouteChildren: AuthenticatedWWsIdPProjectIdRouteRouteChildren =
   {
+    AuthenticatedWWsIdPProjectIdIssuesRoute:
+      AuthenticatedWWsIdPProjectIdIssuesRoute,
     AuthenticatedWWsIdPProjectIdTaxonomyRoute:
       AuthenticatedWWsIdPProjectIdTaxonomyRoute,
     AuthenticatedWWsIdPProjectIdIndexRoute:

@@ -17,7 +17,7 @@ import {
 } from "@/lib/queries";
 
 type FilterKey = "필수 누락" | "미정의" | "타입" | "값·형식" | "통과" | "전체";
-type FixAction = "type" | "optional" | "allow_value" | "add" | "rename" | "impl";
+type FixAction = "type" | "optional" | "allow_value" | "add" | "rename";
 
 const OBSERVED_TYPE_TO_TAXONOMY_TYPE: Record<string, string> = {
   string: "string",
@@ -78,8 +78,7 @@ export function QaItemSpecDiffTable({
   rawPropertiesList,
   aiFailedPropertyIds,
   onReanalyze,
-  onCarryOver,
-  onPassOverride,
+  onCreateIssue,
 }: {
   projectId: string;
   eventId: string;
@@ -87,8 +86,7 @@ export function QaItemSpecDiffTable({
   rawPropertiesList: Record<string, unknown>[];
   aiFailedPropertyIds: Set<string>;
   onReanalyze: () => Promise<void>;
-  onCarryOver: () => void;
-  onPassOverride: () => void;
+  onCreateIssue: (target: { id: string; label: string }) => void;
 }) {
   const { user } = useAuth();
   const updateDataType = useUpdateEventPropertyDataType(projectId);
@@ -154,20 +152,11 @@ export function QaItemSpecDiffTable({
               : passedRows;
 
   function actionsFor(row: SpecDiffRow): Array<{ key: FixAction; label: string }> {
-    // Passing here only means the structural check (type + presence) found no
-    // issue — it says nothing about semantic correctness (e.g. the same
-    // property carrying inconsistent-but-same-type values across events). A
-    // reviewer can still flag one for implementation follow-up; there's no
-    // auto-fixable taxonomy action for it though, since nothing is structurally
-    // wrong to correct.
     if (row.verdict === "pass") {
-      return [{ key: "impl", label: "구현 수정 요청 · 이월" }];
+      return [];
     }
     if (row.verdict === "missing_required") {
-      return [
-        { key: "optional", label: "택소노미에서 선택값으로" },
-        { key: "impl", label: "구현 수정 요청 · 이월" },
-      ];
+      return [{ key: "optional", label: "택소노미에서 선택값으로" }];
     }
     if (row.verdict === "type_mismatch") {
       const observedTaxonomyType = OBSERVED_TYPE_TO_TAXONOMY_TYPE[row.observedType];
@@ -175,17 +164,13 @@ export function QaItemSpecDiffTable({
       if (observedTaxonomyType) {
         actions.push({ key: "type", label: `택소노미를 ${observedTaxonomyType}(으)로` });
       }
-      actions.push({ key: "impl", label: "구현 수정 요청 · 이월" });
       return actions;
     }
     if (row.verdict === "value_mismatch") {
-      return [
-        { key: "allow_value", label: `${JSON.stringify(row.observedSample)} 허용값 추가` },
-        { key: "impl", label: "구현 수정 요청 · 이월" },
-      ];
+      return [{ key: "allow_value", label: `${JSON.stringify(row.observedSample)} 허용값 추가` }];
     }
     if (row.verdict === "semantic_mismatch") {
-      return [{ key: "impl", label: "구현 수정 요청 · 이월" }];
+      return [];
     }
     // undefined_property
     const actions: Array<{ key: FixAction; label: string }> = [];
@@ -196,7 +181,6 @@ export function QaItemSpecDiffTable({
       key: "add",
       label: row.typoCandidate ? "새 프로퍼티로 추가" : "택소노미에 추가",
     });
-    actions.push({ key: "impl", label: "구현 수정 요청 · 이월" });
     return actions;
   }
 
@@ -204,10 +188,6 @@ export function QaItemSpecDiffTable({
     setFixes((prev) => ({ ...prev, [name]: prev[name] === action ? null : action }));
   }
 
-  // pass rows carry their own "impl" entry too (flagging a false-negative for
-  // implementation follow-up), so scope this to rows still structurally wrong —
-  // a pass-row impl flag shouldn't drive the resolved/remaining counter or the
-  // carry-over banner meant for real violations.
   const activeMismatchNames = useMemo(
     () => new Set(mismatchRows.map((r) => r.name)),
     [mismatchRows],
@@ -216,8 +196,7 @@ export function QaItemSpecDiffTable({
     ([name, action]) => Boolean(action) && activeMismatchNames.has(name),
   ).length;
   const pendingEntries = Object.entries(fixes).filter(
-    (entry): entry is [string, FixAction] =>
-      Boolean(entry[1]) && entry[1] !== "impl" && activeMismatchNames.has(entry[0]),
+    (entry): entry is [string, FixAction] => Boolean(entry[1]) && activeMismatchNames.has(entry[0]),
   );
 
   async function applyPending() {
@@ -269,10 +248,6 @@ export function QaItemSpecDiffTable({
     }
   }
 
-  const hasImplementationFix = Object.entries(fixes).some(
-    ([name, action]) => action === "impl" && activeMismatchNames.has(name),
-  );
-
   return (
     <Panel
       title="스펙 대조"
@@ -307,7 +282,7 @@ export function QaItemSpecDiffTable({
           <div>AS-IS · 실제 수신</div>
           <div>TO-BE · 택소노미 정의</div>
           <div>판정</div>
-          <div>해소 방향</div>
+          <div>확인 및 처리</div>
         </div>
 
         {shown.length === 0 ? (
@@ -382,14 +357,18 @@ export function QaItemSpecDiffTable({
                           택소노미에서 수정
                         </Link>
                       ) : null}
-                      {row.verdict === "semantic_mismatch" ? (
+                      {row.verdict !== "pass" ? (
                         <button
                           type="button"
-                          onClick={onPassOverride}
-                          title="AI 오탐으로 판단하고 이 체크리스트 항목 전체를 통과 처리합니다."
-                          className="rounded-md border border-[#cfe8d8] bg-[#f2faf5] px-2 py-1 text-left text-[11.5px] font-semibold leading-tight text-[#16803c]"
+                          onClick={() =>
+                            onCreateIssue({
+                              id: row.propertyId ?? `observed:${row.name}`,
+                              label: row.name,
+                            })
+                          }
+                          className="rounded-md border border-[#f0dfc0] bg-[#fdf9f1] px-2 py-1 text-left text-[11.5px] font-semibold leading-tight text-[#b45309]"
                         >
-                          AI 오탐 · 항목 통과 처리
+                          이슈 있음
                         </button>
                       ) : null}
                       {actionsFor(row).map((a) => (
@@ -400,9 +379,7 @@ export function QaItemSpecDiffTable({
                           className={cn(
                             "rounded-md px-2 py-1 text-left text-[11.5px] leading-tight",
                             chosen === a.key
-                              ? a.key === "impl"
-                                ? "border border-[#2b6a9c] bg-[#eaf1f8] font-semibold text-[#2b6a9c]"
-                                : "border border-[#4b4f8a] bg-[#f6f7fd] font-semibold text-[#4b4f8a]"
+                              ? "border border-[#4b4f8a] bg-[#f6f7fd] font-semibold text-[#4b4f8a]"
                               : "border border-[#e3e8ef] text-[#64748b]",
                           )}
                         >
@@ -483,17 +460,6 @@ export function QaItemSpecDiffTable({
               );
             })}
           </div>
-        </div>
-      ) : null}
-
-      {hasImplementationFix ? (
-        <div className="m-4 flex flex-wrap items-center gap-3 rounded-[14px] border border-[#cddcec] bg-[#f3f7fb] px-4 py-3.5">
-          <p className="flex-1 text-[12.5px] text-[#46647e]">
-            실제 구현과 새 로그가 필요하므로 지금 통과시킬 수 없어요.
-          </p>
-          <Button size="sm" variant="outline" onClick={onCarryOver}>
-            구현 수정 항목으로 다음 차수 이월
-          </Button>
         </div>
       ) : null}
     </Panel>
