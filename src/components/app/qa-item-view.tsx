@@ -190,8 +190,8 @@ export function QaItemView({
                 className={cn(
                   selected &&
                     (evidenceHighlight?.tone === "pass"
-                      ? "rounded-sm bg-[#dff4e6] px-0.5 text-[#166534]"
-                      : "rounded-sm bg-[#fff3c4] px-0.5 text-[#854d0e]"),
+                      ? "rounded-sm bg-emerald-400/20 px-0.5"
+                      : "rounded-sm bg-amber-300/20 px-0.5"),
                   !selected && highlighted && "rounded-sm bg-[#4a3f00] px-0.5 text-[#f2d675]",
                 )}
               >
