@@ -7,13 +7,13 @@ import type { CoverageItem, EnvironmentCoverage } from "@/lib/queries";
 
 export function deriveSessionStep(input: {
   checklistItemCount: number;
-  endedAt: string | null;
+  hasRunEvents: boolean;
   hasResults: boolean;
 }): 1 | 2 | 3 | 4 {
   if (input.checklistItemCount === 0) return 1;
-  if (!input.endedAt) return 2;
-  if (!input.hasResults) return 3;
-  return 4;
+  if (input.hasResults) return 4;
+  if (input.hasRunEvents) return 3;
+  return 2;
 }
 
 export type MergedTimelineRow = {

@@ -17,40 +17,32 @@ import type { CoverageItem } from "@/lib/queries";
 
 describe("deriveSessionStep", () => {
   it("returns 1 when the session has no checklist items", () => {
-    expect(deriveSessionStep({ checklistItemCount: 0, endedAt: null, hasResults: false })).toBe(1);
-  });
-
-  it("returns 2 when items exist but the session hasn't ended", () => {
-    expect(deriveSessionStep({ checklistItemCount: 3, endedAt: null, hasResults: false })).toBe(2);
-  });
-
-  it("returns 3 when the session ended but analysis hasn't produced results yet", () => {
     expect(
-      deriveSessionStep({
-        checklistItemCount: 3,
-        endedAt: "2026-08-01T00:00:00Z",
-        hasResults: false,
-      }),
+      deriveSessionStep({ checklistItemCount: 0, hasRunEvents: false, hasResults: false }),
+    ).toBe(1);
+  });
+
+  it("returns 2 when items exist but nothing has been collected yet", () => {
+    expect(
+      deriveSessionStep({ checklistItemCount: 3, hasRunEvents: false, hasResults: false }),
+    ).toBe(2);
+  });
+
+  it("returns 3 once run events are collected but analysis hasn't produced results yet", () => {
+    expect(
+      deriveSessionStep({ checklistItemCount: 3, hasRunEvents: true, hasResults: false }),
     ).toBe(3);
   });
 
-  it("returns 4 once results exist", () => {
+  it("returns 4 once results exist, regardless of whether more run events keep arriving", () => {
     expect(
-      deriveSessionStep({
-        checklistItemCount: 3,
-        endedAt: "2026-08-01T00:00:00Z",
-        hasResults: true,
-      }),
+      deriveSessionStep({ checklistItemCount: 3, hasRunEvents: true, hasResults: true }),
     ).toBe(4);
   });
 
-  it("returns 1 when the checklist is empty even if the session has already ended", () => {
+  it("returns 1 when the checklist is empty even if results somehow exist", () => {
     expect(
-      deriveSessionStep({
-        checklistItemCount: 0,
-        endedAt: "2026-08-01T00:00:00Z",
-        hasResults: false,
-      }),
+      deriveSessionStep({ checklistItemCount: 0, hasRunEvents: true, hasResults: true }),
     ).toBe(1);
   });
 });

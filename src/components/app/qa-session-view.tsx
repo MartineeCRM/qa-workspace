@@ -59,7 +59,7 @@ export function QaSessionView({
   const hasResults = checklistItems.some((i) => i.qa_checklist_item_results.length > 0);
   const currentStep = deriveSessionStep({
     checklistItemCount: checklistItems.length,
-    endedAt: session.ended_at,
+    hasRunEvents: runEvents.length > 0,
     hasResults,
   });
   const [viewingStep, setViewingStep] = useState(currentStep);
@@ -128,9 +128,9 @@ export function QaSessionView({
             체크리스트 {checklistItems.length} · 이벤트 {runEvents.length}행
           </p>
         </div>
-        {currentStep === 3 ? (
+        {checklistItems.length > 0 && runEvents.length > 0 ? (
           <Button onClick={runAnalysis} disabled={analyze.isPending}>
-            분석 돌리기
+            {hasResults ? "다시 분석 돌리기" : "분석 돌리기"}
           </Button>
         ) : null}
       </div>
