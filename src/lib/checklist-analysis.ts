@@ -84,7 +84,14 @@ export async function judgeChecklistItem(
 
   const attribute = ctx.customAttributes.find((a) => a.id === item.target_id);
   const value = attribute ? matchLatestSnapshotValue(attribute.technical_name, ctx.snapshots) : undefined;
-  if (!attribute || value === undefined) {
+  // A single snapshot only tells us the attribute's *current* value — it can't tell
+  // us whether that value was actually produced by this session's test actions or
+  // was just carried over from before the session started (e.g. an existing user's
+  // real Braze history). Require at least a before/after pair before trusting a
+  // "no rule configured" auto-pass; otherwise a stale-but-present value silently
+  // reads as verified.
+  const capturedSnapshotCount = ctx.snapshots.filter((s) => s.status === "captured").length;
+  if (!attribute || value === undefined || capturedSnapshotCount < 2) {
     return {
       ...base,
       ai_verdict: "not_collected",
