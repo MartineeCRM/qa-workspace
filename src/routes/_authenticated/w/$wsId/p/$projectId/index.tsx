@@ -57,7 +57,7 @@ function ProjectOverview() {
 
   const items = buildCoverageItems(events, eventProperties, customAttributes);
   const activeEvents = events.filter((e) => e.is_active).length;
-  const activeAttributes = items.length - activeEvents;
+  const activeAttributes = customAttributes.filter((a) => a.is_active).length;
 
   // See checklistCoverageItems in qa-workflow.ts: the checklist schema only
   // tracks events/custom attributes, so this is a narrower set than `items`.
@@ -86,10 +86,9 @@ function ProjectOverview() {
         <p className="max-w-2xl text-sm text-muted-foreground">{project.description}</p>
       ) : null}
 
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2">
         <Stat icon={ListTree} label="이벤트" value={activeEvents} />
         <Stat icon={Layers} label="속성" value={activeAttributes} />
-        <Stat icon={ShieldCheck} label="전체 커버리지 항목" value={checklistItems.length} />
       </div>
 
       <Panel
