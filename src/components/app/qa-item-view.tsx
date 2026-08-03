@@ -273,6 +273,7 @@ export function QaItemView({
               eventId={item.target_id}
               properties={thisEventProperties}
               rawPropertiesList={matchedRawPropertiesList}
+              resultId={result?.id ?? null}
             />
           ) : (
             <div

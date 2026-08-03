@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { ChevronDown, ChevronRight, MoreHorizontal, Plus } from "lucide-react";
@@ -89,6 +89,7 @@ export function TaxonomyTab({
   customAttributes,
   customAttributeProperties,
   editable,
+  openPropertyId,
 }: {
   projectId: string;
   events: TaxonomyEvent[];
@@ -96,6 +97,11 @@ export function TaxonomyTab({
   customAttributes: TaxonomyCustomAttribute[];
   customAttributeProperties: TaxonomyCustomAttributeProperty[];
   editable: boolean;
+  // Deep-link from elsewhere (e.g. a passing spec-diff row) straight into this
+  // property's edit dialog — there's no auto-fixable action for a row that's
+  // already structurally passing, so this just gets the reviewer to where they
+  // can make whatever change (allowed values, description, etc.) by hand.
+  openPropertyId?: string;
 }) {
   const qc = useQueryClient();
   const { user } = useAuth();
@@ -115,6 +121,16 @@ export function TaxonomyTab({
     property: TaxonomyCustomAttributeProperty | null;
     customAttributeId: string;
   } | null>(null);
+
+  const openedFromLinkRef = useRef(false);
+  useEffect(() => {
+    if (!openPropertyId || openedFromLinkRef.current) return;
+    const prop = eventProperties.find((p) => p.id === openPropertyId);
+    if (!prop) return; // not loaded yet — retry once eventProperties arrives
+    openedFromLinkRef.current = true;
+    setOpen((s) => ({ ...s, [prop.event_id]: true }));
+    setAttrDialog({ attribute: prop, eventId: prop.event_id });
+  }, [openPropertyId, eventProperties]);
 
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ["events", projectId] });
