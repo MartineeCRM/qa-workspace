@@ -16,7 +16,7 @@ import {
   type TaxonomyEventProperty,
 } from "@/lib/queries";
 
-type FilterKey = "불일치" | "타입" | "미정의" | "전체";
+type FilterKey = "필수 누락" | "미정의" | "타입" | "값·형식" | "통과" | "전체";
 type FixAction = "type" | "optional" | "allow_value" | "add" | "rename" | "impl";
 
 const OBSERVED_TYPE_TO_TAXONOMY_TYPE: Record<string, string> = {
@@ -94,7 +94,7 @@ export function QaItemSpecDiffTable({
   const updateAllowedValues = useUpdateEventPropertyAllowedValues(projectId);
   const renameProperty = useRenameEventProperty(projectId);
   const addProperty = useAddDiscoveredEventProperty(projectId);
-  const [filter, setFilter] = useState<FilterKey>("불일치");
+  const [filter, setFilter] = useState<FilterKey>("전체");
   const [fixes, setFixes] = useState<Record<string, FixAction | null>>({});
   const [applying, setApplying] = useState(false);
 
@@ -121,24 +121,35 @@ export function QaItemSpecDiffTable({
 
   const typeMismatchRows = rows.filter((r) => r.verdict === "type_mismatch");
   const undefinedRows = rows.filter((r) => r.verdict === "undefined_property");
+  const missingRows = rows.filter((r) => r.verdict === "missing_required");
+  const valueRows = rows.filter(
+    (r) => r.verdict === "value_mismatch" || r.verdict === "semantic_mismatch",
+  );
+  const passedRows = rows.filter((r) => r.verdict === "pass");
   const mismatchRows = rows.filter((r) => r.verdict !== "pass");
   const mismatchTotal = mismatchRows.length;
 
   const filters: Array<{ key: FilterKey; label: string }> = [
-    { key: "불일치", label: `불일치 ${mismatchTotal}` },
-    { key: "타입", label: `타입 ${typeMismatchRows.length}` },
+    { key: "필수 누락", label: `필수 누락 ${missingRows.length}` },
     { key: "미정의", label: `미정의 ${undefinedRows.length}` },
+    { key: "타입", label: `타입 ${typeMismatchRows.length}` },
+    { key: "값·형식", label: `값·형식 ${valueRows.length}` },
+    { key: "통과", label: `통과 ${passedRows.length}` },
     { key: "전체", label: `전체 ${rows.length}` },
   ];
 
   const shown =
     filter === "전체"
       ? rows
-      : filter === "타입"
-        ? typeMismatchRows
-        : filter === "미정의"
-          ? undefinedRows
-          : mismatchRows;
+      : filter === "필수 누락"
+        ? missingRows
+        : filter === "타입"
+          ? typeMismatchRows
+          : filter === "미정의"
+            ? undefinedRows
+            : filter === "값·형식"
+              ? valueRows
+              : passedRows;
 
   function actionsFor(row: SpecDiffRow): Array<{ key: FixAction; label: string }> {
     // Passing here only means the structural check (type + presence) found no
@@ -265,7 +276,7 @@ export function QaItemSpecDiffTable({
       title="스펙 대조"
       description="실제 로그로 들어온 형태(AS-IS)와 택소노미가 기대하는 형태(TO-BE)를 나란히 봅니다."
       actions={
-        <div className="flex gap-1 rounded-lg bg-[#f1f4f8] p-[3px]">
+        <div className="flex flex-wrap gap-1 rounded-lg bg-[#f1f4f8] p-[3px]">
           {filters.map((f) => (
             <button
               key={f.key}
