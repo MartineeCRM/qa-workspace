@@ -14,6 +14,7 @@ import {
   useAddDiscussionComment,
   useDeleteQaIssue,
   useProjectQaIssues,
+  useQaChannels,
   useUpdateQaIssue,
 } from "@/lib/qa-rounds-queries";
 import { useEnvironments, useTaxonomyEvents } from "@/lib/queries";
@@ -36,11 +37,13 @@ function QaIssuesPage() {
   const { data: issues = [] } = useProjectQaIssues(projectId);
   const { data: events = [] } = useTaxonomyEvents(projectId);
   const { data: environments = [] } = useEnvironments(projectId);
+  const { data: channels = [] } = useQaChannels(projectId);
   const updateIssue = useUpdateQaIssue(projectId);
   const deleteIssue = useDeleteQaIssue(projectId);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const eventById = new Map(events.map((event) => [event.id, event]));
   const environmentById = new Map(environments.map((environment) => [environment.id, environment]));
+  const channelById = new Map(channels.map((channel) => [channel.id, channel]));
   const openIssues = issues.filter(
     (issue) => issue.workflow_status !== "dismissed" && issue.workflow_status !== "verified",
   );
@@ -65,6 +68,7 @@ function QaIssuesPage() {
             {openIssues.map((issue) => {
               const event = eventById.get(issue.event_id);
               const environment = environmentById.get(issue.qa_environment_id);
+              const channel = issue.qa_channel_id ? channelById.get(issue.qa_channel_id) : null;
               return (
                 <li key={issue.id} className="space-y-3 p-4">
                   <div className="flex flex-wrap items-start gap-2">
@@ -75,7 +79,8 @@ function QaIssuesPage() {
                           {event?.technical_name ?? issue.event_id}.{issue.target_label}
                         </code>
                         {environment ? <Pill>{environment.name}</Pill> : null}
-                        <Pill>세션 · {issue.session_name}</Pill>
+                        <Pill>{channel?.name ?? "채널 미지정"}</Pill>
+                        <Pill>실행 · {issue.session_name}</Pill>
                         <Pill>{STATUS_LABEL[issue.workflow_status]}</Pill>
                       </div>
                       <Link

@@ -37,7 +37,73 @@ export type QaSession = {
   started_by: string;
   started_at: string;
   ended_at: string | null;
+  qa_channel_id: string | null;
 };
+
+export type QaChannel = {
+  id: string;
+  project_id: string;
+  name: string;
+  slug: string;
+  is_required: boolean;
+  is_active: boolean;
+  sort_order: number;
+};
+
+export function useQaChannels(projectId: string, activeOnly = true) {
+  return useQuery({
+    queryKey: ["qa-channels", projectId, activeOnly],
+    enabled: Boolean(projectId),
+    queryFn: async () => {
+      let query = db
+        .from("qa_channels")
+        .select("*")
+        .eq("project_id", projectId)
+        .order("sort_order");
+      if (activeOnly) query = query.eq("is_active", true);
+      const { data, error } = await query;
+      if (error) throw error;
+      return data as QaChannel[];
+    },
+  });
+}
+
+export function useQaChannelExclusions(eventIds: string[], propertyIds: string[]) {
+  return useQuery({
+    queryKey: ["qa-channel-exclusions", eventIds, propertyIds],
+    queryFn: async () => {
+      const [eventsResult, propertiesResult] = await Promise.all([
+        eventIds.length > 0
+          ? db
+              .from("taxonomy_event_channel_exclusions")
+              .select("event_id, channel_id")
+              .in("event_id", eventIds)
+          : Promise.resolve({ data: [], error: null }),
+        propertyIds.length > 0
+          ? db
+              .from("taxonomy_property_channel_exclusions")
+              .select("property_id, channel_id")
+              .in("property_id", propertyIds)
+          : Promise.resolve({ data: [], error: null }),
+      ]);
+      if (eventsResult.error) throw eventsResult.error;
+      if (propertiesResult.error) throw propertiesResult.error;
+      return {
+        events: new Set<string>(
+          (eventsResult.data ?? []).map(
+            (row: { event_id: string; channel_id: string }) => `${row.event_id}:${row.channel_id}`,
+          ),
+        ),
+        properties: new Set<string>(
+          (propertiesResult.data ?? []).map(
+            (row: { property_id: string; channel_id: string }) =>
+              `${row.property_id}:${row.channel_id}`,
+          ),
+        ),
+      };
+    },
+  });
+}
 
 export type QaChecklistItem = {
   id: string;
@@ -117,10 +183,18 @@ export function useQaSessionSteps(roundId: string) {
 export function useCreateQaSession(roundId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ userId, name }: { userId: string; name: string }) => {
+    mutationFn: async ({
+      userId,
+      name,
+      channelId,
+    }: {
+      userId: string;
+      name: string;
+      channelId: string;
+    }) => {
       const { data, error } = await db
         .from("qa_sessions")
-        .insert({ qa_round_id: roundId, name, started_by: userId })
+        .insert({ qa_round_id: roundId, name, qa_channel_id: channelId, started_by: userId })
         .select()
         .single();
       if (error) throw error;
@@ -141,6 +215,24 @@ export function useDeleteQaSession(roundId: string) {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["qa-sessions", roundId] });
+    },
+  });
+}
+
+export function useSetQaSessionChannel(roundId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ sessionId, channelId }: { sessionId: string; channelId: string }) => {
+      const { error } = await db
+        .from("qa_sessions")
+        .update({ qa_channel_id: channelId })
+        .eq("id", sessionId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["qa-sessions", roundId] });
+      qc.invalidateQueries({ queryKey: ["project-checklist-coverage"] });
+      qc.invalidateQueries({ queryKey: ["project-qa-issues"] });
     },
   });
 }
@@ -608,15 +700,23 @@ export function useCreateQaIssue(resultId: string, userId: string | undefined) {
   });
 }
 
-export function usePendingCarryOverItems(sessionId: string, previousRoundId: string | null) {
+export function usePendingCarryOverItems(
+  sessionId: string,
+  previousRoundId: string | null,
+  channelId: string | null,
+) {
   return useQuery({
-    queryKey: ["qa-pending-carryover", sessionId, previousRoundId],
+    queryKey: ["qa-pending-carryover", sessionId, previousRoundId, channelId],
     enabled: Boolean(sessionId && previousRoundId),
     queryFn: async () => {
-      const { data: prevSessions, error: prevSessionsError } = await db
+      let previousSessionsQuery = db
         .from("qa_sessions")
         .select("id")
         .eq("qa_round_id", previousRoundId);
+      previousSessionsQuery = channelId
+        ? previousSessionsQuery.eq("qa_channel_id", channelId)
+        : previousSessionsQuery.is("qa_channel_id", null);
+      const { data: prevSessions, error: prevSessionsError } = await previousSessionsQuery;
       if (prevSessionsError) throw prevSessionsError;
       const prevSessionIds = (prevSessions ?? []).map((s: { id: string }) => s.id);
       if (prevSessionIds.length === 0) return [];
@@ -703,6 +803,7 @@ export type ProjectQaIssue = QaDiscussion & {
   checklist_item_id: string;
   event_id: string;
   qa_session_id: string;
+  qa_channel_id: string | null;
   session_name: string;
   qa_environment_id: string;
   round_id: string;
@@ -719,7 +820,12 @@ export function useProjectQaIssues(projectId: string) {
         .eq("project_id", projectId);
       if (roundsError) throw roundsError;
       type IssueRoundRow = { id: string; qa_environment_id: string };
-      type IssueSessionRow = { id: string; qa_round_id: string; name: string };
+      type IssueSessionRow = {
+        id: string;
+        qa_round_id: string;
+        qa_channel_id: string | null;
+        name: string;
+      };
       type IssueItemRow = { id: string; qa_session_id: string; target_id: string };
       type IssueResultRow = { id: string; checklist_item_id: string };
       const roundById = new Map<string, IssueRoundRow>(
@@ -729,7 +835,7 @@ export function useProjectQaIssues(projectId: string) {
 
       const { data: sessions, error: sessionsError } = await db
         .from("qa_sessions")
-        .select("id, qa_round_id, name")
+        .select("id, qa_round_id, qa_channel_id, name")
         .in("qa_round_id", [...roundById.keys()]);
       if (sessionsError) throw sessionsError;
       const sessionById = new Map<string, IssueSessionRow>(
@@ -780,6 +886,7 @@ export function useProjectQaIssues(projectId: string) {
             checklist_item_id: item.id,
             event_id: item.target_id,
             qa_session_id: session.id,
+            qa_channel_id: session.qa_channel_id,
             session_name: session.name,
             qa_environment_id: round.qa_environment_id,
             round_id: session.qa_round_id,
@@ -920,7 +1027,7 @@ export function useProjectChecklistCoverageRows(projectId: string) {
       const { data, error } = await db
         .from("qa_rounds")
         .select(
-          "id, qa_environment_id, round_number, qa_sessions(id, qa_round_checklist_items(id, target_type, target_id, disposition, qa_checklist_item_results(final_status, updated_at)))",
+          "id, qa_environment_id, round_number, qa_sessions(id, qa_channel_id, qa_round_checklist_items(id, target_type, target_id, disposition, qa_checklist_item_results(final_status, updated_at)))",
         )
         .eq("project_id", projectId);
       if (error) throw error;

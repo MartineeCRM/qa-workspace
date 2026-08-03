@@ -21,7 +21,9 @@ function SessionLayout() {
   }, [sessionId]);
 
   if (sessions.length > 0 && !session) {
-    return <EmptyState title="세션을 찾을 수 없어요" description="삭제됐거나 잘못된 링크예요." />;
+    return (
+      <EmptyState title="검증 실행을 찾을 수 없어요" description="삭제됐거나 잘못된 링크예요." />
+    );
   }
   if (!session) return null;
 

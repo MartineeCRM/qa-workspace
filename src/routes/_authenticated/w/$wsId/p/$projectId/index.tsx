@@ -14,7 +14,12 @@ import {
   useTaxonomyEvents,
   type QaEnvironment,
 } from "@/lib/queries";
-import { useProjectChecklistCoverageRows, useProjectQaIssues } from "@/lib/qa-rounds-queries";
+import {
+  useProjectChecklistCoverageRows,
+  useProjectQaIssues,
+  useQaChannelExclusions,
+  useQaChannels,
+} from "@/lib/qa-rounds-queries";
 import { checklistCoverageItems, environmentChecklistCoverage } from "@/lib/qa-workflow";
 import { formatDateTime } from "@/lib/domain";
 
@@ -48,6 +53,11 @@ function ProjectOverview() {
   const { data: stages = [] } = useEnvironments(projectId);
   const { data: coverageRows = [] } = useProjectChecklistCoverageRows(projectId);
   const { data: qaIssues = [] } = useProjectQaIssues(projectId);
+  const { data: channels = [] } = useQaChannels(projectId);
+  const { data: exclusions } = useQaChannelExclusions(
+    events.map((event) => event.id),
+    eventProperties.map((property) => property.id),
+  );
   const { data: activity = [] } = useActivity({ projectId, limit: 12 });
 
   const items = buildCoverageItems(events, eventProperties, customAttributes);
@@ -95,7 +105,13 @@ function ProjectOverview() {
         ) : (
           <ul className="divide-y">
             {stages.map((stage: QaEnvironment) => {
-              const cov = environmentChecklistCoverage(checklistItems, coverageRows, stage.id);
+              const cov = environmentChecklistCoverage(
+                checklistItems,
+                coverageRows,
+                stage.id,
+                channels.filter((channel) => channel.is_required).map((channel) => channel.id),
+                exclusions?.events,
+              );
               return (
                 <li key={stage.id} className="px-4 py-3">
                   <div className="flex items-center justify-between gap-4">
@@ -139,6 +155,7 @@ function ProjectOverview() {
               {issues.slice(0, 12).map((issue) => {
                 const stage = environmentById.get(issue.qa_environment_id);
                 const event = eventById.get(issue.event_id);
+                const channel = channels.find((candidate) => candidate.id === issue.qa_channel_id);
                 return (
                   <li key={issue.id} className="px-4 py-2.5">
                     <div className="flex items-start gap-2">
@@ -162,7 +179,8 @@ function ProjectOverview() {
                             {event?.technical_name ?? issue.event_id}.{issue.target_label}
                           </Link>
                           {stage ? <Pill>{stage.name}</Pill> : null}
-                          <Pill>세션 · {issue.session_name}</Pill>
+                          <Pill>{channel?.name ?? "채널 미지정"}</Pill>
+                          <Pill>실행 · {issue.session_name}</Pill>
                           <Pill>
                             {issue.workflow_status === "next_validation"
                               ? "다음 검증 대기"

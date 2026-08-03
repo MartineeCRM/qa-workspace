@@ -21,6 +21,8 @@ import {
 import { Pill } from "@/components/app/badges";
 import { StagesManager } from "@/components/app/stages-manager";
 import { AttributeApiSettings } from "@/components/app/attribute-api-settings";
+import { QaChannelsManager } from "@/components/app/qa-channels-manager";
+import { useQaChannels } from "@/lib/qa-rounds-queries";
 import { useWorkspaceContext } from "@/lib/workspace-context";
 import { canEdit, errorMessage } from "@/lib/domain";
 import { cn } from "@/lib/utils";
@@ -33,11 +35,13 @@ function ProjectShell() {
   const { wsId, projectId } = useParams({ from: "/_authenticated/w/$wsId/p/$projectId" });
   const { data: project, isLoading } = useProject(projectId);
   const { data: stages } = useEnvironments(projectId);
+  const { data: channels = [] } = useQaChannels(projectId, false);
   const { role } = useWorkspaceContext();
   const editable = canEdit(role);
   const [stagesOpen, setStagesOpen] = useState(false);
   const [renameOpen, setRenameOpen] = useState(false);
   const [apiSettingsOpen, setApiSettingsOpen] = useState(false);
+  const [channelsOpen, setChannelsOpen] = useState(false);
 
   if (isLoading)
     return (
@@ -91,6 +95,9 @@ function ProjectShell() {
               <Button size="sm" variant="outline" onClick={() => setApiSettingsOpen(true)}>
                 Attribute API 설정
               </Button>
+              <Button size="sm" variant="outline" onClick={() => setChannelsOpen(true)}>
+                검증 채널 설정
+              </Button>
             </div>
           ) : null}
         </div>
@@ -127,6 +134,12 @@ function ProjectShell() {
         projectId={projectId}
         open={apiSettingsOpen}
         onOpenChange={setApiSettingsOpen}
+      />
+      <QaChannelsManager
+        projectId={projectId}
+        channels={channels}
+        open={channelsOpen}
+        onOpenChange={setChannelsOpen}
       />
       {renameOpen ? (
         <RenameProjectDialog

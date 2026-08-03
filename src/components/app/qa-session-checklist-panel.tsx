@@ -20,6 +20,7 @@ import {
   useAddChecklistItems,
   useAdoptCarryOverItems,
   usePendingCarryOverItems,
+  useQaChannelExclusions,
   useQaChecklistItems,
   useQaRounds,
   useRemoveChecklistItem,
@@ -60,12 +61,20 @@ export function QaSessionChecklistPanel({
 }) {
   const { data: events = [] } = useTaxonomyEvents(projectId);
   const { data: customAttributes = [] } = useTaxonomyCustomAttributes(projectId);
+  const { data: exclusions } = useQaChannelExclusions(
+    events.map((event) => event.id),
+    [],
+  );
+  const applicableEvents = session.qa_channel_id
+    ? events.filter((event) => !exclusions?.events.has(`${event.id}:${session.qa_channel_id}`))
+    : events;
   const { data: checklistItems = [] } = useQaChecklistItems(session.id);
   const { data: rounds = [] } = useQaRounds(environmentId);
   const round = rounds.find((r) => r.id === session.qa_round_id);
   const { data: pendingCarryOver = [] } = usePendingCarryOverItems(
     session.id,
     round?.previous_round_id ?? null,
+    session.qa_channel_id,
   );
   const adoptCarryOver = useAdoptCarryOverItems(session.id);
   const addItems = useAddChecklistItems(session.id);
@@ -82,7 +91,7 @@ export function QaSessionChecklistPanel({
   const stagedKeys = useMemo(() => new Set(staged.map((t) => `${t.kind}:${t.id}`)), [staged]);
 
   const availableTargets: SearchTarget[] = useMemo(() => {
-    const eventTargets: SearchTarget[] = events.map((e: TaxonomyEvent) => ({
+    const eventTargets: SearchTarget[] = applicableEvents.map((e: TaxonomyEvent) => ({
       kind: "event",
       id: e.id,
       label: e.technical_name,
@@ -97,7 +106,7 @@ export function QaSessionChecklistPanel({
     // Staged targets stay in the list (not filtered out) so the dropdown can show
     // them checked and let a click there un-stage them too.
     return [...eventTargets, ...attrTargets].filter((t) => !existingKeys.has(`${t.kind}:${t.id}`));
-  }, [events, customAttributes, existingKeys]);
+  }, [applicableEvents, customAttributes, existingKeys]);
 
   const searchTargets = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -198,7 +207,7 @@ export function QaSessionChecklistPanel({
 
   return (
     <Panel
-      title="이번 세션에서 검증할 항목"
+      title="이번 실행에서 검증할 항목"
       description={
         <>
           택소노미 전체가 아니라{" "}
@@ -312,7 +321,7 @@ export function QaSessionChecklistPanel({
 
       {checklistItems.length === 0 ? (
         <EmptyState
-          title="이 세션엔 체크리스트 항목이 없어요"
+          title="이 실행에는 체크리스트 항목이 없어요"
           description="위에서 검색해 추가해보세요."
         />
       ) : (
@@ -349,8 +358,8 @@ export function QaSessionChecklistPanel({
           <AlertDialogHeader>
             <AlertDialogTitle>체크리스트를 초기화할까요?</AlertDialogTitle>
             <AlertDialogDescription>
-              담긴 항목 {checklistItems.length}개가 모두 빠지고, 이미 판정된 결과·논의가 있다면
-              함께 사라져요. 되돌릴 수 없어요.
+              담긴 항목 {checklistItems.length}개가 모두 빠지고, 이미 판정된 결과·논의가 있다면 함께
+              사라져요. 되돌릴 수 없어요.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

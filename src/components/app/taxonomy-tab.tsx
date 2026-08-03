@@ -55,6 +55,7 @@ import {
 import { DATA_TYPES, errorMessage } from "@/lib/domain";
 import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
+import { useQaChannelExclusions, useQaChannels, type QaChannel } from "@/lib/qa-rounds-queries";
 
 type AnyAttribute =
   TaxonomyEventProperty | TaxonomyCustomAttribute | TaxonomyCustomAttributeProperty;
@@ -105,6 +106,11 @@ export function TaxonomyTab({
 }) {
   const qc = useQueryClient();
   const { user } = useAuth();
+  const { data: channels = [] } = useQaChannels(projectId);
+  const { data: channelExclusions } = useQaChannelExclusions(
+    events.map((event) => event.id),
+    eventProperties.map((property) => property.id),
+  );
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [sortKey, setSortKey] = useState<SortKey>("name");
@@ -137,6 +143,7 @@ export function TaxonomyTab({
     qc.invalidateQueries({ queryKey: ["taxonomy-event-properties", projectId] });
     qc.invalidateQueries({ queryKey: ["taxonomy-custom-attributes", projectId] });
     qc.invalidateQueries({ queryKey: ["taxonomy-custom-attribute-properties", projectId] });
+    qc.invalidateQueries({ queryKey: ["qa-channel-exclusions"] });
   };
 
   const subPropsByAttribute = useMemo(() => {
@@ -514,6 +521,8 @@ export function TaxonomyTab({
           projectId={projectId}
           userId={user?.id ?? ""}
           event={eventDialog.event}
+          channels={channels}
+          excludedKeys={channelExclusions?.events ?? new Set()}
           onClose={() => setEventDialog(null)}
           onSaved={refresh}
         />
@@ -527,6 +536,8 @@ export function TaxonomyTab({
           eventProperties={eventProperties}
           attribute={attrDialog.attribute}
           eventId={attrDialog.eventId}
+          channels={channels}
+          excludedKeys={channelExclusions?.properties ?? new Set()}
           onClose={() => setAttrDialog(null)}
           onSaved={refresh}
         />
@@ -752,12 +763,16 @@ function EventDialog({
   projectId,
   userId,
   event,
+  channels,
+  excludedKeys,
   onClose,
   onSaved,
 }: {
   projectId: string;
   userId: string;
   event: TaxonomyEvent | null;
+  channels: QaChannel[];
+  excludedKeys: Set<string>;
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -765,6 +780,14 @@ function EventDialog({
   const [displayName, setDisplayName] = useState(event?.display_name ?? "");
   const [description, setDescription] = useState(event?.description ?? "");
   const [saving, setSaving] = useState(false);
+  const [selectedChannelIds, setSelectedChannelIds] = useState(
+    () =>
+      new Set(
+        channels
+          .filter((channel) => !event || !excludedKeys.has(`${event.id}:${channel.id}`))
+          .map((channel) => channel.id),
+      ),
+  );
 
   async function submit() {
     if (!technicalName.trim()) return toast.error("기술 이름은 필수예요");
@@ -781,6 +804,20 @@ function EventDialog({
           .insert({ ...payload, project_id: projectId, created_by: userId });
     setSaving(false);
     if (error) return toast.error(errorMessage(error));
+    if (event) {
+      const { error: deleteError } = await db
+        .from("taxonomy_event_channel_exclusions")
+        .delete()
+        .eq("event_id", event.id);
+      if (deleteError) return toast.error(errorMessage(deleteError));
+      const excluded = channels.filter((channel) => !selectedChannelIds.has(channel.id));
+      if (excluded.length > 0) {
+        const { error: insertError } = await db
+          .from("taxonomy_event_channel_exclusions")
+          .insert(excluded.map((channel) => ({ event_id: event.id, channel_id: channel.id })));
+        if (insertError) return toast.error(errorMessage(insertError));
+      }
+    }
     toast.success(event ? "이벤트를 수정했어요" : "택소노미에 이벤트를 추가했어요");
     onSaved();
     onClose();
@@ -805,6 +842,32 @@ function EventDialog({
               placeholder="purchase"
             />
           </div>
+          {event && channels.length > 0 ? (
+            <div className="space-y-1.5">
+              <Label>수집 채널</Label>
+              <div className="flex flex-wrap gap-2">
+                {channels.map((channel) => (
+                  <label
+                    key={channel.id}
+                    className="flex items-center gap-1.5 rounded-md border px-2 py-1.5 text-xs"
+                  >
+                    <Checkbox
+                      checked={selectedChannelIds.has(channel.id)}
+                      onCheckedChange={(checked) =>
+                        setSelectedChannelIds((current) => {
+                          const next = new Set(current);
+                          if (checked) next.add(channel.id);
+                          else next.delete(channel.id);
+                          return next;
+                        })
+                      }
+                    />
+                    {channel.name}
+                  </label>
+                ))}
+              </div>
+            </div>
+          ) : null}
           <div className="space-y-1.5">
             <Label htmlFor="ev-display">표시 이름</Label>
             <Input
@@ -844,6 +907,8 @@ function AttributeDialog({
   eventProperties,
   attribute,
   eventId,
+  channels,
+  excludedKeys,
   onClose,
   onSaved,
 }: {
@@ -853,6 +918,8 @@ function AttributeDialog({
   eventProperties: TaxonomyEventProperty[];
   attribute: AnyAttribute | null;
   eventId: string | null;
+  channels: QaChannel[];
+  excludedKeys: Set<string>;
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -895,6 +962,31 @@ function AttributeDialog({
       : "",
   );
   const [saving, setSaving] = useState(false);
+  const isExistingEventProperty = Boolean(attribute && "event_id" in attribute);
+  const [selectedChannelIds, setSelectedChannelIds] = useState(
+    () =>
+      new Set(
+        channels
+          .filter((channel) => !attribute || !excludedKeys.has(`${attribute.id}:${channel.id}`))
+          .map((channel) => channel.id),
+      ),
+  );
+
+  async function savePropertyExclusions(propertyIds: string[]) {
+    const { error: deleteError } = await db
+      .from("taxonomy_property_channel_exclusions")
+      .delete()
+      .in("property_id", propertyIds);
+    if (deleteError) return deleteError;
+    const excludedRows = propertyIds.flatMap((propertyId) =>
+      channels
+        .filter((channel) => !selectedChannelIds.has(channel.id))
+        .map((channel) => ({ property_id: propertyId, channel_id: channel.id })),
+    );
+    if (excludedRows.length === 0) return null;
+    const { error } = await db.from("taxonomy_property_channel_exclusions").insert(excludedRows);
+    return error;
+  }
 
   async function submit() {
     if (!technicalName.trim()) return toast.error("기술 이름은 필수예요");
@@ -926,6 +1018,8 @@ function AttributeDialog({
         .select("id");
       setSaving(false);
       if (error) return toast.error(errorMessage(error));
+      const exclusionError = await savePropertyExclusions(targetIds);
+      if (exclusionError) return toast.error(errorMessage(exclusionError));
       const appliedCount = data?.length ?? 0;
       if (appliedCount < targetIds.length) {
         toast.info(
@@ -951,6 +1045,10 @@ function AttributeDialog({
       : await db.from(table).insert({ ...payload, created_by: userId });
     setSaving(false);
     if (error) return toast.error(errorMessage(error));
+    if (attribute && isProperty) {
+      const exclusionError = await savePropertyExclusions([attribute.id]);
+      if (exclusionError) return toast.error(errorMessage(exclusionError));
+    }
     toast.success(attribute ? "속성을 수정했어요" : "택소노미에 속성을 추가했어요");
     onSaved();
     onClose();
@@ -1027,6 +1125,32 @@ function AttributeDialog({
               </SelectContent>
             </Select>
           </div>
+          {isExistingEventProperty && channels.length > 0 ? (
+            <div className="space-y-1.5">
+              <Label>수집 채널</Label>
+              <div className="flex flex-wrap gap-2">
+                {channels.map((channel) => (
+                  <label
+                    key={channel.id}
+                    className="flex items-center gap-1.5 rounded-md border px-2 py-1.5 text-xs"
+                  >
+                    <Checkbox
+                      checked={selectedChannelIds.has(channel.id)}
+                      onCheckedChange={(checked) =>
+                        setSelectedChannelIds((current) => {
+                          const next = new Set(current);
+                          if (checked) next.add(channel.id);
+                          else next.delete(channel.id);
+                          return next;
+                        })
+                      }
+                    />
+                    {channel.name}
+                  </label>
+                ))}
+              </div>
+            </div>
+          ) : null}
           <div className="space-y-1.5">
             <Label htmlFor="at-allowed">허용 값 (쉼표로 구분)</Label>
             <Input id="at-allowed" value={allowed} onChange={(e) => setAllowed(e.target.value)} />

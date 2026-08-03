@@ -25,6 +25,7 @@ import {
   useCreateQaIssue,
   useDeleteQaIssue,
   useQaAttributeSnapshots,
+  useQaChannelExclusions,
   useQaChecklistItems,
   useQaDiscussions,
   useQaRunEvents,
@@ -62,6 +63,10 @@ export function QaItemView({
   const { data: customAttributes = [] } = useTaxonomyCustomAttributes(projectId);
   const { data: eventProperties = [], refetch: refetchEventProperties } =
     useTaxonomyEventProperties(projectId);
+  const { data: exclusions } = useQaChannelExclusions(
+    events.map((event) => event.id),
+    eventProperties.map((property) => property.id),
+  );
   const { data: rules = [] } = useRules(projectId);
   const { data: checklistItems = [] } = useQaChecklistItems(session.id);
   const { data: runEvents = [] } = useQaRunEvents(session.id);
@@ -123,7 +128,12 @@ export function QaItemView({
   );
   const thisEventProperties =
     item.target_type === "event"
-      ? eventProperties.filter((p) => p.event_id === item.target_id)
+      ? eventProperties.filter(
+          (property) =>
+            property.event_id === item.target_id &&
+            (!session.qa_channel_id ||
+              !exclusions?.properties.has(`${property.id}:${session.qa_channel_id}`)),
+        )
       : [];
   // Newest-first: buildEventSpecDiffRows uses this as the representative sample
   // value shown per property, and the most recent occurrence is the most
@@ -197,10 +207,17 @@ export function QaItemView({
 
   async function reanalyzeAfterTaxonomyChange() {
     const refreshed = await refetchEventProperties();
+    const refreshedProperties = refreshed.data ?? eventProperties;
     await analyze.mutateAsync({
       checklistItems,
-      events,
-      eventProperties: refreshed.data ?? eventProperties,
+      events: session.qa_channel_id
+        ? events.filter((event) => !exclusions?.events.has(`${event.id}:${session.qa_channel_id}`))
+        : events,
+      eventProperties: session.qa_channel_id
+        ? refreshedProperties.filter(
+            (property) => !exclusions?.properties.has(`${property.id}:${session.qa_channel_id}`),
+          )
+        : refreshedProperties,
       customAttributes,
       rules,
       runEvents,

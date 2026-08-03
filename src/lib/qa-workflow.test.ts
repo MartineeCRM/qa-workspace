@@ -313,6 +313,7 @@ describe("flattenChecklistCoverageRounds", () => {
         qa_round_id: "round-1",
         round_number: 1,
         qa_session_id: "session-1",
+        qa_channel_id: null,
         checklist_item_id: "item-1",
         target_type: "event",
         target_id: "ev-1",
@@ -325,6 +326,7 @@ describe("flattenChecklistCoverageRounds", () => {
         qa_round_id: "round-1",
         round_number: 1,
         qa_session_id: "session-1",
+        qa_channel_id: null,
         checklist_item_id: "item-2",
         target_type: "custom_attribute",
         target_id: "attr-1",
@@ -375,6 +377,7 @@ describe("flattenChecklistCoverageRounds", () => {
         qa_round_id: "round-2",
         round_number: 2,
         qa_session_id: "session-2",
+        qa_channel_id: null,
         checklist_item_id: "item-1",
         target_type: "event",
         target_id: "ev-1",
@@ -518,6 +521,32 @@ describe("environmentChecklistCoverage", () => {
     const result = environmentChecklistCoverage(items, rows, "env-1");
     expect(result.verified).toBe(1);
     expect(result.failed).toBe(0);
+  });
+
+  it("counts coverage independently for every required QA channel", () => {
+    const rows = [
+      row({
+        target_type: "event",
+        target_id: "ev-1",
+        qa_channel_id: "ios",
+        final_status: "passed",
+      }),
+    ];
+    expect(environmentChecklistCoverage(items, rows, "env-1", ["ios", "android"])).toEqual({
+      total: 6,
+      verified: 1,
+      failed: 0,
+      notStarted: 5,
+      ratio: 1 / 6,
+    });
+  });
+
+  it("removes event-channel exclusions from the coverage denominator", () => {
+    const eventOnly = [items[0]];
+    const exclusions = new Set(["ev-1:android"]);
+    expect(
+      environmentChecklistCoverage(eventOnly, [], "env-1", ["ios", "android"], exclusions),
+    ).toEqual({ total: 1, verified: 0, failed: 0, notStarted: 1, ratio: 0 });
   });
 
   it("does not count a carried-over failure as a current-round failure", () => {

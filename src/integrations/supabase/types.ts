@@ -729,11 +729,45 @@ export type Database = {
           },
         ];
       };
+      qa_channels: {
+        Row: {
+          created_at: string;
+          id: string;
+          is_active: boolean;
+          is_required: boolean;
+          name: string;
+          project_id: string;
+          slug: string;
+          sort_order: number;
+        };
+        Insert: {
+          created_at?: string;
+          id?: string;
+          is_active?: boolean;
+          is_required?: boolean;
+          name: string;
+          project_id: string;
+          slug: string;
+          sort_order?: number;
+        };
+        Update: {
+          created_at?: string;
+          id?: string;
+          is_active?: boolean;
+          is_required?: boolean;
+          name?: string;
+          project_id?: string;
+          slug?: string;
+          sort_order?: number;
+        };
+        Relationships: [];
+      };
       qa_sessions: {
         Row: {
           ended_at: string | null;
           id: string;
           name: string;
+          qa_channel_id: string | null;
           qa_round_id: string;
           started_at: string;
           started_by: string;
@@ -742,6 +776,7 @@ export type Database = {
           ended_at?: string | null;
           id?: string;
           name: string;
+          qa_channel_id?: string | null;
           qa_round_id: string;
           started_at?: string;
           started_by: string;
@@ -750,11 +785,19 @@ export type Database = {
           ended_at?: string | null;
           id?: string;
           name?: string;
+          qa_channel_id?: string | null;
           qa_round_id?: string;
           started_at?: string;
           started_by?: string;
         };
         Relationships: [
+          {
+            foreignKeyName: "qa_sessions_qa_channel_id_fkey";
+            columns: ["qa_channel_id"];
+            isOneToOne: false;
+            referencedRelation: "qa_channels";
+            referencedColumns: ["id"];
+          },
           {
             foreignKeyName: "qa_sessions_qa_round_id_fkey";
             columns: ["qa_round_id"];
@@ -970,6 +1013,18 @@ export type Database = {
             referencedColumns: ["id"];
           },
         ];
+      };
+      taxonomy_event_channel_exclusions: {
+        Row: { channel_id: string; event_id: string };
+        Insert: { channel_id: string; event_id: string };
+        Update: { channel_id?: string; event_id?: string };
+        Relationships: [];
+      };
+      taxonomy_property_channel_exclusions: {
+        Row: { channel_id: string; property_id: string };
+        Insert: { channel_id: string; property_id: string };
+        Update: { channel_id?: string; property_id?: string };
+        Relationships: [];
       };
       taxonomy_event_properties: {
         Row: {

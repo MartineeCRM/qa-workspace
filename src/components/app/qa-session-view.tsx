@@ -7,6 +7,7 @@ import {
   useAnalyzeChecklist,
   useQaAttributeSnapshots,
   useQaChecklistItems,
+  useQaChannelExclusions,
   useQaRounds,
   useQaRunEvents,
   type QaSession,
@@ -53,6 +54,18 @@ export function QaSessionView({
   const { data: snapshots = [] } = useQaAttributeSnapshots(session.id);
   const { data: events = [] } = useTaxonomyEvents(projectId);
   const { data: eventProperties = [] } = useTaxonomyEventProperties(projectId);
+  const { data: exclusions } = useQaChannelExclusions(
+    events.map((event) => event.id),
+    eventProperties.map((property) => property.id),
+  );
+  const applicableEvents = session.qa_channel_id
+    ? events.filter((event) => !exclusions?.events.has(`${event.id}:${session.qa_channel_id}`))
+    : events;
+  const applicableEventProperties = session.qa_channel_id
+    ? eventProperties.filter(
+        (property) => !exclusions?.properties.has(`${property.id}:${session.qa_channel_id}`),
+      )
+    : eventProperties;
   const { data: customAttributes = [] } = useTaxonomyCustomAttributes(projectId);
   const { data: rules = [] } = useRules(projectId);
   const analyze = useAnalyzeChecklist(session.id);
@@ -92,8 +105,8 @@ export function QaSessionView({
     try {
       await analyze.mutateAsync({
         checklistItems,
-        events,
-        eventProperties,
+        events: applicableEvents,
+        eventProperties: applicableEventProperties,
         customAttributes,
         rules,
         runEvents,

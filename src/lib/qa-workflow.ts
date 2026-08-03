@@ -132,6 +132,7 @@ export type ChecklistCoverageRow = {
   qa_round_id: string;
   round_number: number;
   qa_session_id: string;
+  qa_channel_id?: string | null;
   checklist_item_id: string;
   target_type: "event" | "custom_attribute";
   target_id: string;
@@ -151,7 +152,11 @@ type RawChecklistItem = {
   disposition: ChecklistDisposition;
   qa_checklist_item_results: RawChecklistItemResult[] | null;
 };
-type RawSession = { id: string; qa_round_checklist_items: RawChecklistItem[] | null };
+type RawSession = {
+  id: string;
+  qa_channel_id?: string | null;
+  qa_round_checklist_items: RawChecklistItem[] | null;
+};
 type RawRound = {
   id: string;
   qa_environment_id: string;
@@ -170,6 +175,7 @@ export function flattenChecklistCoverageRounds(rounds: RawRound[]): ChecklistCov
           qa_round_id: round.id,
           round_number: round.round_number,
           qa_session_id: session.id,
+          qa_channel_id: session.qa_channel_id ?? null,
           checklist_item_id: item.id,
           target_type: item.target_type,
           target_id: item.target_id,
@@ -206,7 +212,7 @@ export function latestRoundChecklistRows(
   // shadow a fresher pass/fail.
   const byTarget = new Map<string, ChecklistCoverageRow>();
   for (const current of latestRows) {
-    const key = checklistTargetKey(current);
+    const key = `${checklistTargetKey(current)}:${current.qa_channel_id ?? "unassigned"}`;
     const existing = byTarget.get(key);
     if (!existing || (current.result_updated_at ?? "") > (existing.result_updated_at ?? "")) {
       byTarget.set(key, current);
@@ -227,20 +233,33 @@ export function environmentChecklistCoverage(
   items: CoverageItem[],
   rows: ChecklistCoverageRow[],
   environmentId: string,
+  requiredChannelIds: string[] = [],
+  excludedEventChannelKeys: Set<string> = new Set(),
 ): EnvironmentCoverage {
+  const latestRows = latestRoundChecklistRows(rows, environmentId);
+  const channels = requiredChannelIds.length > 0 ? requiredChannelIds : ["legacy"];
   const byKey = new Map(
-    latestRoundChecklistRows(rows, environmentId).map((r) => [checklistTargetKey(r), r]),
+    latestRows.map((r) => [
+      `${checklistTargetKey(r)}:${requiredChannelIds.length > 0 ? (r.qa_channel_id ?? "unassigned") : "legacy"}`,
+      r,
+    ]),
   );
   let verified = 0;
   let failed = 0;
+  let total = 0;
   for (const item of items) {
-    const current = byKey.get(item.key);
-    if (!current) continue;
-    if (current.disposition === "passed_override" || current.final_status === "passed")
-      verified += 1;
-    else if (current.disposition === "unresolved" && current.final_status === "failed") failed += 1;
+    for (const channelId of channels) {
+      if (item.kind === "event" && excludedEventChannelKeys.has(`${item.id}:${channelId}`))
+        continue;
+      total += 1;
+      const current = byKey.get(`${item.key}:${channelId}`);
+      if (!current) continue;
+      if (current.disposition === "passed_override" || current.final_status === "passed")
+        verified += 1;
+      else if (current.disposition === "unresolved" && current.final_status === "failed")
+        failed += 1;
+    }
   }
-  const total = items.length;
   return {
     total,
     verified,

@@ -41,10 +41,12 @@ import {
   useDeleteQaRound,
   useDeleteQaSession,
   useQaRounds,
+  useQaChannels,
   useQaSessions,
   useQaSessionSteps,
   useRenameQaRound,
   useRoundDispositionSummary,
+  useSetQaSessionChannel,
   type QaRound,
   type QaSession,
 } from "@/lib/qa-rounds-queries";
@@ -116,11 +118,13 @@ export function QaRoundView({
   const { data: rounds = [] } = useQaRounds(environmentId);
   const round = rounds.find((r) => r.id === roundId);
   const { data: sessions = [] } = useQaSessions(roundId);
+  const { data: channels = [] } = useQaChannels(projectId);
   const { data: sessionSteps } = useQaSessionSteps(roundId);
   const createRound = useCreateQaRound(projectId, environmentId);
   const renameRound = useRenameQaRound(environmentId);
   const deleteRound = useDeleteQaRound(environmentId);
   const deleteSession = useDeleteQaSession(roundId);
+  const setSessionChannel = useSetQaSessionChannel(roundId);
   const latestRound = rounds[rounds.length - 1];
   const { data: summary = { passed: 0, unresolvedErrors: 0, carriedOver: 0 } } =
     useRoundDispositionSummary(roundId);
@@ -173,7 +177,7 @@ export function QaRoundView({
     deleteSession.mutate(deletingSession.id, {
       onError: (error) => toast.error(errorMessage(error)),
       onSuccess: () => {
-        toast.success("세션을 삭제했어요");
+        toast.success("검증 실행을 삭제했어요");
         setDeletingSession(null);
       },
     });
@@ -197,7 +201,7 @@ export function QaRoundView({
             {round.name?.trim() ? round.name : `${round.round_number}차`} 라운드
           </h2>
           <p className="text-[13px] text-[#8b97a8]">
-            세션 하나가 체크리스트 → 수집 → 분석 → 결과의 한 사이클이에요.
+            검증 실행 하나가 채널별 체크리스트 → 수집 → 분석 → 결과의 한 사이클이에요.
           </p>
         </div>
         <Button
@@ -320,9 +324,9 @@ export function QaRoundView({
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>“{deletingSession?.name}” 세션을 삭제할까요?</AlertDialogTitle>
+            <AlertDialogTitle>“{deletingSession?.name}” 검증 실행을 삭제할까요?</AlertDialogTitle>
             <AlertDialogDescription>
-              이 세션의 체크리스트·수집한 스냅샷/CSV·판정 결과·논의가 모두 함께 사라져요. 되돌릴 수
+              이 실행의 체크리스트·수집한 스냅샷/CSV·판정 결과·논의가 모두 함께 사라져요. 되돌릴 수
               없어요.
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -335,7 +339,7 @@ export function QaRoundView({
 
       <div className="mb-[18px] grid grid-cols-[repeat(auto-fit,minmax(160px,1fr))] gap-2.5">
         <RoundMetricCard
-          label="세션"
+          label="검증 실행"
           value={sessions.length}
           sub={`수집 중 ${sessions.filter((s) => !s.ended_at).length} · 완료 ${sessions.filter((s) => s.ended_at).length}`}
           tone="neutral"
@@ -361,63 +365,102 @@ export function QaRoundView({
       </div>
 
       {sessions.length === 0 ? (
-        <EmptyState title="아직 세션이 없어요" description="아래에서 첫 세션을 만들어보세요." />
+        <EmptyState
+          title="아직 검증 실행이 없어요"
+          description="아래에서 첫 검증 실행을 만들어보세요."
+        />
       ) : null}
 
       <div className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-3">
         {sessions.map((s) => {
           const step = sessionSteps?.get(s.id) ?? 1;
           return (
-          <div
-            key={s.id}
-            className="group relative rounded-[14px] border border-[#e3e8ef] bg-white hover:border-[#2b6a9c] hover:shadow-[0_2px_10px_rgba(28,36,49,0.06)]"
-          >
-            <Link
-              from="/w/$wsId/p/$projectId/qa/$stageSlug/$roundId"
-              to="/w/$wsId/p/$projectId/qa/$stageSlug/$roundId/$sessionId"
-              params={(prev) => ({ ...prev, sessionId: s.id })}
-              className="block p-4"
+            <div
+              key={s.id}
+              className="group relative rounded-[14px] border border-[#e3e8ef] bg-white hover:border-[#2b6a9c] hover:shadow-[0_2px_10px_rgba(28,36,49,0.06)]"
             >
-              <div className="flex items-center justify-between pr-6">
-                <span className="text-[15px] font-semibold tracking-[-0.2px]">{s.name}</span>
-              </div>
-              <SessionProgressBar step={step} />
-              <p className="mt-2 text-[11.5px] text-[#8b97a8]">
-                {step}/4 · {SESSION_STEP_LABELS[step - 1]} 단계
-              </p>
-            </Link>
-            {canDeleteRounds ? (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  setDeletingSession(s);
-                }}
-                aria-label={`${s.name} 세션 삭제`}
-                className="absolute right-3 top-4 rounded-md p-1 text-[#c3ccd8] opacity-0 hover:text-destructive group-hover:opacity-100"
+              <Link
+                from="/w/$wsId/p/$projectId/qa/$stageSlug/$roundId"
+                to="/w/$wsId/p/$projectId/qa/$stageSlug/$roundId/$sessionId"
+                params={(prev) => ({ ...prev, sessionId: s.id })}
+                className="block p-4"
               >
-                <Trash2 className="size-3.5" />
-              </button>
-            ) : null}
-          </div>
+                <div className="flex items-center justify-between pr-6">
+                  <div>
+                    <span className="text-[15px] font-semibold tracking-[-0.2px]">{s.name}</span>
+                    <p className="mt-0.5 text-[11.5px] text-[#64748b]">
+                      {channels.find((channel) => channel.id === s.qa_channel_id)?.name ??
+                        "채널 미지정"}
+                    </p>
+                  </div>
+                </div>
+                <SessionProgressBar step={step} />
+                <p className="mt-2 text-[11.5px] text-[#8b97a8]">
+                  {step}/4 · {SESSION_STEP_LABELS[step - 1]} 단계
+                </p>
+              </Link>
+              <div className="border-t border-[#eef1f5] px-4 py-2">
+                <select
+                  value={s.qa_channel_id ?? ""}
+                  onChange={(event) =>
+                    setSessionChannel.mutate(
+                      { sessionId: s.id, channelId: event.target.value },
+                      { onError: (error) => toast.error(errorMessage(error)) },
+                    )
+                  }
+                  disabled={!editable || setSessionChannel.isPending}
+                  className="w-full rounded-md border border-[#dbe2ea] bg-white px-2 py-1 text-[12px]"
+                  aria-label={`${s.name} 검증 채널`}
+                >
+                  <option value="" disabled>
+                    채널 미지정
+                  </option>
+                  {channels.map((channel) => (
+                    <option key={channel.id} value={channel.id}>
+                      {channel.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {canDeleteRounds ? (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setDeletingSession(s);
+                  }}
+                  aria-label={`${s.name} 검증 실행 삭제`}
+                  className="absolute right-3 top-4 rounded-md p-1 text-[#c3ccd8] opacity-0 hover:text-destructive group-hover:opacity-100"
+                >
+                  <Trash2 className="size-3.5" />
+                </button>
+              ) : null}
+            </div>
           );
         })}
-        <NewSessionCard roundId={roundId} />
+        <NewSessionCard roundId={roundId} channels={channels} />
       </div>
     </div>
   );
 }
 
-function NewSessionCard({ roundId }: { roundId: string }) {
+function NewSessionCard({
+  roundId,
+  channels,
+}: {
+  roundId: string;
+  channels: Array<{ id: string; name: string }>;
+}) {
   const { user } = useAuth();
   const [name, setName] = useState("");
+  const [channelId, setChannelId] = useState("");
   const createSession = useCreateQaSession(roundId);
 
   function submit() {
-    if (!user || !name.trim()) return;
+    if (!user || !name.trim() || !channelId) return;
     createSession.mutate(
-      { userId: user.id, name: name.trim() },
+      { userId: user.id, name: name.trim(), channelId },
       {
         onSuccess: () => setName(""),
         onError: (error) =>
@@ -428,10 +471,22 @@ function NewSessionCard({ roundId }: { roundId: string }) {
 
   return (
     <div className="flex min-h-[160px] flex-col items-center justify-center gap-1 rounded-[14px] border border-dashed border-[#c8d1dc] p-5 text-center text-[#64748b]">
+      <select
+        value={channelId}
+        onChange={(event) => setChannelId(event.target.value)}
+        className="w-full rounded-md border border-[#dbe2ea] bg-white px-2 py-1.5 text-[13.5px]"
+      >
+        <option value="">검증 채널 선택</option>
+        {channels.map((channel) => (
+          <option key={channel.id} value={channel.id}>
+            {channel.name}
+          </option>
+        ))}
+      </select>
       <input
         value={name}
         onChange={(e) => setName(e.target.value)}
-        placeholder="장바구니 검증, AOS 검증처럼 자유롭게 그룹핑"
+        placeholder="기본 수집, 회원가입 시나리오"
         className="w-full rounded-md border border-[#dbe2ea] px-2 py-1.5 text-[13.5px]"
         onKeyDown={(e) => {
           if (e.key === "Enter") submit();
@@ -439,11 +494,11 @@ function NewSessionCard({ roundId }: { roundId: string }) {
       />
       <button
         type="button"
-        disabled={!user || !name.trim() || createSession.isPending}
+        disabled={!user || !name.trim() || !channelId || createSession.isPending}
         onClick={submit}
         className="mt-1 text-[13.5px] hover:text-[#2b6a9c]"
       >
-        + 새 세션
+        + 새 검증 실행
       </button>
     </div>
   );
