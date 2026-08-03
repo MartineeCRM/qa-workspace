@@ -17,6 +17,10 @@ export type MergedTimelineRow = {
   source: "event" | "snapshot";
   name: string;
   change: string;
+  // Raw JSON properties for event rows only — lets consumers that need to show
+  // the original quoting/typing (e.g. a QA evidence log) render it verbatim
+  // instead of the flattened `key=value` summary in `change`.
+  raw?: Record<string, unknown>;
 };
 
 function formatValue(value: unknown): string {
@@ -48,6 +52,7 @@ export function buildMergedTimeline(
     change: Object.entries(e.raw_properties)
       .map(([k, v]) => `${k}=${formatValue(v)}`)
       .join(", "),
+    raw: e.raw_properties,
   }));
 
   const capturedSnapshots = [...snapshots]

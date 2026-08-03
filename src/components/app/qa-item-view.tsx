@@ -76,14 +76,17 @@ export function QaItemView({
   const verdictStyle = VERDICT_STYLE[finalStatus];
 
   const timeline = buildMergedTimeline(runEvents, snapshots);
+  // Scope the evidence log to this item's own target — never fall back to showing
+  // the whole session's CSV/snapshot history for items with no ai_evidence (e.g.
+  // passed verdicts), which is what a size-0-relevantKeys fallback used to do.
   const relevantKeys = new Set(
-    (Array.isArray(result?.ai_evidence) ? (result?.ai_evidence as Array<{ id?: string }>) : [])
-      .map((e) => (e.id ? `event:${e.id}` : null))
-      .filter((key): key is string => key !== null),
+    item.target_type === "event"
+      ? runEvents.filter((e) => e.event_id === item.target_id).map((e) => `event:${e.id}`)
+      : timeline
+          .filter((row) => row.source === "snapshot" && row.name === label)
+          .map((row) => row.key),
   );
-  const evidenceRows = timeline.filter(
-    (row) => relevantKeys.size === 0 || relevantKeys.has(row.key),
-  );
+  const evidenceRows = timeline.filter((row) => relevantKeys.has(row.key));
   const violatingProperties = new Set(
     result?.judged_by === "rule" && result?.ai_reasoning
       ? result.ai_reasoning
@@ -97,38 +100,51 @@ export function QaItemView({
 
   function copyEvidenceLog() {
     const text = evidenceRows
-      .map(
-        (row) =>
-          `${formatDateTime(row.occurredAt)} | ${row.source === "snapshot" ? "스냅샷" : "이벤트"} | ${row.name} ${row.change}`,
-      )
-      .join("\n");
+      .map((row) => {
+        const header = `${formatDateTime(row.occurredAt)} | ${row.source === "snapshot" ? "스냅샷" : "이벤트"} | ${row.name}`;
+        if (row.source === "event") return `${header}\n${JSON.stringify(row.raw ?? {}, null, 2)}`;
+        return `${header} ${row.change}`;
+      })
+      .join("\n\n");
     navigator.clipboard
       .writeText(text)
       .then(() => toast.success("근거 로그를 클립보드에 복사했어요"))
       .catch(() => toast.error("복사에 실패했어요"));
   }
 
-  function renderChange(row: MergedTimelineRow) {
-    if (row.source === "snapshot") {
-      const highlighted = violatingProperties.has(row.name);
-      return (
-        <span className={highlighted ? "rounded-sm bg-[#4a3f00] px-0.5 text-[#f2d675]" : undefined}>
-          {row.change}
-        </span>
-      );
-    }
-    const segments = row.change ? row.change.split(", ") : [];
-    return segments.map((segment, i) => {
-      const highlighted = violatingProperties.has(segment.split("=")[0]);
-      return (
-        <span key={`${row.key}-${i}`}>
-          <span className={highlighted ? "rounded-sm bg-[#4a3f00] px-0.5 text-[#f2d675]" : undefined}>
-            {segment}
-          </span>
-          {i < segments.length - 1 ? <span className="text-[#6e7681]">, </span> : null}
-        </span>
-      );
-    });
+  // Renders raw_properties as literal JSON (quotes intact) rather than a flattened
+  // "key=value" summary — collapsing everything through String() would make a
+  // JSON string "true" and a JSON boolean true look identical, hiding exactly the
+  // kind of type mismatch this log exists to surface.
+  function renderRawJson(row: MergedTimelineRow) {
+    const entries = Object.entries(row.raw ?? {});
+    if (entries.length === 0) return null;
+    return (
+      <div className="pl-4">
+        <div>{"{"}</div>
+        {entries.map(([k, v], i) => {
+          const highlighted = violatingProperties.has(k);
+          return (
+            <div key={k} className="pl-4">
+              <span className={highlighted ? "rounded-sm bg-[#4a3f00] px-0.5 text-[#f2d675]" : undefined}>
+                {JSON.stringify(k)}: {JSON.stringify(v)}
+              </span>
+              {i < entries.length - 1 ? "," : ""}
+            </div>
+          );
+        })}
+        <div>{"}"}</div>
+      </div>
+    );
+  }
+
+  function renderSnapshotChange(row: MergedTimelineRow) {
+    const highlighted = violatingProperties.has(row.name);
+    return (
+      <span className={highlighted ? "rounded-sm bg-[#4a3f00] px-0.5 text-[#f2d675]" : undefined}>
+        {row.change}
+      </span>
+    );
   }
 
   function copyIssue() {
@@ -189,16 +205,23 @@ export function QaItemView({
                 <p className="text-[#6e7681]">관련된 로그가 없어요.</p>
               ) : (
                 evidenceRows.map((row) => (
-                  <div key={row.key} className="whitespace-pre text-[#c9d1d9]">
-                    <span className="text-[#6e7681]">{formatDateTime(row.occurredAt)}</span>
-                    <span className="text-[#6e7681]"> | </span>
-                    <span className="text-[#7ee787]">
-                      {row.source === "snapshot" ? "스냅샷" : "이벤트"}
-                    </span>
-                    <span className="text-[#6e7681]"> | </span>
-                    <span>{row.name}</span>
-                    <span> </span>
-                    {renderChange(row)}
+                  <div key={row.key} className="text-[#c9d1d9]">
+                    <div className="whitespace-pre">
+                      <span className="text-[#6e7681]">{formatDateTime(row.occurredAt)}</span>
+                      <span className="text-[#6e7681]"> | </span>
+                      <span className="text-[#7ee787]">
+                        {row.source === "snapshot" ? "스냅샷" : "이벤트"}
+                      </span>
+                      <span className="text-[#6e7681]"> | </span>
+                      <span>{row.name}</span>
+                      {row.source === "snapshot" ? (
+                        <>
+                          <span> </span>
+                          {renderSnapshotChange(row)}
+                        </>
+                      ) : null}
+                    </div>
+                    {row.source === "event" ? renderRawJson(row) : null}
                   </div>
                 ))
               )}
