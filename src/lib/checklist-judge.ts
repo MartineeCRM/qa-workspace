@@ -63,7 +63,7 @@ export function matchLatestSnapshotValue(
   return captured[0]?.payload?.[technicalName];
 }
 
-function matchesDataType(value: unknown, dataType: string): boolean {
+export function matchesDataType(value: unknown, dataType: string): boolean {
   switch (dataType) {
     case "string":
       return typeof value === "string";

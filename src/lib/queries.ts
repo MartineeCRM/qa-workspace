@@ -344,6 +344,44 @@ export function useAddDiscoveredEventProperty(projectId: string) {
   });
 }
 
+// Spec-diff "택소노미를 X로" resolution — the log's observed type is right and the
+// taxonomy definition is wrong, so fix the taxonomy in place rather than flag the
+// implementation.
+export function useUpdateEventPropertyDataType(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { propertyId: string; dataType: string }) => {
+      const { error } = await db
+        .from("taxonomy_event_properties")
+        .update({ data_type: input.dataType })
+        .eq("id", input.propertyId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["taxonomy-event-properties", projectId] });
+    },
+  });
+}
+
+// Spec-diff "이름 매핑" resolution — the log's property name is right (the taxonomy
+// name was a typo), so rename the existing taxonomy property to match the log
+// instead of adding a second, near-duplicate property.
+export function useRenameEventProperty(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { propertyId: string; newTechnicalName: string }) => {
+      const { error } = await db
+        .from("taxonomy_event_properties")
+        .update({ technical_name: input.newTechnicalName })
+        .eq("id", input.propertyId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["taxonomy-event-properties", projectId] });
+    },
+  });
+}
+
 export function useTaxonomyCustomAttributes(projectId: string) {
   return useQuery({
     queryKey: ["taxonomy-custom-attributes", projectId],

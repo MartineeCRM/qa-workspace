@@ -3,13 +3,15 @@ import { Link } from "@tanstack/react-router";
 import { Copy } from "lucide-react";
 import { toast } from "sonner";
 import { Panel } from "@/components/app/layout-parts";
+import { QaItemSpecDiffTable } from "@/components/app/qa-item-spec-diff";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/lib/auth";
+import { cn } from "@/lib/utils";
 import { errorMessage, formatDateTime } from "@/lib/domain";
-import { inferDataType } from "@/lib/checklist-judge";
 import {
   buildMergedTimeline,
+  compressRoundHistory,
   nextChecklistItemId,
   previousChecklistItemId,
   type MergedTimelineRow,
@@ -28,8 +30,8 @@ import {
   type QaSession,
 } from "@/lib/qa-rounds-queries";
 import {
-  useAddDiscoveredEventProperty,
   useTaxonomyCustomAttributes,
+  useTaxonomyEventProperties,
   useTaxonomyEvents,
 } from "@/lib/queries";
 
@@ -55,6 +57,7 @@ export function QaItemView({
   const { user } = useAuth();
   const { data: events = [] } = useTaxonomyEvents(projectId);
   const { data: customAttributes = [] } = useTaxonomyCustomAttributes(projectId);
+  const { data: eventProperties = [] } = useTaxonomyEventProperties(projectId);
   const { data: checklistItems = [] } = useQaChecklistItems(session.id);
   const { data: runEvents = [] } = useQaRunEvents(session.id);
   const { data: snapshots = [] } = useQaAttributeSnapshots(session.id);
@@ -63,8 +66,8 @@ export function QaItemView({
   const setDisposition = useSetDisposition(session.id);
   const carryOver = useCarryOverItems(environmentId);
   const addComment = useAddDiscussionComment(result?.id ?? "");
-  const addProperty = useAddDiscoveredEventProperty(projectId);
   const [commentBody, setCommentBody] = useState("");
+  const [openRounds, setOpenRounds] = useState<Record<number, boolean>>({});
 
   // "이전/다음 항목" links only change the :itemId path param, so this component
   // doesn't remount between items (same pattern that caused the session-view stepper
@@ -101,38 +104,21 @@ export function QaItemView({
           .filter((v): v is string => Boolean(v))
       : [],
   );
-  const unknownEventProperties =
-    item.target_type === "event" &&
-    result?.judged_by === "rule" &&
-    Array.isArray(result?.ai_evidence)
-      ? (
-          result.ai_evidence as Array<{
-            property: string;
-            kind?: string;
-            sampleValue?: unknown;
-          }>
-        ).filter((v) => v.kind === "unknown_property")
+  const thisEventProperties =
+    item.target_type === "event"
+      ? eventProperties.filter((p) => p.event_id === item.target_id)
       : [];
-
-  function addToTaxonomy(property: string, sampleValue: unknown) {
-    if (!user) return;
-    addProperty.mutate(
-      {
-        eventId: item.target_id,
-        technicalName: property,
-        dataType: inferDataType(sampleValue),
-        sampleValue,
-        userId: user.id,
-      },
-      {
-        onSuccess: () =>
-          toast.success(
-            `"${property}"을(를) 택소노미에 반영했어요 — 이 항목은 다음 분석부터 반영돼요`,
-          ),
-        onError: (error) => toast.error(errorMessage(error)),
-      },
-    );
-  }
+  // Newest-first: buildEventSpecDiffRows uses this as the representative sample
+  // value shown per property, and the most recent occurrence is the most
+  // relevant one to show.
+  const matchedRawPropertiesList =
+    item.target_type === "event"
+      ? [...runEvents]
+          .filter((e) => e.event_id === item.target_id)
+          .sort((a, b) => b.occurred_at.localeCompare(a.occurred_at))
+          .map((e) => e.raw_properties)
+      : [];
+  const compressedHistory = compressRoundHistory(history);
 
   const orderedIds = checklistItems.map((i) => i.id);
 
@@ -237,46 +223,7 @@ export function QaItemView({
       </div>
 
       <div className="flex flex-wrap items-start gap-4">
-        <div className="min-w-0 flex-[1_1_420px] space-y-4">
-          <div
-            className="rounded-[14px] border px-[18px] py-4"
-            style={{ borderColor: verdictStyle.border, backgroundColor: verdictStyle.bg }}
-          >
-            <p className="text-xs font-bold" style={{ color: verdictStyle.fg }}>
-              {result?.judged_by === "rule" ? "Rule 기반 판정" : "AI 판정"}
-            </p>
-            <p className="mt-1.5 whitespace-pre-line text-[13.5px] leading-[1.7] text-[#3c4757]">
-              {result?.ai_reasoning ?? "판단 이유가 없어요."}
-            </p>
-          </div>
-
-          {unknownEventProperties.length > 0 ? (
-            <div className="space-y-2 rounded-[14px] border border-[#f0dfc0] bg-[#fdf9f1] px-[18px] py-4">
-              <p className="text-xs font-bold text-[#b45309]">택소노미에 없는 프로퍼티</p>
-              {unknownEventProperties.map((v) => (
-                <div
-                  key={v.property}
-                  className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-white/70 px-3 py-2"
-                >
-                  <div className="min-w-0">
-                    <p className="mono-token truncate text-[13px] font-semibold">{v.property}</p>
-                    <p className="text-[11.5px] text-[#8b97a8]">
-                      예시 값: {JSON.stringify(v.sampleValue)} ({inferDataType(v.sampleValue)} 추정)
-                    </p>
-                  </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={addProperty.isPending}
-                    onClick={() => addToTaxonomy(v.property, v.sampleValue)}
-                  >
-                    택소노미에 추가
-                  </Button>
-                </div>
-              ))}
-            </div>
-          ) : null}
-
+        <div className="min-w-0 flex-[1_1_660px] space-y-4">
           <Panel
             title="근거 로그"
             description="이 항목과 관련된 병합 타임라인 구간"
@@ -320,29 +267,143 @@ export function QaItemView({
             </div>
           </Panel>
 
-          <Panel title="라운드 이력">
-            <ul className="px-4 py-2">
-              {history.map((h, i) => (
-                <li
-                  key={i}
-                  className="grid grid-cols-[56px_minmax(0,1fr)_auto] gap-3 py-2 text-[12.5px]"
-                >
-                  <span className="text-[#8b97a8]">{h.roundNumber}차</span>
-                  <span className="text-[#4a5666]">{h.reasoning ?? "—"}</span>
-                  <span>
-                    {h.finalStatus === "passed"
-                      ? "통과"
-                      : h.finalStatus === "failed"
-                        ? "오류"
-                        : "미발생"}
-                  </span>
-                </li>
-              ))}
+          {item.target_type === "event" ? (
+            <QaItemSpecDiffTable
+              projectId={projectId}
+              eventId={item.target_id}
+              properties={thisEventProperties}
+              rawPropertiesList={matchedRawPropertiesList}
+            />
+          ) : (
+            <div
+              className="rounded-[14px] border px-[18px] py-4"
+              style={{ borderColor: verdictStyle.border, backgroundColor: verdictStyle.bg }}
+            >
+              <p className="text-xs font-bold" style={{ color: verdictStyle.fg }}>
+                {result?.judged_by === "rule" ? "Rule 기반 판정" : "AI 판정"}
+              </p>
+              <p className="mt-1.5 whitespace-pre-line text-[13.5px] leading-[1.7] text-[#3c4757]">
+                {result?.ai_reasoning ?? "판단 이유가 없어요."}
+              </p>
+            </div>
+          )}
+
+          <Panel
+            title="라운드 이력"
+            description="차수별 불일치 건수만 봅니다. 세부 목록은 펼쳐서 확인해요."
+          >
+            <ul>
+              {compressedHistory.map((h) => {
+                const open = openRounds[h.roundNumber] ?? false;
+                const total = h.typeMismatchProperties.length + h.undefinedProperties.length;
+                return (
+                  <li key={h.roundNumber} className="border-b border-[#f4f6f9] last:border-b-0">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setOpenRounds((prev) => ({ ...prev, [h.roundNumber]: !open }))
+                      }
+                      className="grid w-full grid-cols-[48px_64px_minmax(0,1fr)_76px_20px] items-center gap-3 px-4 py-2.5 text-left hover:bg-[#f7f9fc]"
+                    >
+                      <span className="text-[13px] font-semibold">{h.roundNumber}차</span>
+                      <span>
+                        <span
+                          className={cn(
+                            "inline-block whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold",
+                            h.finalStatus === "passed"
+                              ? "bg-[#e8f5ec] text-[#16a34a]"
+                              : h.finalStatus === "failed"
+                                ? "bg-[#fdecec] text-[#dc2626]"
+                                : "bg-[#fdf3e3] text-[#b45309]",
+                          )}
+                        >
+                          {h.finalStatus === "passed"
+                            ? "통과"
+                            : h.finalStatus === "failed"
+                              ? "오류"
+                              : "미발생"}
+                        </span>
+                      </span>
+                      <span className="flex min-w-0 flex-wrap items-center gap-1.5">
+                        {h.typeMismatchProperties.length > 0 ? (
+                          <span className="whitespace-nowrap rounded-md border border-[#f4d0d0] bg-[#fdecec] px-1.5 py-0.5 text-[11px] font-semibold text-[#dc2626]">
+                            타입 불일치 {h.typeMismatchProperties.length}
+                          </span>
+                        ) : null}
+                        {h.undefinedProperties.length > 0 ? (
+                          <span className="whitespace-nowrap rounded-md border border-[#f0dfc0] bg-[#fdf3e3] px-1.5 py-0.5 text-[11px] font-semibold text-[#b45309]">
+                            미정의 {h.undefinedProperties.length}
+                          </span>
+                        ) : null}
+                        {total === 0 && h.otherReason ? (
+                          <span className="truncate text-[12px] text-[#4a5666]">
+                            {h.otherReason}
+                          </span>
+                        ) : null}
+                      </span>
+                      <span
+                        className={cn(
+                          "text-right text-[12px] tabular-nums",
+                          h.delta === null || h.delta <= 0 ? "text-[#8b97a8]" : "text-[#dc2626]",
+                        )}
+                      >
+                        {h.delta === null ? "최초" : h.delta > 0 ? `+${h.delta}` : `±${h.delta}`}
+                      </span>
+                      <span
+                        className={cn(
+                          "text-[#c3ccd8] transition-transform",
+                          open ? "rotate-90" : "",
+                        )}
+                      >
+                        ›
+                      </span>
+                    </button>
+                    {open && total > 0 ? (
+                      <div className="space-y-2 px-4 pb-3 pl-[64px]">
+                        {h.typeMismatchProperties.length > 0 ? (
+                          <div>
+                            <p className="text-[11.5px] font-semibold text-[#64748b]">
+                              타입 불일치
+                            </p>
+                            <div className="mt-1 flex flex-wrap gap-1.5">
+                              {h.typeMismatchProperties.map((p) => (
+                                <code
+                                  key={p}
+                                  className="mono-token rounded-md border border-[#eef1f5] bg-[#f6f8fa] px-1.5 py-0.5 text-[11.5px] text-[#4a5666]"
+                                >
+                                  {p}
+                                </code>
+                              ))}
+                            </div>
+                          </div>
+                        ) : null}
+                        {h.undefinedProperties.length > 0 ? (
+                          <div>
+                            <p className="text-[11.5px] font-semibold text-[#64748b]">
+                              미정의 프로퍼티
+                            </p>
+                            <div className="mt-1 flex flex-wrap gap-1.5">
+                              {h.undefinedProperties.map((p) => (
+                                <code
+                                  key={p}
+                                  className="mono-token rounded-md border border-[#eef1f5] bg-[#f6f8fa] px-1.5 py-0.5 text-[11.5px] text-[#4a5666]"
+                                >
+                                  {p}
+                                </code>
+                              ))}
+                            </div>
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </li>
+                );
+              })}
             </ul>
           </Panel>
         </div>
 
-        <div className="min-w-0 max-w-[380px] flex-[1_1_330px] space-y-4">
+        <div className="min-w-0 max-w-[360px] flex-[1_1_320px] space-y-4">
           <Panel
             title="이 항목 처리"
             description="여기서 정하면 세션 결과와 커버리지에 바로 반영돼요."

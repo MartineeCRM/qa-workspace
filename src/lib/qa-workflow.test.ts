@@ -11,9 +11,13 @@ import {
   environmentChecklistCoverage,
   flattenChecklistCoverageRounds,
   latestRoundChecklistRows,
+  findTypoCandidate,
+  parseReasonLines,
+  compressRoundHistory,
+  buildEventSpecDiffRows,
   type ChecklistCoverageRow,
 } from "@/lib/qa-workflow";
-import type { QaAttributeSnapshot, QaRunEvent } from "@/lib/qa-rounds-queries";
+import type { QaAttributeSnapshot, QaRunEvent, RoundHistoryEntry } from "@/lib/qa-rounds-queries";
 import type { CoverageItem } from "@/lib/queries";
 
 describe("deriveSessionStep", () => {
@@ -584,5 +588,203 @@ describe("checklistCoverageIssues", () => {
       }),
     ];
     expect(checklistCoverageIssues(rows, ["env-1"])).toEqual([]);
+  });
+});
+
+describe("findTypoCandidate", () => {
+  const props = (names: string[]) => names.map((n, i) => ({ id: `id-${i}`, technical_name: n }));
+
+  it("finds a nearby typo among known names", () => {
+    expect(findTypoCandidate("refferal_source", props(["referral_source", "platform"]))).toEqual({
+      id: "id-0",
+      name: "referral_source",
+      distance: 2,
+    });
+  });
+
+  it("picks the closest candidate when more than one is within range", () => {
+    expect(findTypoCandidate("itme_id", props(["item_id", "item_ids"]))).toEqual({
+      id: "id-0",
+      name: "item_id",
+      distance: 2,
+    });
+  });
+
+  it("returns null when nothing is within edit distance 2", () => {
+    expect(findTypoCandidate("totally_different", props(["item_id", "platform"]))).toBeNull();
+  });
+
+  it("ignores an exact match (that's not a typo, it's the same name)", () => {
+    expect(findTypoCandidate("platform", props(["platform"]))).toBeNull();
+  });
+});
+
+describe("parseReasonLines", () => {
+  it("returns an empty array for null reasoning", () => {
+    expect(parseReasonLines(null)).toEqual([]);
+  });
+
+  it("classifies type-mismatch and undefined-property lines", () => {
+    const reasoning = [
+      "item_final_price_krw: 타입이 string이어야 하는데 number입니다",
+      "refferal_source: 택소노미에 정의되지 않은 프로퍼티입니다",
+      "membership_grade: 허용된 값(GOLD, SILVER) 중이 아닙니다",
+    ].join("\n");
+    expect(parseReasonLines(reasoning)).toEqual([
+      {
+        property: "item_final_price_krw",
+        kind: "type_mismatch",
+        reason: "타입이 string이어야 하는데 number입니다",
+      },
+      {
+        property: "refferal_source",
+        kind: "undefined_property",
+        reason: "택소노미에 정의되지 않은 프로퍼티입니다",
+      },
+      {
+        property: "membership_grade",
+        kind: "other",
+        reason: "허용된 값(GOLD, SILVER) 중이 아닙니다",
+      },
+    ]);
+  });
+});
+
+describe("compressRoundHistory", () => {
+  it("marks the oldest entry's delta as null (첫 발견, nothing to compare against)", () => {
+    const history: RoundHistoryEntry[] = [
+      { roundNumber: 1, reasoning: "a: 택소노미에 정의되지 않은 프로퍼티입니다", finalStatus: "failed" },
+    ];
+    const [entry] = compressRoundHistory(history);
+    expect(entry.delta).toBeNull();
+    expect(entry.undefinedProperties).toEqual(["a"]);
+  });
+
+  it("computes delta against the chronologically-previous (next-in-array) round", () => {
+    const history: RoundHistoryEntry[] = [
+      {
+        roundNumber: 3,
+        reasoning: [
+          "a: 타입이 string이어야 하는데 number입니다",
+          "b: 타입이 string이어야 하는데 number입니다",
+          "c: 택소노미에 정의되지 않은 프로퍼티입니다",
+        ].join("\n"),
+        finalStatus: "failed",
+      },
+      {
+        roundNumber: 2,
+        reasoning: "c: 택소노미에 정의되지 않은 프로퍼티입니다",
+        finalStatus: "failed",
+      },
+      {
+        roundNumber: 1,
+        reasoning: "c: 택소노미에 정의되지 않은 프로퍼티입니다",
+        finalStatus: "failed",
+      },
+    ];
+    const [latest, middle, oldest] = compressRoundHistory(history);
+    expect(latest.delta).toBe(2); // 3 structured issues now vs 1 before
+    expect(middle.delta).toBe(0); // 1 vs 1
+    expect(oldest.delta).toBeNull();
+  });
+
+  it("keeps the raw reasoning as otherReason when nothing structured was parsed", () => {
+    const history: RoundHistoryEntry[] = [
+      { roundNumber: 1, reasoning: "AI가 판단한 자유 서술 사유", finalStatus: "failed" },
+    ];
+    const [entry] = compressRoundHistory(history);
+    expect(entry.otherReason).toBe("AI가 판단한 자유 서술 사유");
+    expect(entry.typeMismatchProperties).toEqual([]);
+    expect(entry.undefinedProperties).toEqual([]);
+  });
+});
+
+describe("buildEventSpecDiffRows", () => {
+  const properties = [
+    {
+      id: "p1",
+      technical_name: "item_final_price_krw",
+      data_type: "string",
+      is_required: false,
+      allowed_values: null,
+    },
+    {
+      id: "p2",
+      technical_name: "platform",
+      data_type: "string",
+      is_required: true,
+      allowed_values: null,
+    },
+  ];
+
+  it("flags a type mismatch when the observed value doesn't match the taxonomy type", () => {
+    const rows = buildEventSpecDiffRows({
+      properties,
+      rawPropertiesList: [{ item_final_price_krw: 15661, platform: "android_app" }],
+    });
+    const priceRow = rows.find((r) => r.name === "item_final_price_krw");
+    expect(priceRow).toMatchObject({
+      verdict: "type_mismatch",
+      observedType: "number",
+      expectedType: "string",
+    });
+  });
+
+  it("passes a required property whose value matches the declared type", () => {
+    const rows = buildEventSpecDiffRows({
+      properties,
+      rawPropertiesList: [{ item_final_price_krw: "15661", platform: "android_app" }],
+    });
+    expect(rows.find((r) => r.name === "platform")).toMatchObject({ verdict: "pass" });
+  });
+
+  it("treats a missing required property as a mismatch, but lets an absent optional one pass", () => {
+    const rows = buildEventSpecDiffRows({
+      properties,
+      rawPropertiesList: [{ item_final_price_krw: "15661" }], // platform (required) absent
+    });
+    expect(rows.find((r) => r.name === "platform")).toMatchObject({
+      verdict: "type_mismatch",
+      observedType: "없음",
+    });
+    expect(rows.find((r) => r.name === "item_final_price_krw")).toMatchObject({ verdict: "pass" });
+  });
+
+  it("flags a mismatch if ANY matched occurrence is wrong, even when others are fine", () => {
+    const rows = buildEventSpecDiffRows({
+      properties,
+      rawPropertiesList: [
+        { item_final_price_krw: "15661", platform: "android_app" }, // fine
+        { item_final_price_krw: 15661, platform: "android_app" }, // wrong type
+      ],
+    });
+    expect(rows.find((r) => r.name === "item_final_price_krw")).toMatchObject({
+      verdict: "type_mismatch",
+      observedType: "number",
+    });
+  });
+
+  it("surfaces a raw log key that isn't in the taxonomy as undefined_property, with a typo candidate when one is close", () => {
+    const rows = buildEventSpecDiffRows({
+      properties,
+      rawPropertiesList: [
+        { platform: "android_app", refferal_source: "https://example.com" },
+      ],
+    });
+    const undef = rows.find((r) => r.name === "refferal_source");
+    expect(undef).toBeDefined();
+    expect(undef?.verdict).toBe("undefined_property");
+    expect(undef?.propertyId).toBeNull();
+  });
+
+  it("only reports each unknown key once across multiple matched raw property sets", () => {
+    const rows = buildEventSpecDiffRows({
+      properties,
+      rawPropertiesList: [
+        { platform: "android_app", is_login: "true" },
+        { platform: "android_app", is_login: "true" },
+      ],
+    });
+    expect(rows.filter((r) => r.name === "is_login")).toHaveLength(1);
   });
 });
