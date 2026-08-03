@@ -55,6 +55,8 @@ describe("buildJudgePrompt", () => {
     expect(prompt).toContain("rule-b");
     expect(prompt).toContain("A가 없으면 통과");
     expect(prompt).toContain("A가 있는데 B가 없으면 실패");
+    expect(prompt).toContain('기대 예시가 "일본"인데 실제값이 "OKA"');
+    expect(prompt).toContain("불확실하거나 근거가 부족하면 보수적으로 실패");
   });
 });
 

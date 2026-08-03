@@ -63,6 +63,7 @@ export function QaSessionView({
     hasResults,
   });
   const [viewingStep, setViewingStep] = useState(currentStep);
+  const [analysisProgress, setAnalysisProgress] = useState<{ completed: number; total: number }>();
 
   // useState's initializer only runs once, and route params changing doesn't remount this
   // component (same session route, different :sessionId) — so without this effect,
@@ -97,10 +98,13 @@ export function QaSessionView({
         rules,
         runEvents,
         snapshots,
+        onProgress: (completed, total) => setAnalysisProgress({ completed, total }),
       });
       toast.success("판정을 완료했어요");
     } catch (error) {
       toast.error(errorMessage(error, "판정에 실패했어요. 다시 시도해주세요."));
+    } finally {
+      setAnalysisProgress(undefined);
     }
   }
 
@@ -130,10 +134,39 @@ export function QaSessionView({
         </div>
         {checklistItems.length > 0 && runEvents.length > 0 ? (
           <Button onClick={runAnalysis} disabled={analyze.isPending}>
-            {hasResults ? "다시 분석 돌리기" : "분석 돌리기"}
+            {analysisProgress
+              ? `분석 중 ${analysisProgress.completed}/${analysisProgress.total}`
+              : hasResults
+                ? "다시 분석 돌리기"
+                : "분석 돌리기"}
           </Button>
         ) : null}
       </div>
+
+      {analysisProgress ? (
+        <div className="rounded-xl border border-[#d9dcf3] bg-[#f6f7fd] px-4 py-3">
+          <div className="mb-2 flex justify-between text-xs font-semibold text-[#4b4f8a]">
+            <span>AI 분석 진행 중</span>
+            <span>
+              {analysisProgress.completed}/{analysisProgress.total}
+            </span>
+          </div>
+          <div
+            role="progressbar"
+            aria-valuemin={0}
+            aria-valuemax={analysisProgress.total}
+            aria-valuenow={analysisProgress.completed}
+            className="h-2 overflow-hidden rounded-full bg-[#e2e5f4]"
+          >
+            <div
+              className="h-full rounded-full bg-[#5b5fc7] transition-[width] duration-300"
+              style={{
+                width: `${(analysisProgress.completed / analysisProgress.total) * 100}%`,
+              }}
+            />
+          </div>
+        </div>
+      ) : null}
 
       <div className="my-[18px] grid grid-cols-[repeat(auto-fit,minmax(170px,1fr))] gap-2">
         {STEPS.map((step) => {

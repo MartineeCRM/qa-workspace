@@ -431,13 +431,23 @@ export function useAnalyzeChecklist(sessionId: string) {
       rules: ValidationRule[];
       runEvents: RunEvent[];
       snapshots: AttributeSnapshot[];
+      onProgress?: (completed: number, total: number) => void;
     }) => {
       const itemsToJudge = input.checklistItems.filter(
         (item) => !item.qa_checklist_item_results?.[0]?.overridden_by,
       );
       if (itemsToJudge.length === 0) return;
+      let completed = 0;
+      input.onProgress?.(completed, itemsToJudge.length);
       const results = await Promise.all(
-        itemsToJudge.map((item) => judgeChecklistItem(item, input)),
+        itemsToJudge.map(async (item) => {
+          try {
+            return await judgeChecklistItem(item, input);
+          } finally {
+            completed += 1;
+            input.onProgress?.(completed, itemsToJudge.length);
+          }
+        }),
       );
       const { error } = await db
         .from("qa_checklist_item_results")
