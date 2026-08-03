@@ -759,16 +759,28 @@ describe("buildEventSpecDiffRows", () => {
     expect(rows.find((r) => r.name === "platform")).toMatchObject({ verdict: "pass" });
   });
 
-  it("treats a missing required property as a mismatch, but lets an absent optional one pass", () => {
+  it("distinguishes a missing required property, but lets an absent optional one pass", () => {
     const rows = buildEventSpecDiffRows({
       properties,
       rawPropertiesList: [{ item_final_price_krw: "15661" }], // platform (required) absent
     });
     expect(rows.find((r) => r.name === "platform")).toMatchObject({
-      verdict: "type_mismatch",
+      verdict: "missing_required",
       observedType: "없음",
     });
     expect(rows.find((r) => r.name === "item_final_price_krw")).toMatchObject({ verdict: "pass" });
+  });
+
+  it("distinguishes an allowed-value mismatch from a type mismatch", () => {
+    const rows = buildEventSpecDiffRows({
+      properties: [{ ...properties[1], allowed_values: ["android_app", "ios_app"] }],
+      rawPropertiesList: [{ platform: "ANDROID" }],
+    });
+    expect(rows[0]).toMatchObject({
+      verdict: "value_mismatch",
+      observedSample: "ANDROID",
+      allowedValues: ["android_app", "ios_app"],
+    });
   });
 
   it("flags a mismatch if ANY matched occurrence is wrong, even when others are fine", () => {

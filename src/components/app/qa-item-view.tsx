@@ -18,6 +18,7 @@ import {
 } from "@/lib/qa-workflow";
 import {
   useAddDiscussionComment,
+  useAnalyzeChecklist,
   useCarryOverItems,
   useChecklistItemRoundHistory,
   useQaAttributeSnapshots,
@@ -30,6 +31,7 @@ import {
   type QaSession,
 } from "@/lib/qa-rounds-queries";
 import {
+  useRules,
   useTaxonomyCustomAttributes,
   useTaxonomyEventProperties,
   useTaxonomyEvents,
@@ -57,7 +59,9 @@ export function QaItemView({
   const { user } = useAuth();
   const { data: events = [] } = useTaxonomyEvents(projectId);
   const { data: customAttributes = [] } = useTaxonomyCustomAttributes(projectId);
-  const { data: eventProperties = [] } = useTaxonomyEventProperties(projectId);
+  const { data: eventProperties = [], refetch: refetchEventProperties } =
+    useTaxonomyEventProperties(projectId);
+  const { data: rules = [] } = useRules(projectId);
   const { data: checklistItems = [] } = useQaChecklistItems(session.id);
   const { data: runEvents = [] } = useQaRunEvents(session.id);
   const { data: snapshots = [] } = useQaAttributeSnapshots(session.id);
@@ -66,6 +70,7 @@ export function QaItemView({
   const setDisposition = useSetDisposition(session.id);
   const carryOver = useCarryOverItems(environmentId);
   const addComment = useAddDiscussionComment(result?.id ?? "");
+  const analyze = useAnalyzeChecklist(session.id);
   const [commentBody, setCommentBody] = useState("");
   const [openRounds, setOpenRounds] = useState<Record<number, boolean>>({});
 
@@ -189,6 +194,26 @@ export function QaItemView({
       .catch(() => toast.error("복사에 실패했어요"));
   }
 
+  async function reanalyzeAfterTaxonomyChange() {
+    const refreshed = await refetchEventProperties();
+    await analyze.mutateAsync({
+      checklistItems,
+      events,
+      eventProperties: refreshed.data ?? eventProperties,
+      customAttributes,
+      rules,
+      runEvents,
+      snapshots,
+    });
+  }
+
+  function carryItemOver() {
+    carryOver.mutate(
+      { items: [{ id: item.id }], assigneeId: null },
+      { onSuccess: () => toast.success("구현 수정 항목으로 다음 라운드에 이월했어요") },
+    );
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -273,6 +298,8 @@ export function QaItemView({
               eventId={item.target_id}
               properties={thisEventProperties}
               rawPropertiesList={matchedRawPropertiesList}
+              onReanalyze={reanalyzeAfterTaxonomyChange}
+              onCarryOver={carryItemOver}
             />
           ) : (
             <div
@@ -300,9 +327,7 @@ export function QaItemView({
                   <li key={h.roundNumber} className="border-b border-[#f4f6f9] last:border-b-0">
                     <button
                       type="button"
-                      onClick={() =>
-                        setOpenRounds((prev) => ({ ...prev, [h.roundNumber]: !open }))
-                      }
+                      onClick={() => setOpenRounds((prev) => ({ ...prev, [h.roundNumber]: !open }))}
                       className="grid w-full grid-cols-[48px_64px_minmax(0,1fr)_76px_20px] items-center gap-3 px-4 py-2.5 text-left hover:bg-[#f7f9fc]"
                     >
                       <span className="text-[13px] font-semibold">{h.roundNumber}차</span>
@@ -404,6 +429,34 @@ export function QaItemView({
         </div>
 
         <div className="min-w-0 max-w-[360px] flex-[1_1_320px] space-y-4">
+          {result?.failed_layer === "qualitative" ? (
+            <Panel
+              title="AI·규칙 오류 해소"
+              description="값의 의미나 A→B 조건은 규칙을 고친 뒤 다시 분석해야 해요."
+            >
+              <div className="space-y-2 p-4">
+                <Link
+                  from="/w/$wsId/p/$projectId/qa/$stageSlug/$roundId/$sessionId/$itemId"
+                  to="/w/$wsId/p/$projectId/taxonomy"
+                  params={(prev) => ({ wsId: prev.wsId, projectId: prev.projectId })}
+                  className="block rounded-md border border-[#d9dcf3] px-3 py-2 text-center text-[12.5px] font-semibold text-[#4b4f8a]"
+                >
+                  택소노미·AI 규칙 수정
+                </Link>
+                <Button
+                  className="w-full"
+                  disabled={analyze.isPending}
+                  onClick={() =>
+                    reanalyzeAfterTaxonomyChange()
+                      .then(() => toast.success("다시 분석해 판정을 갱신했어요"))
+                      .catch((error) => toast.error(errorMessage(error)))
+                  }
+                >
+                  수정 반영 후 다시 분석
+                </Button>
+              </div>
+            </Panel>
+          ) : null}
           <Panel
             title="이 항목 처리"
             description="여기서 정하면 세션 결과와 커버리지에 바로 반영돼요."
@@ -443,17 +496,7 @@ export function QaItemView({
                   onClick={() => {
                     if (!user) return;
                     if (option.value === "carried_over") {
-                      carryOver.mutate(
-                        {
-                          items: [
-                            {
-                              id: item.id,
-                            },
-                          ],
-                          assigneeId: null,
-                        },
-                        { onSuccess: () => toast.success("다음 라운드로 이월했어요") },
-                      );
+                      carryItemOver();
                       return;
                     }
                     setDisposition.mutate(

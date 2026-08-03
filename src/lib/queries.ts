@@ -363,6 +363,38 @@ export function useUpdateEventPropertyDataType(projectId: string) {
   });
 }
 
+export function useUpdateEventPropertyRequired(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { propertyId: string; isRequired: boolean }) => {
+      const { error } = await db
+        .from("taxonomy_event_properties")
+        .update({ is_required: input.isRequired })
+        .eq("id", input.propertyId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["taxonomy-event-properties", projectId] });
+    },
+  });
+}
+
+export function useUpdateEventPropertyAllowedValues(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { propertyId: string; allowedValues: string[] }) => {
+      const { error } = await db
+        .from("taxonomy_event_properties")
+        .update({ allowed_values: input.allowedValues })
+        .eq("id", input.propertyId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["taxonomy-event-properties", projectId] });
+    },
+  });
+}
+
 // Spec-diff "이름 매핑" resolution — the log's property name is right (the taxonomy
 // name was a typo), so rename the existing taxonomy property to match the log
 // instead of adding a second, near-duplicate property.

@@ -406,7 +406,8 @@ export function compressRoundHistory(history: RoundHistoryEntry[]): CompressedRo
 // ---------------- Item detail: 스펙 대조 (spec diff) table rows ----------------
 // AS-IS = what actually arrived in the log. TO-BE = what the taxonomy expects.
 
-export type SpecDiffVerdict = "pass" | "type_mismatch" | "undefined_property";
+export type SpecDiffVerdict =
+  "pass" | "missing_required" | "type_mismatch" | "value_mismatch" | "undefined_property";
 
 export type SpecDiffRow = {
   // null for a property that isn't in the taxonomy yet (undefined_property row) —
@@ -453,15 +454,23 @@ export function buildEventSpecDiffRows(input: {
       .map((raw) => raw[prop.technical_name])
       .filter((v) => v !== undefined && v !== null);
     const mismatchingValue = values.find((v) => !matchesDataType(v, prop.data_type));
-    const observedValue = mismatchingValue !== undefined ? mismatchingValue : values[0];
+    const invalidAllowedValue = values.find(
+      (v) =>
+        matchesDataType(v, prop.data_type) &&
+        prop.allowed_values !== null &&
+        !prop.allowed_values.includes(String(v)),
+    );
+    const observedValue = mismatchingValue ?? invalidAllowedValue ?? values[0];
     const verdict: SpecDiffVerdict =
       values.length === 0
         ? prop.is_required
-          ? "type_mismatch"
+          ? "missing_required"
           : "pass"
         : mismatchingValue !== undefined
           ? "type_mismatch"
-          : "pass";
+          : invalidAllowedValue !== undefined
+            ? "value_mismatch"
+            : "pass";
     rows.push({
       propertyId: prop.id,
       name: prop.technical_name,
