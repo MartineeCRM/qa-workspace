@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { Panel } from "@/components/app/layout-parts";
 import { Button } from "@/components/ui/button";
@@ -134,7 +135,15 @@ export function QaItemSpecDiffTable({
           : mismatchRows;
 
   function actionsFor(row: SpecDiffRow): Array<{ key: FixAction; label: string }> {
-    if (row.verdict === "pass") return [];
+    // Passing here only means the structural check (type + presence) found no
+    // issue — it says nothing about semantic correctness (e.g. the same
+    // property carrying inconsistent-but-same-type values across events). A
+    // reviewer can still flag one for implementation follow-up; there's no
+    // auto-fixable taxonomy action for it though, since nothing is structurally
+    // wrong to correct.
+    if (row.verdict === "pass") {
+      return [{ key: "impl", label: "구현 수정 요청 · 이월" }];
+    }
     if (row.verdict === "missing_required") {
       return [
         { key: "optional", label: "택소노미에서 선택값으로" },
@@ -173,6 +182,10 @@ export function QaItemSpecDiffTable({
     setFixes((prev) => ({ ...prev, [name]: prev[name] === action ? null : action }));
   }
 
+  // pass rows carry their own "impl" entry too (flagging a false-negative for
+  // implementation follow-up), so scope this to rows still structurally wrong —
+  // a pass-row impl flag shouldn't drive the resolved/remaining counter or the
+  // carry-over banner meant for real violations.
   const activeMismatchNames = useMemo(
     () => new Set(mismatchRows.map((r) => r.name)),
     [mismatchRows],
@@ -336,6 +349,17 @@ export function QaItemSpecDiffTable({
                       </span>
                     </div>
                     <div className="flex flex-col gap-1">
+                      {row.verdict === "pass" && row.propertyId ? (
+                        <Link
+                          from="/w/$wsId/p/$projectId/qa/$stageSlug/$roundId/$sessionId/$itemId"
+                          to="/w/$wsId/p/$projectId/taxonomy"
+                          params={(prev) => ({ wsId: prev.wsId, projectId: prev.projectId })}
+                          search={{ propertyId: row.propertyId }}
+                          className="rounded-md border border-[#e3e8ef] px-2 py-1 text-left text-[11.5px] leading-tight text-[#64748b] hover:border-[#2b6a9c] hover:text-[#2b6a9c]"
+                        >
+                          택소노미에서 수정
+                        </Link>
+                      ) : null}
                       {actionsFor(row).map((a) => (
                         <button
                           key={a.key}

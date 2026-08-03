@@ -16,6 +16,9 @@ import { useWorkspaceContext } from "@/lib/workspace-context";
 import { canEdit } from "@/lib/domain";
 
 export const Route = createFileRoute("/_authenticated/w/$wsId/p/$projectId/taxonomy")({
+  validateSearch: (search: Record<string, unknown>): { propertyId?: string } => ({
+    propertyId: typeof search.propertyId === "string" ? search.propertyId : undefined,
+  }),
   head: () => ({
     meta: [
       { title: "택소노미 — 단일 기준" },
@@ -35,6 +38,7 @@ export const Route = createFileRoute("/_authenticated/w/$wsId/p/$projectId/taxon
 
 function TaxonomyPage() {
   const { projectId } = useParams({ from: "/_authenticated/w/$wsId/p/$projectId/taxonomy" });
+  const { propertyId } = Route.useSearch();
   const { role } = useWorkspaceContext();
   const editable = canEdit(role);
   const [view, setView] = useState<"structure" | "rules">("structure");
@@ -83,6 +87,7 @@ function TaxonomyPage() {
           customAttributes={customAttributes}
           customAttributeProperties={customAttributeProperties}
           editable={editable}
+          openPropertyId={propertyId}
         />
       ) : (
         <RulesTab
