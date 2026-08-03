@@ -273,7 +273,13 @@ export function useCaptureAttributeSnapshot(sessionId: string, projectId: string
       const result = await fetchBrazeAttributeSnapshot({ data: { projectId, brazeId } });
 
       if (!result.ok) {
-        await db.from("qa_attribute_snapshots").update({ status: "failed" }).eq("id", row.id);
+        const { error: failError } = await db
+          .from("qa_attribute_snapshots")
+          .update({ status: "failed" })
+          .eq("id", row.id);
+        // Swallowing this would leave the row stuck at "requesting" forever with no
+        // visible reason why — surface it alongside the real failure instead.
+        if (failError) console.error("Failed to mark snapshot as failed:", failError);
         throw new Error(result.error);
       }
 
