@@ -1,8 +1,13 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { judgeChecklistItem } from "./checklist-analysis";
 import type { AttributeSnapshot } from "./checklist-judge";
 import type { QaChecklistItem } from "./qa-rounds-queries";
-import type { TaxonomyCustomAttribute } from "./queries";
+import type { TaxonomyCustomAttribute, TaxonomyEvent, TaxonomyEventProperty } from "./queries";
+
+const judgeWithAI = vi.hoisted(() => vi.fn());
+vi.mock("./ai-judge.functions", () => ({ judgeChecklistItemWithAI: judgeWithAI }));
+
+beforeEach(() => judgeWithAI.mockReset());
 
 const baseAttribute: TaxonomyCustomAttribute = {
   id: "attr-1",
@@ -99,5 +104,63 @@ describe("judgeChecklistItem — custom attribute with no validation rule", () =
     ];
     const result = await judgeChecklistItem(item, ctxWithSnapshots(snapshots));
     expect(result.final_status).toBe("not_collected");
+  });
+});
+
+describe("judgeChecklistItem — taxonomy example format", () => {
+  it("sends property examples and observed values to AI as an implicit format rule", async () => {
+    judgeWithAI.mockResolvedValue({
+      ok: true,
+      verdict: "failed",
+      reasoning: "ISO 8601 형식이 아닙니다",
+      evidence: {},
+    });
+    const event = {
+      id: "event-1",
+      technical_name: "signup_completed",
+    } as TaxonomyEvent;
+    const property = {
+      id: "property-1",
+      event_id: event.id,
+      technical_name: "birth_date",
+      data_type: "string",
+      is_required: true,
+      description: null,
+      example_value: "2026-01-01T00:00:00.000+09:00",
+      allowed_values: null,
+    } as TaxonomyEventProperty;
+
+    const result = await judgeChecklistItem(
+      { ...item, target_type: "event", target_id: event.id },
+      {
+        events: [event],
+        eventProperties: [property],
+        customAttributes: [],
+        rules: [],
+        runEvents: [
+          {
+            event_id: event.id,
+            raw_event_name: event.technical_name,
+            occurred_at: "2026-08-03T00:00:00Z",
+            external_user_id: "u1",
+            raw_properties: { birth_date: "31년 05월 31일" },
+          },
+        ],
+        snapshots: [],
+      },
+    );
+
+    expect(judgeWithAI).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        rules: [
+          expect.objectContaining({
+            id: "taxonomy-property:property-1",
+            description: expect.stringContaining("2026-01-01T00:00:00.000+09:00"),
+          }),
+        ],
+        targets: [expect.objectContaining({ technicalName: "signup_completed" })],
+      }),
+    });
+    expect(result).toMatchObject({ final_status: "failed", judged_by: "ai" });
   });
 });

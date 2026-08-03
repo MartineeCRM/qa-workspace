@@ -156,7 +156,51 @@ async function judgeQualitative(
     });
   });
 
-  if (rules.length === 0) {
+  const taxonomyRules =
+    targetType === "event"
+      ? ctx.eventProperties
+          .filter(
+            (property) =>
+              property.event_id === targetId &&
+              (Boolean(property.description?.trim()) || property.example_value != null),
+          )
+          .map((property) => ({
+            id: `taxonomy-property:${property.id}`,
+            name: `${property.technical_name} 값 형식`,
+            description: [
+              `${property.technical_name}의 실제 값은 택소노미 정의와 같은 형식·의미여야 합니다.`,
+              property.description?.trim() ? `설명: ${property.description.trim()}` : null,
+              property.example_value != null
+                ? `형식 예시: ${JSON.stringify(property.example_value)} (고정값이 아니라 형식 표본)`
+                : null,
+            ]
+              .filter(Boolean)
+              .join(" "),
+          }))
+      : (() => {
+          const attribute = ctx.customAttributes.find((candidate) => candidate.id === targetId);
+          if (!attribute || (!attribute.description?.trim() && attribute.example_value == null)) {
+            return [];
+          }
+          return [
+            {
+              id: `taxonomy-attribute:${attribute.id}`,
+              name: `${attribute.technical_name} 값 형식`,
+              description: [
+                `${attribute.technical_name}의 실제 값은 택소노미 정의와 같은 형식·의미여야 합니다.`,
+                attribute.description?.trim() ? `설명: ${attribute.description.trim()}` : null,
+                attribute.example_value != null
+                  ? `형식 예시: ${JSON.stringify(attribute.example_value)} (고정값이 아니라 형식 표본)`
+                  : null,
+              ]
+                .filter(Boolean)
+                .join(" "),
+            },
+          ];
+        })();
+  const promptRules = [...rules, ...taxonomyRules];
+
+  if (promptRules.length === 0) {
     return {
       checklist_item_id: checklistItemId,
       ai_verdict: "passed",
@@ -193,7 +237,7 @@ async function judgeQualitative(
     })
     .filter((t): t is NonNullable<typeof t> => t !== null);
 
-  if (rules.some((rule) => rule.validation_rule_targets.length === 0)) {
+  if (taxonomyRules.length > 0 || rules.some((rule) => rule.validation_rule_targets.length === 0)) {
     if (targetType === "event") {
       const event = ctx.events.find((candidate) => candidate.id === targetId);
       targets.push({
@@ -222,7 +266,7 @@ async function judgeQualitative(
   try {
     result = await judgeChecklistItemWithAI({
       data: {
-        rules: rules.map((rule) => ({
+        rules: promptRules.map((rule) => ({
           id: rule.id,
           name: rule.name,
           description: rule.description?.trim() || rule.name,

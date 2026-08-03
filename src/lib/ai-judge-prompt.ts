@@ -28,10 +28,10 @@ export function parseJudgeResponse(text: string, rules: JudgePromptInput["rules"
   try {
     parsed = JSON.parse(text);
   } catch {
-    return { ok: false, error: "Claude 응답을 JSON으로 해석하지 못했어요." };
+    return { ok: false, error: "AI 응답을 JSON으로 해석하지 못했어요." };
   }
   if (!Array.isArray(parsed.results)) {
-    return { ok: false, error: "Claude 응답에 규칙별 results가 없어요." };
+    return { ok: false, error: "AI 응답에 규칙별 results가 없어요." };
   }
   const byRuleId = new Map(parsed.results.map((result) => [result.rule_id, result]));
   const results = rules.map((rule) => byRuleId.get(rule.id));
@@ -40,7 +40,7 @@ export function parseJudgeResponse(text: string, rules: JudgePromptInput["rules"
       (result) => !result || (result.verdict !== "passed" && result.verdict !== "failed"),
     )
   ) {
-    return { ok: false, error: "Claude가 일부 규칙의 판정 결과를 올바르게 반환하지 않았어요." };
+    return { ok: false, error: "AI가 일부 규칙의 판정 결과를 올바르게 반환하지 않았어요." };
   }
   const failed = results.filter((result) => result?.verdict === "failed");
   return {
