@@ -4,9 +4,6 @@ import {
   buildMergedTimeline,
   nextChecklistItemId,
   previousChecklistItemId,
-} from "@/lib/qa-workflow";
-import type { QaAttributeSnapshot, QaRunEvent } from "@/lib/qa-rounds-queries";
-import {
   checklistCoverageIssues,
   checklistTargetKey,
   environmentChecklistCoverage,
@@ -14,6 +11,7 @@ import {
   latestRoundChecklistRows,
   type ChecklistCoverageRow,
 } from "@/lib/qa-workflow";
+import type { QaAttributeSnapshot, QaRunEvent } from "@/lib/qa-rounds-queries";
 import type { CoverageItem } from "@/lib/queries";
 
 describe("deriveSessionStep", () => {
@@ -22,9 +20,7 @@ describe("deriveSessionStep", () => {
   });
 
   it("returns 2 when items exist but the session hasn't ended", () => {
-    expect(
-      deriveSessionStep({ checklistItemCount: 3, endedAt: null, hasResults: false }),
-    ).toBe(2);
+    expect(deriveSessionStep({ checklistItemCount: 3, endedAt: null, hasResults: false })).toBe(2);
   });
 
   it("returns 3 when the session ended but analysis hasn't produced results yet", () => {
@@ -292,6 +288,56 @@ describe("flattenChecklistCoverageRounds", () => {
         checklist_item_id: "item-2",
         target_type: "custom_attribute",
         target_id: "attr-1",
+        disposition: "unresolved",
+        final_status: null,
+        result_updated_at: null,
+      },
+    ]);
+  });
+
+  it("does not throw when Supabase embeds come back as null instead of an empty array", () => {
+    const raw = [
+      {
+        id: "round-1",
+        qa_environment_id: "env-1",
+        round_number: 1,
+        qa_sessions: null,
+      },
+      {
+        id: "round-2",
+        qa_environment_id: "env-1",
+        round_number: 2,
+        qa_sessions: [
+          {
+            id: "session-1",
+            qa_round_checklist_items: null,
+          },
+          {
+            id: "session-2",
+            qa_round_checklist_items: [
+              {
+                id: "item-1",
+                target_type: "event" as const,
+                target_id: "ev-1",
+                disposition: "unresolved" as const,
+                qa_checklist_item_results: null,
+              },
+            ],
+          },
+        ],
+      },
+    ];
+
+    expect(() => flattenChecklistCoverageRounds(raw)).not.toThrow();
+    expect(flattenChecklistCoverageRounds(raw)).toEqual([
+      {
+        qa_environment_id: "env-1",
+        qa_round_id: "round-2",
+        round_number: 2,
+        qa_session_id: "session-2",
+        checklist_item_id: "item-1",
+        target_type: "event",
+        target_id: "ev-1",
         disposition: "unresolved",
         final_status: null,
         result_updated_at: null,

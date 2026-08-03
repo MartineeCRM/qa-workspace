@@ -1,4 +1,8 @@
-import type { ChecklistDisposition, QaAttributeSnapshot, QaRunEvent } from "@/lib/qa-rounds-queries";
+import type {
+  ChecklistDisposition,
+  QaAttributeSnapshot,
+  QaRunEvent,
+} from "@/lib/qa-rounds-queries";
 import type { CoverageItem, EnvironmentCoverage } from "@/lib/queries";
 
 export function deriveSessionStep(input: {
@@ -115,20 +119,23 @@ export type ChecklistCoverageRow = {
   result_updated_at: string | null;
 };
 
-type RawChecklistItemResult = { final_status: "passed" | "failed" | "not_collected"; updated_at: string };
+type RawChecklistItemResult = {
+  final_status: "passed" | "failed" | "not_collected";
+  updated_at: string;
+};
 type RawChecklistItem = {
   id: string;
   target_type: "event" | "custom_attribute";
   target_id: string;
   disposition: ChecklistDisposition;
-  qa_checklist_item_results: RawChecklistItemResult[];
+  qa_checklist_item_results: RawChecklistItemResult[] | null;
 };
-type RawSession = { id: string; qa_round_checklist_items: RawChecklistItem[] };
+type RawSession = { id: string; qa_round_checklist_items: RawChecklistItem[] | null };
 type RawRound = {
   id: string;
   qa_environment_id: string;
   round_number: number;
-  qa_sessions: RawSession[];
+  qa_sessions: RawSession[] | null;
 };
 
 export function flattenChecklistCoverageRounds(rounds: RawRound[]): ChecklistCoverageRow[] {
@@ -157,7 +164,10 @@ export function flattenChecklistCoverageRounds(rounds: RawRound[]): ChecklistCov
 
 // Matches CoverageItem.key from queries.ts ("event:<id>" / "attribute:<id>") so
 // the two can be joined by a plain Map lookup.
-export function checklistTargetKey(row: { target_type: "event" | "custom_attribute"; target_id: string }): string {
+export function checklistTargetKey(row: {
+  target_type: "event" | "custom_attribute";
+  target_id: string;
+}): string {
   return row.target_type === "event" ? `event:${row.target_id}` : `attribute:${row.target_id}`;
 }
 
@@ -197,7 +207,8 @@ export function environmentChecklistCoverage(
   for (const item of items) {
     const current = byKey.get(item.key);
     if (!current) continue;
-    if (current.disposition === "passed_override" || current.final_status === "passed") verified += 1;
+    if (current.disposition === "passed_override" || current.final_status === "passed")
+      verified += 1;
     else if (current.final_status === "failed") failed += 1;
   }
   const total = items.length;
@@ -228,7 +239,8 @@ export function checklistCoverageIssues(
     for (const current of latestRoundChecklistRows(rows, environmentId)) {
       let status: "failed" | "discussing" | null = null;
       if (current.disposition === "discussing") status = "discussing";
-      else if (current.disposition === "unresolved" && current.final_status === "failed") status = "failed";
+      else if (current.disposition === "unresolved" && current.final_status === "failed")
+        status = "failed";
       if (!status) continue;
       issues.push({
         itemKey: checklistTargetKey(current),
