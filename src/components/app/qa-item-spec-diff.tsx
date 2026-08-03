@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Panel } from "@/components/app/layout-parts";
 import { Button } from "@/components/ui/button";
@@ -72,6 +72,10 @@ export function QaItemSpecDiffTable({
   const [fixes, setFixes] = useState<Record<string, FixAction | null>>({});
   const [applying, setApplying] = useState(false);
 
+  useEffect(() => {
+    setFixes({});
+  }, [eventId]);
+
   const rows = useMemo(
     () =>
       buildEventSpecDiffRows({
@@ -132,9 +136,16 @@ export function QaItemSpecDiffTable({
     setFixes((prev) => ({ ...prev, [name]: prev[name] === action ? null : action }));
   }
 
-  const resolvedCount = Object.values(fixes).filter(Boolean).length;
+  const activeMismatchNames = useMemo(
+    () => new Set([...typeMismatchRows, ...undefinedRows].map((r) => r.name)),
+    [typeMismatchRows, undefinedRows],
+  );
+  const resolvedCount = Object.entries(fixes).filter(
+    ([name, action]) => Boolean(action) && activeMismatchNames.has(name),
+  ).length;
   const pendingEntries = Object.entries(fixes).filter(
-    (entry): entry is [string, FixAction] => Boolean(entry[1]) && entry[1] !== "impl",
+    (entry): entry is [string, FixAction] =>
+      Boolean(entry[1]) && entry[1] !== "impl" && activeMismatchNames.has(entry[0]),
   );
 
   async function applyPending() {
