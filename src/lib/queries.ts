@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import type { ItemStatus, WorkspaceRole } from "@/lib/domain";
+import type { WorkspaceRole } from "@/lib/domain";
 
 export type Workspace = {
   id: string;
@@ -146,19 +146,6 @@ export type QaAnalysisRun = {
   started_at: string;
   completed_at: string | null;
   created_at: string;
-};
-
-export type QaItemStatus = {
-  id: string;
-  project_id: string;
-  qa_environment_id: string;
-  event_id: string | null;
-  property_id: string | null;
-  custom_attribute_id: string | null;
-  status: ItemStatus;
-  notes: string | null;
-  last_run_id: string | null;
-  updated_at: string;
 };
 
 export type ActivityLog = {
@@ -432,16 +419,6 @@ export function useEnvironments(projectId: string) {
   });
 }
 
-export function useProjectItemStatuses(projectId: string) {
-  return useQuery({
-    queryKey: ["item-status", projectId],
-    queryFn: async () =>
-      unwrap<QaItemStatus[]>(
-        await db.from("qa_item_status").select("*").eq("project_id", projectId),
-      ),
-  });
-}
-
 export function useUploads(environmentId: string) {
   return useQuery({
     queryKey: ["uploads", environmentId],
@@ -542,16 +519,6 @@ export function buildCoverageItems(
   return items;
 }
 
-export function statusKey(row: {
-  event_id: string | null;
-  property_id: string | null;
-  custom_attribute_id: string | null;
-}) {
-  if (row.event_id) return `event:${row.event_id}`;
-  if (row.property_id) return `property:${row.property_id}`;
-  return `attribute:${row.custom_attribute_id}`;
-}
-
 export type EnvironmentCoverage = {
   total: number;
   verified: number;
@@ -559,32 +526,5 @@ export type EnvironmentCoverage = {
   notStarted: number;
   ratio: number;
 };
-
-export function environmentCoverage(
-  items: CoverageItem[],
-  statuses: QaItemStatus[],
-  environmentId: string,
-): EnvironmentCoverage {
-  const map = new Map(
-    statuses
-      .filter((s) => s.qa_environment_id === environmentId)
-      .map((s) => [statusKey(s), s.status]),
-  );
-  let verified = 0;
-  let failed = 0;
-  for (const item of items) {
-    const st = map.get(item.key);
-    if (st === "verified") verified += 1;
-    else if (st === "failed") failed += 1;
-  }
-  const total = items.length;
-  return {
-    total,
-    verified,
-    failed,
-    notStarted: total - verified - failed,
-    ratio: total === 0 ? 0 : verified / total,
-  };
-}
 
 export { db };
