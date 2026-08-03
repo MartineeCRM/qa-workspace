@@ -72,29 +72,32 @@ function ProjectsPage() {
   const [showArchived, setShowArchived] = useState(false);
   const [editing, setEditing] = useState<Project | null>(null);
   const [creating, setCreating] = useState(false);
-  const [counts, setCounts] = useState<Record<string, { events: number; attributes: number }>>({});
+  const [counts, setCounts] = useState<
+    Record<string, { events: number; properties: number; attributes: number }>
+  >({});
   const qc = useQueryClient();
 
+  // Matches the taxonomy detail page's own counts exactly (useTaxonomyEvents /
+  // useTaxonomyEventProperties / useTaxonomyCustomAttributes there fetch every
+  // row with no is_active filter) — filtering to active-only here would silently
+  // diverge from what a reviewer sees one click later on that project's own
+  // taxonomy tab. Properties and attributes are also kept as separate numbers
+  // instead of one merged "속성" figure, again to match that page's labels.
   useMemo(() => {
     if (!projects || projects.length === 0) return;
     const ids = projects.map((p) => p.id);
     Promise.all([
-      db.from("taxonomy_events").select("project_id").in("project_id", ids).eq("is_active", true),
+      db.from("taxonomy_events").select("project_id").in("project_id", ids),
       db
         .from("taxonomy_event_properties")
-        .select("is_active, taxonomy_events!inner(project_id)")
-        .in("taxonomy_events.project_id", ids)
-        .eq("is_active", true),
-      db
-        .from("taxonomy_custom_attributes")
-        .select("project_id")
-        .in("project_id", ids)
-        .eq("is_active", true),
+        .select("taxonomy_events!inner(project_id)")
+        .in("taxonomy_events.project_id", ids),
+      db.from("taxonomy_custom_attributes").select("project_id").in("project_id", ids),
     ]).then(([e, p, c]) => {
-      const map: Record<string, { events: number; attributes: number }> = {};
-      for (const id of ids) map[id] = { events: 0, attributes: 0 };
+      const map: Record<string, { events: number; properties: number; attributes: number }> = {};
+      for (const id of ids) map[id] = { events: 0, properties: 0, attributes: 0 };
       for (const row of e.data ?? []) map[row.project_id].events += 1;
-      for (const row of p.data ?? []) map[row.taxonomy_events.project_id].attributes += 1;
+      for (const row of p.data ?? []) map[row.taxonomy_events.project_id].properties += 1;
       for (const row of c.data ?? []) map[row.project_id].attributes += 1;
       setCounts(map);
     });
@@ -187,7 +190,8 @@ function ProjectsPage() {
                   <TableHead>프로젝트</TableHead>
                   <TableHead>키</TableHead>
                   <TableHead className="text-right">이벤트</TableHead>
-                  <TableHead className="text-right">속성</TableHead>
+                  <TableHead className="text-right">이벤트 프로퍼티</TableHead>
+                  <TableHead className="text-right">어트리뷰트</TableHead>
                   <TableHead>최근 수정</TableHead>
                   <TableHead className="w-10" />
                 </TableRow>
@@ -215,6 +219,9 @@ function ProjectsPage() {
                     <TableCell className="mono-token">{p.project_key}</TableCell>
                     <TableCell className="text-right tabular-nums">
                       {counts[p.id]?.events ?? 0}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {counts[p.id]?.properties ?? 0}
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
                       {counts[p.id]?.attributes ?? 0}
