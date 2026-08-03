@@ -171,7 +171,8 @@ export function formatPercent(value: number) {
 export function errorMessage(error: unknown, fallback = "문제가 발생했어요") {
   if (!error) return fallback;
   if (typeof error === "string") return error;
-  const anyErr = error as { message?: string; details?: string; hint?: string };
+  const anyErr = error as { message?: string; details?: string; hint?: string; code?: string };
+  if (anyErr.code === "23505") return fallback;
   return anyErr.message || anyErr.details || anyErr.hint || fallback;
 }
 
