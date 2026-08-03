@@ -446,6 +446,7 @@ export function useAnalyzeChecklist(sessionId: string) {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["qa-checklist-items", sessionId] });
+      qc.invalidateQueries({ queryKey: ["project-checklist-coverage"] });
     },
   });
 }
@@ -494,6 +495,7 @@ export function useSetDisposition(sessionId: string) {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["qa-checklist-items", sessionId] });
+      qc.invalidateQueries({ queryKey: ["project-checklist-coverage"] });
     },
   });
 }
@@ -519,6 +521,7 @@ export function useCarryOverItems(environmentId: string) {
       qc.invalidateQueries({ queryKey: ["qa-checklist-items"] });
       qc.invalidateQueries({ queryKey: ["qa-sessions"] });
       qc.invalidateQueries({ queryKey: ["qa-rounds", environmentId] });
+      qc.invalidateQueries({ queryKey: ["project-checklist-coverage"] });
     },
   });
 }
