@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatDate, formatDateTime } from "@/lib/domain";
+import { formatDate, formatDateTime, formatRawLogTime } from "@/lib/domain";
 
 describe("formatDate / formatDateTime", () => {
   it("formats in Asia/Seoul time regardless of the runtime's local timezone", () => {
@@ -16,5 +16,23 @@ describe("formatDate / formatDateTime", () => {
   it("returns a placeholder for missing values", () => {
     expect(formatDate(null)).toBe("—");
     expect(formatDateTime(undefined)).toBe("—");
+  });
+});
+
+describe("formatRawLogTime", () => {
+  it("renders the stored value's literal digits with no timezone shift", () => {
+    // Ingested logs are stored verbatim with no zone conversion at any point
+    // (see run-events-csv.ts), so displaying them must not shift the digits
+    // either — unlike formatDateTime, which deliberately converts to KST for
+    // genuine system timestamps.
+    const stored = "2026-08-01T02:12:00.000Z";
+
+    expect(formatRawLogTime(stored)).toContain("8. 1.");
+    expect(formatRawLogTime(stored)).toContain("2:12");
+  });
+
+  it("returns a placeholder for missing values", () => {
+    expect(formatRawLogTime(null)).toBe("—");
+    expect(formatRawLogTime(undefined)).toBe("—");
   });
 });

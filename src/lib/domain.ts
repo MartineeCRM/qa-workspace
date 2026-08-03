@@ -166,6 +166,20 @@ export function formatDateTime(value: string | null | undefined) {
   }).format(new Date(value));
 }
 
+// Raw event/attribute logs are ingested verbatim (see run-events-csv.ts) with
+// no timezone conversion at any point, so the timestamp already IS the wall-clock
+// value from the source log. Rendering it with a real zone conversion (like
+// formatDateTime's Asia/Seoul) would shift it away from what was actually logged —
+// this formats the stored value's literal digits instead, with no shift at all.
+export function formatRawLogTime(value: string | null | undefined) {
+  if (!value) return "—";
+  return new Intl.DateTimeFormat("ko-KR", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: "UTC",
+  }).format(new Date(value));
+}
+
 export function formatPercent(value: number) {
   return `${(Math.round(value * 1000) / 10).toFixed(1)}%`;
 }

@@ -1,5 +1,5 @@
 import { Panel } from "@/components/app/layout-parts";
-import { formatDateTime } from "@/lib/domain";
+import { formatRawLogTime } from "@/lib/domain";
 import { buildMergedTimeline } from "@/lib/qa-workflow";
 import {
   useQaAttributeSnapshots,
@@ -47,7 +47,7 @@ export function QaSessionAnalysisPanel({ session }: { session: QaSession }) {
           key={row.key}
           className="grid grid-cols-[88px_76px_minmax(0,1fr)_minmax(0,1fr)] gap-3 border-b border-[#f1f4f8] px-5 py-2.5 text-xs"
         >
-          <span className="tabular-nums text-[#8b97a8]">{formatDateTime(row.occurredAt)}</span>
+          <span className="tabular-nums text-[#8b97a8]">{formatRawLogTime(row.occurredAt)}</span>
           <span>
             <span
               className="rounded-full px-2 py-0.5 text-[11px] font-semibold"
