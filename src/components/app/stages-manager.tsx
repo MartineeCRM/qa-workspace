@@ -34,11 +34,13 @@ export function StagesManager({
   stages,
   open,
   onOpenChange,
+  onManageChannels,
 }: {
   projectId: string;
   stages: QaEnvironment[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onManageChannels: () => void;
 }) {
   const qc = useQueryClient();
   const [editing, setEditing] = useState<QaEnvironment | null>(null);
@@ -163,6 +165,18 @@ export function StagesManager({
             ))
           )}
         </ul>
+
+        <div className="flex items-center justify-between gap-4 rounded-md border p-3">
+          <div>
+            <p className="text-sm font-semibold">검증 채널</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Android, iOS처럼 환경별 검증에 사용할 플랫폼을 관리해요.
+            </p>
+          </div>
+          <Button type="button" size="sm" variant="outline" onClick={onManageChannels}>
+            검증 채널 설정
+          </Button>
+        </div>
 
         <form className="space-y-3 rounded-md border p-3" onSubmit={submit}>
           <p className="text-sm font-semibold">{editing ? "환경 수정" : "새 QA 환경 추가"}</p>

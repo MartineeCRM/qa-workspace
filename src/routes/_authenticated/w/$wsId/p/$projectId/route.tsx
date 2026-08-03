@@ -95,18 +95,12 @@ function ProjectShell() {
               <Button size="sm" variant="outline" onClick={() => setApiSettingsOpen(true)}>
                 Attribute API 설정
               </Button>
-              <Button size="sm" variant="outline" onClick={() => setChannelsOpen(true)}>
-                검증 채널 설정
-              </Button>
             </div>
           ) : null}
         </div>
         <ul className="mt-3 flex flex-wrap gap-1">
           <TabLink to="/w/$wsId/p/$projectId" params={{ wsId, projectId }} exact>
             개요
-          </TabLink>
-          <TabLink to="/w/$wsId/p/$projectId/taxonomy" params={{ wsId, projectId }}>
-            택소노미
           </TabLink>
           <TabLink to="/w/$wsId/p/$projectId/issues" params={{ wsId, projectId }}>
             이슈 모아보기
@@ -120,6 +114,9 @@ function ProjectShell() {
               {stage.name}
             </TabLink>
           ))}
+          <TabLink to="/w/$wsId/p/$projectId/taxonomy" params={{ wsId, projectId }}>
+            택소노미
+          </TabLink>
         </ul>
       </div>
       <Outlet />
@@ -129,6 +126,10 @@ function ProjectShell() {
         stages={stages ?? []}
         open={stagesOpen}
         onOpenChange={setStagesOpen}
+        onManageChannels={() => {
+          setStagesOpen(false);
+          setChannelsOpen(true);
+        }}
       />
       <AttributeApiSettings
         projectId={projectId}
