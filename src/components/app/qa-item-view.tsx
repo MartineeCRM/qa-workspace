@@ -195,12 +195,35 @@ export function QaItemView({
 
   return (
     <div className="space-y-4">
-      <div>
-        <h2 className="mono-token text-xl font-bold">{label ?? item.target_id}</h2>
-        <p className="mt-1 text-[12.5px] text-[#8b97a8]">
-          {item.target_type === "event" ? "이벤트" : "attribute"} · 마지막 판정{" "}
-          {result ? formatDateTime(result.updated_at) : "없음"}
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="mono-token text-xl font-bold">{label ?? item.target_id}</h2>
+          <p className="mt-1 text-[12.5px] text-[#8b97a8]">
+            {item.target_type === "event" ? "이벤트" : "attribute"} · 마지막 판정{" "}
+            {result ? formatDateTime(result.updated_at) : "없음"}
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Link
+            from="/w/$wsId/p/$projectId/qa/$stageSlug/$roundId/$sessionId/$itemId"
+            to="/w/$wsId/p/$projectId/qa/$stageSlug/$roundId/$sessionId/$itemId"
+            params={(prev) => ({
+              ...prev,
+              itemId: previousChecklistItemId(orderedIds, item.id),
+            })}
+            className="rounded-md border px-3 py-1.5 text-center text-sm hover:border-[#2b6a9c]"
+          >
+            ← 이전 항목
+          </Link>
+          <Link
+            from="/w/$wsId/p/$projectId/qa/$stageSlug/$roundId/$sessionId/$itemId"
+            to="/w/$wsId/p/$projectId/qa/$stageSlug/$roundId/$sessionId/$itemId"
+            params={(prev) => ({ ...prev, itemId: nextChecklistItemId(orderedIds, item.id) })}
+            className="rounded-md border px-3 py-1.5 text-center text-sm hover:border-[#2b6a9c]"
+          >
+            다음 항목 →
+          </Link>
+        </div>
       </div>
 
       <div className="flex flex-wrap items-start gap-4">
@@ -433,28 +456,6 @@ export function QaItemView({
               </div>
             </div>
           </Panel>
-
-          <div className="flex gap-2">
-            <Link
-              from="/w/$wsId/p/$projectId/qa/$stageSlug/$roundId/$sessionId/$itemId"
-              to="/w/$wsId/p/$projectId/qa/$stageSlug/$roundId/$sessionId/$itemId"
-              params={(prev) => ({
-                ...prev,
-                itemId: previousChecklistItemId(orderedIds, item.id),
-              })}
-              className="flex-1 rounded-md border px-3 py-2 text-center text-sm hover:border-[#2b6a9c]"
-            >
-              ← 이전 항목
-            </Link>
-            <Link
-              from="/w/$wsId/p/$projectId/qa/$stageSlug/$roundId/$sessionId/$itemId"
-              to="/w/$wsId/p/$projectId/qa/$stageSlug/$roundId/$sessionId/$itemId"
-              params={(prev) => ({ ...prev, itemId: nextChecklistItemId(orderedIds, item.id) })}
-              className="flex-1 rounded-md border px-3 py-2 text-center text-sm hover:border-[#2b6a9c]"
-            >
-              다음 항목 →
-            </Link>
-          </div>
         </div>
       </div>
     </div>
