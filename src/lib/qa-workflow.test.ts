@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   deriveSessionStep,
+  deriveSessionStepFromRow,
   buildMergedTimeline,
   nextChecklistItemId,
   previousChecklistItemId,
@@ -44,6 +45,47 @@ describe("deriveSessionStep", () => {
     expect(
       deriveSessionStep({ checklistItemCount: 0, hasRunEvents: true, hasResults: true }),
     ).toBe(1);
+  });
+});
+
+describe("deriveSessionStepFromRow", () => {
+  it("returns 1 for a brand new session with no checklist items yet", () => {
+    expect(
+      deriveSessionStepFromRow({ id: "s1", qa_round_checklist_items: [], qa_run_events: [] }),
+    ).toBe(1);
+  });
+
+  it("returns 2 once items are checklisted but nothing's been collected", () => {
+    expect(
+      deriveSessionStepFromRow({
+        id: "s1",
+        qa_round_checklist_items: [{ qa_checklist_item_results: [] }],
+        qa_run_events: [],
+      }),
+    ).toBe(2);
+  });
+
+  it("returns 3 once run events exist but no item has a result yet", () => {
+    expect(
+      deriveSessionStepFromRow({
+        id: "s1",
+        qa_round_checklist_items: [{ qa_checklist_item_results: [] }],
+        qa_run_events: [{ id: "re1" }],
+      }),
+    ).toBe(3);
+  });
+
+  it("returns 4 once any item has a judged result", () => {
+    expect(
+      deriveSessionStepFromRow({
+        id: "s1",
+        qa_round_checklist_items: [
+          { qa_checklist_item_results: [] },
+          { qa_checklist_item_results: [{ id: "r1" }] },
+        ],
+        qa_run_events: [{ id: "re1" }],
+      }),
+    ).toBe(4);
   });
 });
 

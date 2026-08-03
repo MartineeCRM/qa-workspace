@@ -9,7 +9,11 @@ import type {
   TaxonomyEventProperty,
   ValidationRule,
 } from "@/lib/queries";
-import { flattenChecklistCoverageRounds, type ChecklistCoverageRow } from "@/lib/qa-workflow";
+import {
+  deriveSessionStepFromRow,
+  flattenChecklistCoverageRounds,
+  type ChecklistCoverageRow,
+} from "@/lib/qa-workflow";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as any;
@@ -85,6 +89,27 @@ export function useQaSessions(roundId: string) {
         .order("started_at", { ascending: false });
       if (error) throw error;
       return data as QaSession[];
+    },
+  });
+}
+
+// One nested select for every session in the round so a round view with N session
+// cards doesn't need N separate useQaChecklistItems/useQaRunEvents query pairs.
+export function useQaSessionSteps(roundId: string) {
+  return useQuery({
+    queryKey: ["qa-session-steps", roundId],
+    enabled: Boolean(roundId),
+    queryFn: async () => {
+      const { data, error } = await db
+        .from("qa_sessions")
+        .select("id, qa_round_checklist_items(qa_checklist_item_results(id)), qa_run_events(id)")
+        .eq("qa_round_id", roundId);
+      if (error) throw error;
+      const steps = new Map<string, 1 | 2 | 3 | 4>();
+      for (const row of data ?? []) {
+        steps.set(row.id, deriveSessionStepFromRow(row));
+      }
+      return steps;
     },
   });
 }
@@ -177,6 +202,22 @@ export function useRemoveChecklistItem(sessionId: string) {
   return useMutation({
     mutationFn: async (itemId: string) => {
       const { error } = await db.from("qa_round_checklist_items").delete().eq("id", itemId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["qa-checklist-items", sessionId] });
+    },
+  });
+}
+
+export function useResetChecklist(sessionId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const { error } = await db
+        .from("qa_round_checklist_items")
+        .delete()
+        .eq("qa_session_id", sessionId);
       if (error) throw error;
     },
     onSuccess: () => {
