@@ -6,18 +6,17 @@ import { CoverageBar } from "@/components/app/coverage";
 import { Pill } from "@/components/app/badges";
 import {
   buildCoverageItems,
-  environmentCoverage,
-  statusKey,
   useActivity,
   useEnvironments,
   useProject,
-  useProjectItemStatuses,
   useRules,
   useTaxonomyCustomAttributes,
   useTaxonomyEventProperties,
   useTaxonomyEvents,
   type QaEnvironment,
 } from "@/lib/queries";
+import { useProjectChecklistCoverageRows } from "@/lib/qa-rounds-queries";
+import { checklistCoverageIssues, environmentChecklistCoverage } from "@/lib/qa-workflow";
 import { formatDateTime } from "@/lib/domain";
 
 export const Route = createFileRoute("/_authenticated/w/$wsId/p/$projectId/")({
@@ -49,24 +48,33 @@ function ProjectOverview() {
   const { data: customAttributes = [] } = useTaxonomyCustomAttributes(projectId);
   const { data: rules = [] } = useRules(projectId);
   const { data: stages = [] } = useEnvironments(projectId);
-  const { data: statuses = [] } = useProjectItemStatuses(projectId);
+  const { data: coverageRows = [] } = useProjectChecklistCoverageRows(projectId);
   const { data: activity = [] } = useActivity({ projectId, limit: 12 });
 
   const items = buildCoverageItems(events, eventProperties, customAttributes);
   const activeEvents = events.filter((e) => e.is_active).length;
   const activeAttributes = items.length - activeEvents;
 
-  const itemByKey = new Map(items.map((i) => [i.key, i]));
+  // The new round/session workflow only judges events and custom attributes —
+  // a property's pass/fail is folded into its parent event's structural check,
+  // there's no per-property result row. So the checklist-backed coverage bars
+  // (and the matching "전체 커버리지 항목" stat below) use a narrower item set
+  // than the full taxonomy-size stats above.
+  const checklistItems = items.filter((i) => i.kind !== "property");
+  const itemByKey = new Map(checklistItems.map((i) => [i.key, i]));
   const environmentById = new Map(stages.map((s) => [s.id, s]));
-  const issues = statuses
-    .filter((s) => s.status === "failed" || s.status === "blocked")
-    .map((s) => ({
-      id: s.id,
-      stage: environmentById.get(s.qa_environment_id),
-      item: itemByKey.get(statusKey(s)),
-      status: s.status,
-      notes: s.notes,
-      updatedAt: s.updated_at,
+  const issues = checklistCoverageIssues(
+    coverageRows,
+    stages.map((s) => s.id),
+  )
+    .map((issue) => ({
+      id: issue.checklistItemId,
+      stage: environmentById.get(issue.environmentId),
+      item: itemByKey.get(issue.itemKey),
+      status: issue.status,
+      roundId: issue.roundId,
+      sessionId: issue.sessionId,
+      checklistItemId: issue.checklistItemId,
     }))
     .filter((i) => i.stage && i.item)
     .sort((a, b) => (a.status === b.status ? 0 : a.status === "failed" ? -1 : 1));
@@ -80,7 +88,7 @@ function ProjectOverview() {
       <div className="grid gap-3 sm:grid-cols-3">
         <Stat icon={ListTree} label="이벤트" value={activeEvents} />
         <Stat icon={Layers} label="속성" value={activeAttributes} />
-        <Stat icon={ShieldCheck} label="전체 커버리지 항목" value={items.length} />
+        <Stat icon={ShieldCheck} label="전체 커버리지 항목" value={checklistItems.length} />
       </div>
 
       <Panel
@@ -104,7 +112,7 @@ function ProjectOverview() {
         ) : (
           <ul className="divide-y">
             {stages.map((stage: QaEnvironment) => {
-              const cov = environmentCoverage(items, statuses, stage.id);
+              const cov = environmentChecklistCoverage(checklistItems, coverageRows, stage.id);
               return (
                 <li key={stage.id} className="px-4 py-3">
                   <div className="flex items-center justify-between gap-4">
@@ -158,21 +166,22 @@ function ProjectOverview() {
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <Link
-                          to="/w/$wsId/p/$projectId/qa/$stageSlug"
-                          params={{ wsId, projectId, stageSlug: issue.stage!.slug }}
+                          to="/w/$wsId/p/$projectId/qa/$stageSlug/$roundId/$sessionId/$itemId"
+                          params={{
+                            wsId,
+                            projectId,
+                            stageSlug: issue.stage!.slug,
+                            roundId: issue.roundId,
+                            sessionId: issue.sessionId,
+                            itemId: issue.checklistItemId,
+                          }}
                           className="mono-token truncate text-sm font-medium hover:underline"
                         >
                           {issue.item!.label}
                         </Link>
                         <Pill>{issue.stage!.name}</Pill>
-                        <Pill>{issue.status === "failed" ? "실패" : "차단"}</Pill>
+                        <Pill>{issue.status === "failed" ? "실패" : "논의중"}</Pill>
                       </div>
-                      {issue.notes ? (
-                        <p className="mt-0.5 text-xs text-muted-foreground">{issue.notes}</p>
-                      ) : null}
-                      <p className="text-xs text-muted-foreground">
-                        {formatDateTime(issue.updatedAt)}
-                      </p>
                     </div>
                   </div>
                 </li>
