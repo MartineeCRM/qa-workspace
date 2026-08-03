@@ -27,6 +27,16 @@ const OBSERVED_TYPE_TO_TAXONOMY_TYPE: Record<string, string> = {
   array: "array",
 };
 
+// Unlike observedSample (a real typed value from the log, where JSON.stringify
+// usefully distinguishes e.g. the string "true" from the boolean true), the
+// taxonomy's example_value is always free descriptive text authored in a
+// spreadsheet — even for boolean/number properties, e.g. is_login's example is
+// the string "true", not the boolean. Stringifying it would just double-quote
+// and escape a value that's already meant to be read as plain text.
+function formatExampleValue(value: unknown): string {
+  return typeof value === "string" ? value : JSON.stringify(value);
+}
+
 function verdictBadge(verdict: SpecDiffVerdict) {
   if (verdict === "type_mismatch") {
     return { label: "타입", className: "bg-[#fdecec] text-[#dc2626]" };
@@ -273,7 +283,7 @@ export function QaItemSpecDiffTable({
                       {!row.expectedType
                         ? "스펙에 누락"
                         : row.expectedExample !== null && row.expectedExample !== undefined
-                          ? `예: ${JSON.stringify(row.expectedExample)}`
+                          ? `예: ${formatExampleValue(row.expectedExample)}`
                           : "예시값 없음 · 택소노미에 추가해주세요"}
                     </p>
                   </div>
