@@ -67,19 +67,27 @@ export async function judgeChecklistItem(
         allowed_values: Array.isArray(p.allowed_values) ? (p.allowed_values as string[]) : null,
       }));
     const violations = judgeEventStructural(matched, properties);
+    const qualitative = await judgeQualitative(base.checklist_item_id, event.id, "event", ctx);
     if (violations.length > 0) {
+      const structuralReason = violations.map((v) => `${v.property}: ${v.reason}`).join("\n");
       return {
         ...base,
         ai_verdict: "failed",
-        ai_reasoning: violations.map((v) => `${v.property}: ${v.reason}`).join("\n"),
-        ai_evidence: violations,
+        ai_reasoning: [
+          structuralReason,
+          qualitative.final_status === "failed" ? qualitative.ai_reasoning : null,
+        ]
+          .filter(Boolean)
+          .join("\n"),
+        ai_evidence: { structural: violations, qualitative: qualitative.ai_evidence },
         failed_layer: "structural",
         final_status: "failed",
-        judged_by: "rule",
+        judged_by:
+          qualitative.judged_by === "ai" && qualitative.ai_evidence !== null ? "ai" : "rule",
       };
     }
 
-    return judgeQualitative(base.checklist_item_id, event.id, "event", ctx);
+    return qualitative;
   }
 
   const attribute = ctx.customAttributes.find((a) => a.id === item.target_id);
@@ -115,19 +123,30 @@ export async function judgeChecklistItem(
       : null,
   };
   const violations = judgeAttributeStructural(value, attributeLite);
+  const qualitative = await judgeQualitative(
+    base.checklist_item_id,
+    attribute.id,
+    "custom_attribute",
+    ctx,
+  );
   if (violations.length > 0) {
     return {
       ...base,
       ai_verdict: "failed",
-      ai_reasoning: violations.map((v) => v.reason).join("\n"),
-      ai_evidence: { value },
+      ai_reasoning: [
+        violations.map((v) => v.reason).join("\n"),
+        qualitative.final_status === "failed" ? qualitative.ai_reasoning : null,
+      ]
+        .filter(Boolean)
+        .join("\n"),
+      ai_evidence: { value, structural: violations, qualitative: qualitative.ai_evidence },
       failed_layer: "structural",
       final_status: "failed",
-      judged_by: "rule",
+      judged_by: qualitative.judged_by === "ai" && qualitative.ai_evidence !== null ? "ai" : "rule",
     };
   }
 
-  return judgeQualitative(base.checklist_item_id, attribute.id, "custom_attribute", ctx);
+  return qualitative;
 }
 
 async function judgeQualitative(

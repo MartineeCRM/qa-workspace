@@ -46,6 +46,9 @@ function verdictBadge(verdict: SpecDiffVerdict) {
   if (verdict === "value_mismatch") {
     return { label: "값", className: "bg-[#fdecec] text-[#dc2626]" };
   }
+  if (verdict === "semantic_mismatch") {
+    return { label: "형식·의미", className: "bg-[#fdecec] text-[#dc2626]" };
+  }
   if (verdict === "undefined_property") {
     return { label: "미정의", className: "bg-[#fdf3e3] text-[#b45309]" };
   }
@@ -73,6 +76,7 @@ export function QaItemSpecDiffTable({
   eventId,
   properties,
   rawPropertiesList,
+  aiFailedPropertyIds,
   onReanalyze,
   onCarryOver,
 }: {
@@ -80,6 +84,7 @@ export function QaItemSpecDiffTable({
   eventId: string;
   properties: TaxonomyEventProperty[];
   rawPropertiesList: Record<string, unknown>[];
+  aiFailedPropertyIds: Set<string>;
   onReanalyze: () => Promise<void>;
   onCarryOver: () => void;
 }) {
@@ -109,8 +114,9 @@ export function QaItemSpecDiffTable({
           example_value: p.example_value,
         })),
         rawPropertiesList,
+        aiFailedPropertyIds,
       }),
-    [properties, rawPropertiesList],
+    [properties, rawPropertiesList, aiFailedPropertyIds],
   );
 
   const typeMismatchRows = rows.filter((r) => r.verdict === "type_mismatch");
@@ -164,6 +170,9 @@ export function QaItemSpecDiffTable({
         { key: "allow_value", label: `${JSON.stringify(row.observedSample)} 허용값 추가` },
         { key: "impl", label: "구현 수정 요청 · 이월" },
       ];
+    }
+    if (row.verdict === "semantic_mismatch") {
+      return [{ key: "impl", label: "구현 수정 요청 · 이월" }];
     }
     // undefined_property
     const actions: Array<{ key: FixAction; label: string }> = [];
@@ -349,7 +358,7 @@ export function QaItemSpecDiffTable({
                       </span>
                     </div>
                     <div className="flex flex-col gap-1">
-                      {row.verdict === "pass" && row.propertyId ? (
+                      {row.propertyId ? (
                         <Link
                           from="/w/$wsId/p/$projectId/qa/$stageSlug/$roundId/$sessionId/$itemId"
                           to="/w/$wsId/p/$projectId/taxonomy"

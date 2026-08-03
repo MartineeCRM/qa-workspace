@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  aiFailedTaxonomyPropertyIds,
   deriveSessionStep,
   deriveSessionStepFromRow,
   buildMergedTimeline,
@@ -828,5 +829,29 @@ describe("buildEventSpecDiffRows", () => {
       expectedExample: "android_app",
     });
     expect(rows.find((r) => r.name === "refferal_source")?.expectedExample).toBeUndefined();
+  });
+
+  it("shows an AI-failed structurally valid property as a semantic mismatch", () => {
+    const rows = buildEventSpecDiffRows({
+      properties,
+      rawPropertiesList: [{ item_final_price_krw: "15661", platform: "android_app" }],
+      aiFailedPropertyIds: new Set(["p2"]),
+    });
+    expect(rows.find((row) => row.propertyId === "p2")?.verdict).toBe("semantic_mismatch");
+  });
+});
+
+describe("aiFailedTaxonomyPropertyIds", () => {
+  it("extracts failed property rule ids from combined structural and AI evidence", () => {
+    expect(
+      aiFailedTaxonomyPropertyIds({
+        structural: [],
+        qualitative: [
+          { rule_id: "taxonomy-property:p1", verdict: "passed" },
+          { rule_id: "taxonomy-property:p2", verdict: "failed" },
+          { rule_id: "custom-rule", verdict: "failed" },
+        ],
+      }),
+    ).toEqual(new Set(["p2"]));
   });
 });

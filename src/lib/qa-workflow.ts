@@ -407,7 +407,12 @@ export function compressRoundHistory(history: RoundHistoryEntry[]): CompressedRo
 // AS-IS = what actually arrived in the log. TO-BE = what the taxonomy expects.
 
 export type SpecDiffVerdict =
-  "pass" | "missing_required" | "type_mismatch" | "value_mismatch" | "undefined_property";
+  | "pass"
+  | "missing_required"
+  | "type_mismatch"
+  | "value_mismatch"
+  | "semantic_mismatch"
+  | "undefined_property";
 
 export type SpecDiffRow = {
   // null for a property that isn't in the taxonomy yet (undefined_property row) —
@@ -442,6 +447,7 @@ export function buildEventSpecDiffRows(input: {
   // raw_properties from every matched run event in the session, newest first —
   // a property only counts as "observed" once some occurrence actually carried it.
   rawPropertiesList: Array<Record<string, unknown>>;
+  aiFailedPropertyIds?: Set<string>;
 }): SpecDiffRow[] {
   const knownNames = input.properties.map((p) => p.technical_name);
   const rows: SpecDiffRow[] = [];
@@ -461,7 +467,7 @@ export function buildEventSpecDiffRows(input: {
         !prop.allowed_values.includes(String(v)),
     );
     const observedValue = mismatchingValue ?? invalidAllowedValue ?? values[0];
-    const verdict: SpecDiffVerdict =
+    const structuralVerdict: SpecDiffVerdict =
       values.length === 0
         ? prop.is_required
           ? "missing_required"
@@ -471,6 +477,10 @@ export function buildEventSpecDiffRows(input: {
           : invalidAllowedValue !== undefined
             ? "value_mismatch"
             : "pass";
+    const verdict: SpecDiffVerdict =
+      structuralVerdict === "pass" && input.aiFailedPropertyIds?.has(prop.id)
+        ? "semantic_mismatch"
+        : structuralVerdict;
     rows.push({
       propertyId: prop.id,
       name: prop.technical_name,
@@ -504,4 +514,24 @@ export function buildEventSpecDiffRows(input: {
   }
 
   return rows;
+}
+
+export function aiFailedTaxonomyPropertyIds(evidence: unknown): Set<string> {
+  const nested =
+    evidence && typeof evidence === "object" && !Array.isArray(evidence)
+      ? (evidence as { qualitative?: unknown }).qualitative
+      : evidence;
+  if (!Array.isArray(nested)) return new Set();
+  return new Set(
+    nested
+      .filter(
+        (result): result is { rule_id: string; verdict: string } =>
+          Boolean(result) &&
+          typeof result === "object" &&
+          typeof result.rule_id === "string" &&
+          result.verdict === "failed" &&
+          result.rule_id.startsWith("taxonomy-property:"),
+      )
+      .map((result) => result.rule_id.slice("taxonomy-property:".length)),
+  );
 }

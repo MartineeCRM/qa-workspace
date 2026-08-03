@@ -10,6 +10,7 @@ import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 import { errorMessage, formatDateTime, formatRawLogTime } from "@/lib/domain";
 import {
+  aiFailedTaxonomyPropertyIds,
   buildMergedTimeline,
   compressRoundHistory,
   nextChecklistItemId,
@@ -103,6 +104,7 @@ export function QaItemView({
           .map((row) => row.key),
   );
   const evidenceRows = timeline.filter((row) => relevantKeys.has(row.key));
+  const aiFailedPropertyIds = aiFailedTaxonomyPropertyIds(result?.ai_evidence);
   const evidenceIsLong =
     evidenceRows.length > 6 ||
     evidenceRows.reduce(
@@ -328,6 +330,7 @@ export function QaItemView({
               eventId={item.target_id}
               properties={thisEventProperties}
               rawPropertiesList={matchedRawPropertiesList}
+              aiFailedPropertyIds={aiFailedPropertyIds}
               onReanalyze={reanalyzeAfterTaxonomyChange}
               onCarryOver={carryItemOver}
             />

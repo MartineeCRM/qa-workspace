@@ -129,12 +129,18 @@ describe("judgeChecklistItem — taxonomy example format", () => {
       example_value: "2026-01-01T00:00:00.000+09:00",
       allowed_values: null,
     } as TaxonomyEventProperty;
+    const missingProperty = {
+      ...property,
+      id: "property-2",
+      technical_name: "required_but_missing",
+      example_value: null,
+    } as TaxonomyEventProperty;
 
     const result = await judgeChecklistItem(
       { ...item, target_type: "event", target_id: event.id },
       {
         events: [event],
-        eventProperties: [property],
+        eventProperties: [property, missingProperty],
         customAttributes: [],
         rules: [],
         runEvents: [
@@ -161,6 +167,10 @@ describe("judgeChecklistItem — taxonomy example format", () => {
         targets: [expect.objectContaining({ technicalName: "signup_completed" })],
       }),
     });
-    expect(result).toMatchObject({ final_status: "failed", judged_by: "ai" });
+    expect(result).toMatchObject({
+      final_status: "failed",
+      failed_layer: "structural",
+      judged_by: "ai",
+    });
   });
 });
