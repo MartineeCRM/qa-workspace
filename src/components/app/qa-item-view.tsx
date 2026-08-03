@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
+import { Copy } from "lucide-react";
 import { toast } from "sonner";
 import { Panel } from "@/components/app/layout-parts";
 import { Button } from "@/components/ui/button";
@@ -10,6 +11,7 @@ import {
   buildMergedTimeline,
   nextChecklistItemId,
   previousChecklistItemId,
+  type MergedTimelineRow,
 } from "@/lib/qa-workflow";
 import {
   useAddDiscussionComment,
@@ -75,15 +77,59 @@ export function QaItemView({
 
   const timeline = buildMergedTimeline(runEvents, snapshots);
   const relevantKeys = new Set(
-    (Array.isArray(result?.ai_evidence) ? (result?.ai_evidence as Array<{ id?: string }>) : []).map(
-      (e) => e.id,
-    ),
+    (Array.isArray(result?.ai_evidence) ? (result?.ai_evidence as Array<{ id?: string }>) : [])
+      .map((e) => (e.id ? `event:${e.id}` : null))
+      .filter((key): key is string => key !== null),
   );
   const evidenceRows = timeline.filter(
     (row) => relevantKeys.size === 0 || relevantKeys.has(row.key),
   );
+  const violatingProperties = new Set(
+    result?.judged_by === "rule" && result?.ai_reasoning
+      ? result.ai_reasoning
+          .split("\n")
+          .map((line) => line.split(":")[0]?.trim())
+          .filter((v): v is string => Boolean(v))
+      : [],
+  );
 
   const orderedIds = checklistItems.map((i) => i.id);
+
+  function copyEvidenceLog() {
+    const text = evidenceRows
+      .map(
+        (row) =>
+          `${formatDateTime(row.occurredAt)} | ${row.source === "snapshot" ? "스냅샷" : "이벤트"} | ${row.name} ${row.change}`,
+      )
+      .join("\n");
+    navigator.clipboard
+      .writeText(text)
+      .then(() => toast.success("근거 로그를 클립보드에 복사했어요"))
+      .catch(() => toast.error("복사에 실패했어요"));
+  }
+
+  function renderChange(row: MergedTimelineRow) {
+    if (row.source === "snapshot") {
+      const highlighted = violatingProperties.has(row.name);
+      return (
+        <span className={highlighted ? "rounded-sm bg-[#4a3f00] px-0.5 text-[#f2d675]" : undefined}>
+          {row.change}
+        </span>
+      );
+    }
+    const segments = row.change ? row.change.split(", ") : [];
+    return segments.map((segment, i) => {
+      const highlighted = violatingProperties.has(segment.split("=")[0]);
+      return (
+        <span key={`${row.key}-${i}`}>
+          <span className={highlighted ? "rounded-sm bg-[#4a3f00] px-0.5 text-[#f2d675]" : undefined}>
+            {segment}
+          </span>
+          {i < segments.length - 1 ? <span className="text-[#6e7681]">, </span> : null}
+        </span>
+      );
+    });
+  }
 
   function copyIssue() {
     const bundle = [
@@ -116,33 +162,47 @@ export function QaItemView({
             style={{ borderColor: verdictStyle.border, backgroundColor: verdictStyle.bg }}
           >
             <p className="text-xs font-bold" style={{ color: verdictStyle.fg }}>
-              AI 판정
+              {result?.judged_by === "rule" ? "Rule 기반 판정" : "AI 판정"}
             </p>
-            <p className="mt-1.5 text-[13.5px] leading-[1.7] text-[#3c4757]">
+            <p className="mt-1.5 whitespace-pre-line text-[13.5px] leading-[1.7] text-[#3c4757]">
               {result?.ai_reasoning ?? "판단 이유가 없어요."}
             </p>
           </div>
 
-          <Panel title="근거 로그" description="이 항목과 관련된 병합 타임라인 구간">
-            <div className="grid grid-cols-[88px_76px_1fr_1fr] gap-3 bg-[#fbfcfd] px-4 py-2 text-xs font-medium text-[#64748b]">
-              <span>시각</span>
-              <span>출처</span>
-              <span>이름</span>
-              <span>값/변화</span>
-            </div>
-            {evidenceRows.map((row) => (
-              <div
-                key={row.key}
-                className="grid grid-cols-[88px_76px_1fr_1fr] gap-3 border-b border-[#f1f4f8] px-4 py-2 text-xs"
+          <Panel
+            title="근거 로그"
+            description="이 항목과 관련된 병합 타임라인 구간"
+            actions={
+              <button
+                type="button"
+                onClick={copyEvidenceLog}
+                disabled={evidenceRows.length === 0}
+                className="flex items-center gap-1.5 rounded-md border border-[#dbe2ea] px-2.5 py-1.5 text-xs text-[#64748b] hover:border-[#2b6a9c] hover:text-[#2b6a9c] disabled:opacity-40"
               >
-                <span className="tabular-nums text-[#8b97a8]">
-                  {formatDateTime(row.occurredAt)}
-                </span>
-                <span>{row.source === "snapshot" ? "스냅샷" : "이벤트"}</span>
-                <span className="mono-token truncate">{row.name}</span>
-                <span className="mono-token truncate">{row.change}</span>
-              </div>
-            ))}
+                <Copy className="size-3.5" />
+                복사
+              </button>
+            }
+          >
+            <div className="space-y-1 overflow-x-auto bg-[#0d1117] p-4 font-mono text-[12px] leading-[1.7]">
+              {evidenceRows.length === 0 ? (
+                <p className="text-[#6e7681]">관련된 로그가 없어요.</p>
+              ) : (
+                evidenceRows.map((row) => (
+                  <div key={row.key} className="whitespace-pre text-[#c9d1d9]">
+                    <span className="text-[#6e7681]">{formatDateTime(row.occurredAt)}</span>
+                    <span className="text-[#6e7681]"> | </span>
+                    <span className="text-[#7ee787]">
+                      {row.source === "snapshot" ? "스냅샷" : "이벤트"}
+                    </span>
+                    <span className="text-[#6e7681]"> | </span>
+                    <span>{row.name}</span>
+                    <span> </span>
+                    {renderChange(row)}
+                  </div>
+                ))
+              )}
+            </div>
           </Panel>
 
           <Panel title="라운드 이력">
