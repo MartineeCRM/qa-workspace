@@ -1132,7 +1132,7 @@ Expected: no errors in `src/routes/_authenticated/w/$wsId/settings.tsx`.
 
 - [ ] **Step 6: Lint the touched file and build**
 
-The pre-existing codebase has ~760 unrelated Prettier formatting errors (Lovable-generated code was never run through this repo's Prettier config), so running `npm run lint` repo-wide always "fails" regardless of what this task changes. Lint only the file this task touched instead:
+The pre-existing codebase has ~760 unrelated Prettier formatting errors, so running `npm run lint` repo-wide always "fails" regardless of what this task changes. Lint only the file this task touched instead:
 
 ```bash
 cd ~/Projects/qa-workspace
