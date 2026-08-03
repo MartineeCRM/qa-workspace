@@ -680,6 +680,7 @@ export function useRoundDispositionSummary(roundId: string) {
 export type RoundHistoryEntry = {
   roundNumber: number;
   reasoning: string | null;
+  evidence?: unknown;
   finalStatus: "passed" | "failed" | "not_collected";
 };
 
@@ -695,7 +696,7 @@ export function useChecklistItemRoundHistory(itemId: string) {
         const { data: item, error }: { data: any; error: unknown } = await db
           .from("qa_round_checklist_items")
           .select(
-            "carried_from_item_id, qa_sessions(qa_rounds(round_number)), qa_checklist_item_results(ai_reasoning, final_status)",
+            "carried_from_item_id, qa_sessions(qa_rounds(round_number)), qa_checklist_item_results(ai_reasoning, ai_evidence, final_status)",
           )
           .eq("id", currentId)
           .maybeSingle();
@@ -705,6 +706,7 @@ export function useChecklistItemRoundHistory(itemId: string) {
         history.push({
           roundNumber: item.qa_sessions?.qa_rounds?.round_number ?? 0,
           reasoning: result?.ai_reasoning ?? null,
+          evidence: result?.ai_evidence ?? null,
           finalStatus: result?.final_status ?? "not_collected",
         });
         currentId = item.carried_from_item_id;

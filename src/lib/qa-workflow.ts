@@ -330,7 +330,7 @@ export function findTypoCandidate(
 
 export type ParsedReasonLine = {
   property: string;
-  kind: "type_mismatch" | "undefined_property" | "other";
+  kind: "missing_required" | "type_mismatch" | "value_mismatch" | "undefined_property" | "other";
   reason: string;
 };
 
@@ -350,9 +350,13 @@ export function parseReasonLines(reasoning: string | null): ParsedReasonLine[] {
         "택소노미에 정의되지 않은 프로퍼티입니다",
       )
         ? "undefined_property"
-        : reason.startsWith("타입이")
-          ? "type_mismatch"
-          : "other";
+        : reason.includes("필수 프로퍼티")
+          ? "missing_required"
+          : reason.startsWith("타입이")
+            ? "type_mismatch"
+            : reason.startsWith("허용된 값")
+              ? "value_mismatch"
+              : "other";
       return { property, kind, reason };
     });
 }
@@ -360,8 +364,10 @@ export function parseReasonLines(reasoning: string | null): ParsedReasonLine[] {
 export type CompressedRoundHistoryEntry = {
   roundNumber: number;
   finalStatus: "passed" | "failed" | "not_collected";
+  missingProperties: string[];
   typeMismatchProperties: string[];
   undefinedProperties: string[];
+  valueFormatProperties: string[];
   otherReason: string | null;
   delta: number | null;
 };
@@ -369,34 +375,54 @@ export type CompressedRoundHistoryEntry = {
 // history[0] is the most recent round (useChecklistItemRoundHistory walks
 // carried_from_item_id backward), so each entry's delta compares against the
 // NEXT entry in the array — the round that came chronologically before it.
-export function compressRoundHistory(history: RoundHistoryEntry[]): CompressedRoundHistoryEntry[] {
+export function compressRoundHistory(
+  history: RoundHistoryEntry[],
+  propertyNameById = new Map<string, string>(),
+): CompressedRoundHistoryEntry[] {
   const counts = history.map((h) => {
     const lines = parseReasonLines(h.reasoning);
+    const semanticProperties = [...aiFailedTaxonomyPropertyIds(h.evidence)].map(
+      (id) => propertyNameById.get(id) ?? id,
+    );
     return {
+      missingProperties: lines.filter((l) => l.kind === "missing_required").map((l) => l.property),
       typeMismatchProperties: lines
         .filter((l) => l.kind === "type_mismatch")
         .map((l) => l.property),
       undefinedProperties: lines
         .filter((l) => l.kind === "undefined_property")
         .map((l) => l.property),
+      valueFormatProperties: [
+        ...lines.filter((l) => l.kind === "value_mismatch").map((l) => l.property),
+        ...semanticProperties,
+      ].filter((property, index, all) => all.indexOf(property) === index),
       lines,
     };
   });
   return history.map((h, i) => {
     const current = counts[i];
     const structuredCount =
-      current.typeMismatchProperties.length + current.undefinedProperties.length;
+      current.missingProperties.length +
+      current.typeMismatchProperties.length +
+      current.undefinedProperties.length +
+      current.valueFormatProperties.length;
     const otherReason = structuredCount === 0 ? h.reasoning : null;
     const prev = counts[i + 1];
     const delta =
       prev === undefined
         ? null
-        : structuredCount - (prev.typeMismatchProperties.length + prev.undefinedProperties.length);
+        : structuredCount -
+          (prev.missingProperties.length +
+            prev.typeMismatchProperties.length +
+            prev.undefinedProperties.length +
+            prev.valueFormatProperties.length);
     return {
       roundNumber: h.roundNumber,
       finalStatus: h.finalStatus,
+      missingProperties: current.missingProperties,
       typeMismatchProperties: current.typeMismatchProperties,
       undefinedProperties: current.undefinedProperties,
+      valueFormatProperties: current.valueFormatProperties,
       otherReason,
       delta,
     };

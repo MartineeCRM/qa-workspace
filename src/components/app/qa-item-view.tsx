@@ -133,7 +133,10 @@ export function QaItemView({
           .sort((a, b) => b.occurred_at.localeCompare(a.occurred_at))
           .map((e) => e.raw_properties)
       : [];
-  const compressedHistory = compressRoundHistory(history);
+  const compressedHistory = compressRoundHistory(
+    history,
+    new Map(eventProperties.map((property) => [property.id, property.technical_name])),
+  );
 
   const orderedIds = checklistItems.map((i) => i.id);
 
@@ -355,7 +358,16 @@ export function QaItemView({
             <ul>
               {compressedHistory.map((h) => {
                 const open = openRounds[h.roundNumber] ?? false;
-                const total = h.typeMismatchProperties.length + h.undefinedProperties.length;
+                const categories = [
+                  { label: "필수 누락", properties: h.missingProperties, tone: "red" },
+                  { label: "미정의", properties: h.undefinedProperties, tone: "amber" },
+                  { label: "타입", properties: h.typeMismatchProperties, tone: "red" },
+                  { label: "값·형식", properties: h.valueFormatProperties, tone: "red" },
+                ] as const;
+                const total = categories.reduce(
+                  (count, category) => count + category.properties.length,
+                  0,
+                );
                 return (
                   <li key={h.roundNumber} className="border-b border-[#f4f6f9] last:border-b-0">
                     <button
@@ -383,16 +395,21 @@ export function QaItemView({
                         </span>
                       </span>
                       <span className="flex min-w-0 flex-wrap items-center gap-1.5">
-                        {h.typeMismatchProperties.length > 0 ? (
-                          <span className="whitespace-nowrap rounded-md border border-[#f4d0d0] bg-[#fdecec] px-1.5 py-0.5 text-[11px] font-semibold text-[#dc2626]">
-                            타입 불일치 {h.typeMismatchProperties.length}
-                          </span>
-                        ) : null}
-                        {h.undefinedProperties.length > 0 ? (
-                          <span className="whitespace-nowrap rounded-md border border-[#f0dfc0] bg-[#fdf3e3] px-1.5 py-0.5 text-[11px] font-semibold text-[#b45309]">
-                            미정의 {h.undefinedProperties.length}
-                          </span>
-                        ) : null}
+                        {categories.map((category) =>
+                          category.properties.length > 0 ? (
+                            <span
+                              key={category.label}
+                              className={cn(
+                                "whitespace-nowrap rounded-md border px-1.5 py-0.5 text-[11px] font-semibold",
+                                category.tone === "amber"
+                                  ? "border-[#f0dfc0] bg-[#fdf3e3] text-[#b45309]"
+                                  : "border-[#f4d0d0] bg-[#fdecec] text-[#dc2626]",
+                              )}
+                            >
+                              {category.label} {category.properties.length}
+                            </span>
+                          ) : null,
+                        )}
                         {total === 0 && h.otherReason ? (
                           <span className="truncate text-[12px] text-[#4a5666]">
                             {h.otherReason}
@@ -418,40 +435,25 @@ export function QaItemView({
                     </button>
                     {open && total > 0 ? (
                       <div className="space-y-2 px-4 pb-3 pl-[64px]">
-                        {h.typeMismatchProperties.length > 0 ? (
-                          <div>
-                            <p className="text-[11.5px] font-semibold text-[#64748b]">
-                              타입 불일치
-                            </p>
-                            <div className="mt-1 flex flex-wrap gap-1.5">
-                              {h.typeMismatchProperties.map((p) => (
-                                <code
-                                  key={p}
-                                  className="mono-token rounded-md border border-[#eef1f5] bg-[#f6f8fa] px-1.5 py-0.5 text-[11.5px] text-[#4a5666]"
-                                >
-                                  {p}
-                                </code>
-                              ))}
+                        {categories.map((category) =>
+                          category.properties.length > 0 ? (
+                            <div key={category.label}>
+                              <p className="text-[11.5px] font-semibold text-[#64748b]">
+                                {category.label}
+                              </p>
+                              <div className="mt-1 flex flex-wrap gap-1.5">
+                                {category.properties.map((property) => (
+                                  <code
+                                    key={property}
+                                    className="mono-token rounded-md border border-[#eef1f5] bg-[#f6f8fa] px-1.5 py-0.5 text-[11.5px] text-[#4a5666]"
+                                  >
+                                    {property}
+                                  </code>
+                                ))}
+                              </div>
                             </div>
-                          </div>
-                        ) : null}
-                        {h.undefinedProperties.length > 0 ? (
-                          <div>
-                            <p className="text-[11.5px] font-semibold text-[#64748b]">
-                              미정의 프로퍼티
-                            </p>
-                            <div className="mt-1 flex flex-wrap gap-1.5">
-                              {h.undefinedProperties.map((p) => (
-                                <code
-                                  key={p}
-                                  className="mono-token rounded-md border border-[#eef1f5] bg-[#f6f8fa] px-1.5 py-0.5 text-[11.5px] text-[#4a5666]"
-                                >
-                                  {p}
-                                </code>
-                              ))}
-                            </div>
-                          </div>
-                        ) : null}
+                          ) : null,
+                        )}
                       </div>
                     ) : null}
                   </li>

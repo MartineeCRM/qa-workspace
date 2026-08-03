@@ -659,7 +659,7 @@ describe("parseReasonLines", () => {
       },
       {
         property: "membership_grade",
-        kind: "other",
+        kind: "value_mismatch",
         reason: "허용된 값(GOLD, SILVER) 중이 아닙니다",
       },
     ]);
@@ -716,6 +716,31 @@ describe("compressRoundHistory", () => {
     expect(entry.otherReason).toBe("AI가 판단한 자유 서술 사유");
     expect(entry.typeMismatchProperties).toEqual([]);
     expect(entry.undefinedProperties).toEqual([]);
+  });
+
+  it("uses the same missing, undefined, type, and value-format categories as the current result", () => {
+    const [entry] = compressRoundHistory(
+      [
+        {
+          roundNumber: 2,
+          reasoning: [
+            "missing: 필수 프로퍼티가 로그에 없습니다",
+            "unknown: 택소노미에 정의되지 않은 프로퍼티입니다",
+            "typed: 타입이 string이어야 하는데 number입니다",
+            "enumed: 허용된 값(GOLD) 중이 아닙니다",
+          ].join("\n"),
+          evidence: {
+            qualitative: [{ rule_id: "taxonomy-property:p5", verdict: "failed" }],
+          },
+          finalStatus: "failed",
+        },
+      ],
+      new Map([["p5", "formatted"]]),
+    );
+    expect(entry.missingProperties).toEqual(["missing"]);
+    expect(entry.undefinedProperties).toEqual(["unknown"]);
+    expect(entry.typeMismatchProperties).toEqual(["typed"]);
+    expect(entry.valueFormatProperties).toEqual(["enumed", "formatted"]);
   });
 });
 
