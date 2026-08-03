@@ -27,7 +27,11 @@ import {
   type QaChecklistItemResult,
   type QaSession,
 } from "@/lib/qa-rounds-queries";
-import { useAddDiscoveredEventProperty, useTaxonomyCustomAttributes, useTaxonomyEvents } from "@/lib/queries";
+import {
+  useAddDiscoveredEventProperty,
+  useTaxonomyCustomAttributes,
+  useTaxonomyEvents,
+} from "@/lib/queries";
 
 const VERDICT_STYLE = {
   passed: { border: "#cfe8d8", bg: "#f2faf5", fg: "#16a34a" },
@@ -98,7 +102,9 @@ export function QaItemView({
       : [],
   );
   const unknownEventProperties =
-    item.target_type === "event" && result?.judged_by === "rule" && Array.isArray(result?.ai_evidence)
+    item.target_type === "event" &&
+    result?.judged_by === "rule" &&
+    Array.isArray(result?.ai_evidence)
       ? (
           result.ai_evidence as Array<{
             property: string;
@@ -158,7 +164,11 @@ export function QaItemView({
           const highlighted = violatingProperties.has(k);
           return (
             <div key={k} className="pl-4">
-              <span className={highlighted ? "rounded-sm bg-[#4a3f00] px-0.5 text-[#f2d675]" : undefined}>
+              <span
+                className={
+                  highlighted ? "rounded-sm bg-[#4a3f00] px-0.5 text-[#f2d675]" : undefined
+                }
+              >
                 {JSON.stringify(k)}: {JSON.stringify(v)}
               </span>
               {i < entries.length - 1 ? "," : ""}
@@ -377,12 +387,8 @@ export function QaItemView({
                           items: [
                             {
                               id: item.id,
-                              qa_session_id: item.qa_session_id,
-                              target_type: item.target_type,
-                              target_id: item.target_id,
                             },
                           ],
-                          userId: user.id,
                           assigneeId: null,
                         },
                         { onSuccess: () => toast.success("다음 라운드로 이월했어요") },
@@ -390,7 +396,7 @@ export function QaItemView({
                       return;
                     }
                     setDisposition.mutate(
-                      { itemId: item.id, disposition: option.value, userId: user.id },
+                      { itemId: item.id, disposition: option.value },
                       { onSuccess: () => toast.success("처리 상태를 반영했어요") },
                     );
                   }}
@@ -430,25 +436,17 @@ export function QaItemView({
                   disabled={!user || !commentBody.trim() || addComment.isPending}
                   onClick={() => {
                     if (!user || !commentBody.trim()) return;
-                    addComment.mutate(
-                      {
-                        userId: user.id,
-                        body: commentBody.trim(),
-                        discussionId: discussion?.id ?? null,
+                    addComment.mutate(commentBody.trim(), {
+                      onSuccess: () => {
+                        setCommentBody("");
+                        if (item.disposition === "unresolved" && user) {
+                          setDisposition.mutate({
+                            itemId: item.id,
+                            disposition: "discussing",
+                          });
+                        }
                       },
-                      {
-                        onSuccess: () => {
-                          setCommentBody("");
-                          if (item.disposition === "unresolved" && user) {
-                            setDisposition.mutate({
-                              itemId: item.id,
-                              disposition: "discussing",
-                              userId: user.id,
-                            });
-                          }
-                        },
-                      },
-                    );
+                    });
                   }}
                 >
                   코멘트 남기기

@@ -482,16 +482,14 @@ export function useSetDisposition(sessionId: string) {
     mutationFn: async ({
       itemId,
       disposition,
-      userId,
     }: {
       itemId: string;
       disposition: "passed_override" | "discussing";
-      userId: string;
     }) => {
-      const { error } = await db
-        .from("qa_round_checklist_items")
-        .update({ disposition, disposed_by: userId, disposed_at: new Date().toISOString() })
-        .eq("id", itemId);
+      const { error } = await db.rpc("set_qa_checklist_disposition", {
+        _item_id: itemId,
+        _disposition: disposition,
+      });
       if (error) throw error;
     },
     onSuccess: () => {
@@ -505,112 +503,17 @@ export function useCarryOverItems(environmentId: string) {
   return useMutation({
     mutationFn: async ({
       items,
-      userId,
       assigneeId,
     }: {
-      items: Array<{
-        id: string;
-        qa_session_id: string;
-        target_type: "event" | "custom_attribute";
-        target_id: string;
-      }>;
-      userId: string;
+      items: Array<{ id: string }>;
       assigneeId: string | null;
     }) => {
       if (items.length === 0) return;
-      const sessionId = items[0].qa_session_id;
-
-      const { data: session, error: sessionError } = await db
-        .from("qa_sessions")
-        .select("qa_round_id")
-        .eq("id", sessionId)
-        .single();
-      if (sessionError) throw sessionError;
-
-      const { data: round, error: roundError } = await db
-        .from("qa_rounds")
-        .select("qa_environment_id, project_id, round_number")
-        .eq("id", session.qa_round_id)
-        .single();
-      if (roundError) throw roundError;
-
-      const { data: existingNextRound, error: nextRoundError } = await db
-        .from("qa_rounds")
-        .select("id")
-        .eq("qa_environment_id", round.qa_environment_id)
-        .eq("round_number", round.round_number + 1)
-        .maybeSingle();
-      if (nextRoundError) throw nextRoundError;
-
-      let nextRoundId: string = existingNextRound?.id;
-      if (!nextRoundId) {
-        const { data: createdRound, error: createRoundError } = await db
-          .from("qa_rounds")
-          .insert({
-            project_id: round.project_id,
-            qa_environment_id: round.qa_environment_id,
-            round_number: round.round_number + 1,
-            previous_round_id: session.qa_round_id,
-            started_by: userId,
-          })
-          .select()
-          .single();
-        if (createRoundError) throw createRoundError;
-        nextRoundId = createdRound.id;
-      }
-
-      // qa_sessions_round_name_uq (qa_round_id, name) makes this atomic: concurrent
-      // carry-overs racing to create the "이월 항목" session for the same round will
-      // converge on a single row instead of splitting items across duplicates.
-      // ignoreDuplicates (DO NOTHING) is required here instead of the default merge
-      // (DO UPDATE): without it, every re-run against an already-existing session would
-      // silently overwrite started_by to whoever's carry-over ran most recently,
-      // clobbering the original creator's id. DO NOTHING means Postgres's RETURNING
-      // clause omits the row when it already existed, so we can't chain .select() on
-      // the upsert itself — instead we fetch the id with a separate plain select
-      // afterward, which the unique constraint guarantees will find the row either way.
-      const { error: nextSessionError } = await db
-        .from("qa_sessions")
-        .upsert(
-          { qa_round_id: nextRoundId, name: "이월 항목", started_by: userId },
-          { onConflict: "qa_round_id,name", ignoreDuplicates: true },
-        );
-      if (nextSessionError) throw nextSessionError;
-
-      const { data: nextSession, error: nextSessionFetchError } = await db
-        .from("qa_sessions")
-        .select("id")
-        .eq("qa_round_id", nextRoundId)
-        .eq("name", "이월 항목")
-        .single();
-      if (nextSessionFetchError) throw nextSessionFetchError;
-      const nextSessionId: string = nextSession.id;
-
-      const rows = items.map((item) => ({
-        qa_session_id: nextSessionId,
-        target_type: item.target_type,
-        target_id: item.target_id,
-        carried_from_item_id: item.id,
-        assigned_to: assigneeId,
-      }));
-      const { error: insertError } = await db.from("qa_round_checklist_items").upsert(rows, {
-        onConflict: "qa_session_id,target_type,target_id",
-        ignoreDuplicates: true,
+      const { error } = await db.rpc("carry_over_qa_checklist_items", {
+        _item_ids: items.map((item) => item.id),
+        _assignee_id: assigneeId,
       });
-      if (insertError) throw insertError;
-
-      const { error: dispositionError } = await db
-        .from("qa_round_checklist_items")
-        .update({
-          disposition: "carried_over",
-          disposed_by: userId,
-          disposed_at: new Date().toISOString(),
-        })
-        .in(
-          "id",
-          items.map((i) => i.id),
-        );
-      if (dispositionError) throw dispositionError;
+      if (error) throw error;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["qa-checklist-items"] });
@@ -722,29 +625,12 @@ export function useAdoptCarryOverItems(sessionId: string) {
 export function useAddDiscussionComment(resultId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({
-      userId,
-      body,
-      discussionId,
-    }: {
-      userId: string;
-      body: string;
-      discussionId: string | null;
-    }) => {
-      let id = discussionId;
-      if (!id) {
-        const { data, error } = await db
-          .from("qa_discussions")
-          .insert({ checklist_item_result_id: resultId, created_by: userId })
-          .select()
-          .single();
-        if (error) throw error;
-        id = data.id;
-      }
-      const { error: commentError } = await db
-        .from("qa_discussion_comments")
-        .insert({ discussion_id: id, author_id: userId, body });
-      if (commentError) throw commentError;
+    mutationFn: async (body: string) => {
+      const { error } = await db.rpc("add_qa_discussion_comment", {
+        _result_id: resultId,
+        _body: body,
+      });
+      if (error) throw error;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["qa-discussion", resultId] });

@@ -408,7 +408,7 @@ export type Database = {
           {
             foreignKeyName: "qa_discussions_checklist_item_result_id_fkey";
             columns: ["checklist_item_result_id"];
-            isOneToOne: false;
+            isOneToOne: true;
             referencedRelation: "qa_checklist_item_results";
             referencedColumns: ["id"];
           },
@@ -545,32 +545,68 @@ export type Database = {
       };
       qa_round_checklist_items: {
         Row: {
+          assigned_to: string | null;
+          carried_from_item_id: string | null;
           created_at: string;
+          disposed_at: string | null;
+          disposed_by: string | null;
+          disposition: string;
           id: string;
-          qa_round_id: string;
+          qa_session_id: string;
           target_id: string;
           target_type: string;
         };
         Insert: {
+          assigned_to?: string | null;
+          carried_from_item_id?: string | null;
           created_at?: string;
+          disposed_at?: string | null;
+          disposed_by?: string | null;
+          disposition?: string;
           id?: string;
-          qa_round_id: string;
+          qa_session_id: string;
           target_id: string;
           target_type: string;
         };
         Update: {
+          assigned_to?: string | null;
+          carried_from_item_id?: string | null;
           created_at?: string;
+          disposed_at?: string | null;
+          disposed_by?: string | null;
+          disposition?: string;
           id?: string;
-          qa_round_id?: string;
+          qa_session_id?: string;
           target_id?: string;
           target_type?: string;
         };
         Relationships: [
           {
-            foreignKeyName: "qa_round_checklist_items_qa_round_id_fkey";
-            columns: ["qa_round_id"];
+            foreignKeyName: "qa_round_checklist_items_assigned_to_fkey";
+            columns: ["assigned_to"];
             isOneToOne: false;
-            referencedRelation: "qa_rounds";
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "qa_round_checklist_items_carried_from_item_id_fkey";
+            columns: ["carried_from_item_id"];
+            isOneToOne: false;
+            referencedRelation: "qa_round_checklist_items";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "qa_round_checklist_items_disposed_by_fkey";
+            columns: ["disposed_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "qa_round_checklist_items_qa_session_id_fkey";
+            columns: ["qa_session_id"];
+            isOneToOne: false;
+            referencedRelation: "qa_sessions";
             referencedColumns: ["id"];
           },
         ];
@@ -1239,6 +1275,14 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      add_qa_discussion_comment: {
+        Args: { _body: string; _result_id: string };
+        Returns: string;
+      };
+      carry_over_qa_checklist_items: {
+        Args: { _assignee_id?: string | null; _item_ids: string[] };
+        Returns: { round_id: string; session_id: string }[];
+      };
       can_admin_ws: { Args: { _ws: string }; Returns: boolean };
       can_edit_ws: { Args: { _ws: string }; Returns: boolean };
       ensure_profile: {
@@ -1259,6 +1303,10 @@ export type Database = {
         };
       };
       is_ws_member: { Args: { _ws: string }; Returns: boolean };
+      set_qa_checklist_disposition: {
+        Args: { _disposition: string; _item_id: string };
+        Returns: undefined;
+      };
       ws_of_project: { Args: { _p: string }; Returns: string };
       ws_role: { Args: { _ws: string }; Returns: string };
     };
