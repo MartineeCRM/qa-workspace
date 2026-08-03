@@ -821,6 +821,20 @@ export function useUpdateQaIssue(projectId: string) {
   });
 }
 
+export function useDeleteQaIssue(projectId: string, resultId?: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (issueId: string) => {
+      const { error } = await db.from("qa_discussions").delete().eq("id", issueId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      if (resultId) qc.invalidateQueries({ queryKey: ["qa-discussions", resultId] });
+      qc.invalidateQueries({ queryKey: ["project-qa-issues", projectId] });
+    },
+  });
+}
+
 export function useRoundDispositionSummary(roundId: string) {
   return useQuery({
     queryKey: ["qa-round-disposition-summary", roundId],

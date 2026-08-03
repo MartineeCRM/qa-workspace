@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { createFileRoute, Link, useParams } from "@tanstack/react-router";
-import { AlertTriangle, CheckCircle2, Clock3 } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Clock3, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { EmptyState, Panel } from "@/components/app/layout-parts";
@@ -11,6 +11,7 @@ import { useAuth } from "@/lib/auth";
 import { errorMessage, formatDateTime } from "@/lib/domain";
 import {
   useAddDiscussionComment,
+  useDeleteQaIssue,
   useProjectQaIssues,
   useUpdateQaIssue,
 } from "@/lib/qa-rounds-queries";
@@ -35,6 +36,7 @@ function QaIssuesPage() {
   const { data: events = [] } = useTaxonomyEvents(projectId);
   const { data: environments = [] } = useEnvironments(projectId);
   const updateIssue = useUpdateQaIssue(projectId);
+  const deleteIssue = useDeleteQaIssue(projectId);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const eventById = new Map(events.map((event) => [event.id, event]));
   const environmentById = new Map(environments.map((environment) => [environment.id, environment]));
@@ -170,6 +172,26 @@ function QaIssuesPage() {
                       }
                     >
                       오탐·종료
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="text-[#dc2626] hover:text-[#dc2626]"
+                      disabled={deleteIssue.isPending}
+                      onClick={() => {
+                        if (
+                          !window.confirm(
+                            `${event?.technical_name ?? issue.event_id}.${issue.target_label} 이슈와 댓글을 삭제할까요?`,
+                          )
+                        )
+                          return;
+                        deleteIssue.mutate(issue.id, {
+                          onSuccess: () => toast.success("이슈를 삭제했어요"),
+                          onError: (error) => toast.error(errorMessage(error)),
+                        });
+                      }}
+                    >
+                      <Trash2 className="size-4" /> 이슈 삭제
                     </Button>
                   </div>
                 </li>
