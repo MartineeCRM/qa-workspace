@@ -227,6 +227,13 @@ export function QaItemView({
     );
   }
 
+  function passItemOverride() {
+    setDisposition.mutate(
+      { itemId: item.id, disposition: "passed_override" },
+      { onSuccess: () => toast.success("AI 오탐으로 확인해 항목 전체를 통과 처리했어요") },
+    );
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -336,6 +343,7 @@ export function QaItemView({
               aiFailedPropertyIds={aiFailedPropertyIds}
               onReanalyze={reanalyzeAfterTaxonomyChange}
               onCarryOver={carryItemOver}
+              onPassOverride={passItemOverride}
             />
           ) : (
             <div

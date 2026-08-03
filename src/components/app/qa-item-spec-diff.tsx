@@ -79,6 +79,7 @@ export function QaItemSpecDiffTable({
   aiFailedPropertyIds,
   onReanalyze,
   onCarryOver,
+  onPassOverride,
 }: {
   projectId: string;
   eventId: string;
@@ -87,6 +88,7 @@ export function QaItemSpecDiffTable({
   aiFailedPropertyIds: Set<string>;
   onReanalyze: () => Promise<void>;
   onCarryOver: () => void;
+  onPassOverride: () => void;
 }) {
   const { user } = useAuth();
   const updateDataType = useUpdateEventPropertyDataType(projectId);
@@ -379,6 +381,16 @@ export function QaItemSpecDiffTable({
                         >
                           택소노미에서 수정
                         </Link>
+                      ) : null}
+                      {row.verdict === "semantic_mismatch" ? (
+                        <button
+                          type="button"
+                          onClick={onPassOverride}
+                          title="AI 오탐으로 판단하고 이 체크리스트 항목 전체를 통과 처리합니다."
+                          className="rounded-md border border-[#cfe8d8] bg-[#f2faf5] px-2 py-1 text-left text-[11.5px] font-semibold leading-tight text-[#16803c]"
+                        >
+                          AI 오탐 · 항목 통과 처리
+                        </button>
                       ) : null}
                       {actionsFor(row).map((a) => (
                         <button
