@@ -16,7 +16,11 @@ import {
   type QaEnvironment,
 } from "@/lib/queries";
 import { useProjectChecklistCoverageRows } from "@/lib/qa-rounds-queries";
-import { checklistCoverageIssues, environmentChecklistCoverage } from "@/lib/qa-workflow";
+import {
+  checklistCoverageIssues,
+  checklistCoverageItems,
+  environmentChecklistCoverage,
+} from "@/lib/qa-workflow";
 import { formatDateTime } from "@/lib/domain";
 
 export const Route = createFileRoute("/_authenticated/w/$wsId/p/$projectId/")({
@@ -55,12 +59,9 @@ function ProjectOverview() {
   const activeEvents = events.filter((e) => e.is_active).length;
   const activeAttributes = items.length - activeEvents;
 
-  // The new round/session workflow only judges events and custom attributes —
-  // a property's pass/fail is folded into its parent event's structural check,
-  // there's no per-property result row. So the checklist-backed coverage bars
-  // (and the matching "전체 커버리지 항목" stat below) use a narrower item set
-  // than the full taxonomy-size stats above.
-  const checklistItems = items.filter((i) => i.kind !== "property");
+  // See checklistCoverageItems in qa-workflow.ts: the checklist schema only
+  // tracks events/custom attributes, so this is a narrower set than `items`.
+  const checklistItems = checklistCoverageItems(items);
   const itemByKey = new Map(checklistItems.map((i) => [i.key, i]));
   const environmentById = new Map(stages.map((s) => [s.id, s]));
   const issues = checklistCoverageIssues(
@@ -143,13 +144,13 @@ function ProjectOverview() {
       <div className="grid gap-4 lg:grid-cols-2">
         <Panel
           title="팔로업이 필요한 QA 이슈"
-          description="실패했거나 막혀 있는 항목이에요. 위에서부터 처리하면 커버리지가 올라가요."
+          description="실패했거나 논의 중인 항목이에요. 위에서부터 처리하면 커버리지가 올라가요."
         >
           {issues.length === 0 ? (
             <EmptyState
               icon={ShieldCheck}
               title="지금 팔로업할 이슈가 없어요"
-              description="실패나 차단으로 표시된 항목이 생기면 여기에 모여요."
+              description="실패나 논의중으로 표시된 항목이 생기면 여기에 모여요."
             />
           ) : (
             <ul className="divide-y">

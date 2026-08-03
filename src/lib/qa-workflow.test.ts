@@ -5,6 +5,7 @@ import {
   nextChecklistItemId,
   previousChecklistItemId,
   checklistCoverageIssues,
+  checklistCoverageItems,
   checklistTargetKey,
   environmentChecklistCoverage,
   flattenChecklistCoverageRounds,
@@ -414,6 +415,23 @@ describe("latestRoundChecklistRows", () => {
     const result = latestRoundChecklistRows(rows, "env-1");
     expect(result).toHaveLength(1);
     expect(result[0].checklist_item_id).toBe("fresh");
+  });
+});
+
+describe("checklistCoverageItems", () => {
+  it("excludes property-kind items, keeping event and attribute kinds", () => {
+    const items: CoverageItem[] = [
+      { key: "event:ev-1", kind: "event", id: "ev-1", label: "cart_item_added", eventName: null },
+      {
+        key: "property:p-1",
+        kind: "property",
+        id: "p-1",
+        label: "sku",
+        eventName: "cart_item_added",
+      },
+      { key: "attribute:attr-1", kind: "attribute", id: "attr-1", label: "email", eventName: null },
+    ];
+    expect(checklistCoverageItems(items).map((i) => i.kind)).toEqual(["event", "attribute"]);
   });
 });
 

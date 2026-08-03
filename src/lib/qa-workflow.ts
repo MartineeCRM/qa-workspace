@@ -194,6 +194,14 @@ export function latestRoundChecklistRows(
   return [...byTarget.values()];
 }
 
+// The new round/session workflow only judges events and custom attributes — a
+// property's pass/fail is folded into its parent event's structural check,
+// there's no per-property result row. This narrows a taxonomy-derived
+// CoverageItem list down to the subset the checklist schema can actually track.
+export function checklistCoverageItems(items: CoverageItem[]): CoverageItem[] {
+  return items.filter((item) => item.kind !== "property");
+}
+
 export function environmentChecklistCoverage(
   items: CoverageItem[],
   rows: ChecklistCoverageRow[],
