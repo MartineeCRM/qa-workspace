@@ -408,6 +408,7 @@ export type SpecDiffRow = {
   observedType: string;
   observedSample: unknown;
   expectedType: string | null;
+  expectedExample: unknown;
   allowedValues: string[] | null;
   verdict: SpecDiffVerdict;
   typoCandidate: TypoCandidate | null;
@@ -427,6 +428,7 @@ export function buildEventSpecDiffRows(input: {
     data_type: string;
     is_required: boolean;
     allowed_values: string[] | null;
+    example_value: unknown;
   }>;
   // raw_properties from every matched run event in the session, newest first —
   // a property only counts as "observed" once some occurrence actually carried it.
@@ -458,6 +460,7 @@ export function buildEventSpecDiffRows(input: {
       observedType: inferObservedType(observedValue),
       observedSample: observedValue,
       expectedType: prop.data_type,
+      expectedExample: prop.example_value,
       allowedValues: prop.allowed_values,
       verdict,
       typoCandidate: null,
@@ -475,6 +478,7 @@ export function buildEventSpecDiffRows(input: {
         observedType: inferObservedType(raw[key]),
         observedSample: raw[key],
         expectedType: null,
+        expectedExample: undefined,
         allowedValues: null,
         verdict: "undefined_property",
         typoCandidate: findTypoCandidate(key, input.properties),

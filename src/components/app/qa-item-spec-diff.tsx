@@ -85,6 +85,7 @@ export function QaItemSpecDiffTable({
           data_type: p.data_type,
           is_required: p.is_required,
           allowed_values: Array.isArray(p.allowed_values) ? (p.allowed_values as string[]) : null,
+          example_value: p.example_value,
         })),
         rawPropertiesList,
       }),
@@ -256,7 +257,7 @@ export function QaItemSpecDiffTable({
                     )}
                     {row.observedSample !== undefined ? (
                       <p className="mt-0.5 truncate text-[11px] text-[#a3adbb]">
-                        예: {JSON.stringify(row.observedSample)}
+                        수신 값: {JSON.stringify(row.observedSample)}
                       </p>
                     ) : null}
                   </div>
@@ -268,8 +269,12 @@ export function QaItemSpecDiffTable({
                         정의 없음
                       </code>
                     )}
-                    <p className="mt-0.5 text-[11px] text-[#a3adbb]">
-                      {row.expectedType ? "택소노미 정의값" : "스펙에 누락"}
+                    <p className="mt-0.5 truncate text-[11px] text-[#a3adbb]">
+                      {!row.expectedType
+                        ? "스펙에 누락"
+                        : row.expectedExample !== null && row.expectedExample !== undefined
+                          ? `예: ${JSON.stringify(row.expectedExample)}`
+                          : "예시값 없음 · 택소노미에 추가해주세요"}
                     </p>
                   </div>
                   <div>
