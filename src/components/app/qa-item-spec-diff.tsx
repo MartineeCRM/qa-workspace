@@ -294,7 +294,7 @@ export function QaItemSpecDiffTable({
       }
     >
       <div className="overflow-x-auto">
-        <div className="grid min-w-[800px] grid-cols-[minmax(150px,1fr)_minmax(155px,1fr)_minmax(180px,1.15fr)_minmax(72px,0.55fr)_minmax(145px,0.8fr)] gap-4 bg-[#fbfcfd] px-4 py-2.5 text-[11.5px] font-semibold tracking-wide text-[#64748b]">
+        <div className="grid min-w-[760px] grid-cols-[minmax(140px,1fr)_minmax(150px,1fr)_minmax(160px,1.1fr)_minmax(68px,0.5fr)_minmax(125px,0.65fr)] gap-4 bg-[#fbfcfd] px-4 py-2.5 text-[11.5px] font-semibold tracking-wide text-[#64748b]">
           <div>프로퍼티</div>
           <div>AS-IS · 실제 수신</div>
           <div>TO-BE · 택소노미 정의</div>
@@ -303,11 +303,11 @@ export function QaItemSpecDiffTable({
         </div>
 
         {shown.length === 0 ? (
-          <p className="min-w-[800px] px-4 py-6 text-center text-[12.5px] text-[#8b97a8]">
+          <p className="min-w-[760px] px-4 py-6 text-center text-[12.5px] text-[#8b97a8]">
             이 필터에 해당하는 프로퍼티가 없어요.
           </p>
         ) : (
-          <ul className="min-w-[800px]">
+          <ul className="min-w-[760px]">
             {shown.map((row) => {
               const chosen = fixes[row.name] ?? null;
               const badge = verdictBadge(row.verdict);
@@ -320,7 +320,7 @@ export function QaItemSpecDiffTable({
                   key={row.name}
                   className={cn("border-b border-[#f4f6f9]", chosen ? "bg-[#fbfdfb]" : "bg-white")}
                 >
-                  <div className="grid grid-cols-[minmax(150px,1fr)_minmax(155px,1fr)_minmax(180px,1.15fr)_minmax(72px,0.55fr)_minmax(145px,0.8fr)] items-start gap-4 px-4 py-3">
+                  <div className="grid grid-cols-[minmax(140px,1fr)_minmax(150px,1fr)_minmax(160px,1.1fr)_minmax(68px,0.5fr)_minmax(125px,0.65fr)] items-start gap-4 px-4 py-3">
                     <div className="min-w-0">
                       <code className="mono-token break-all text-[12.5px]">{row.name}</code>
                       {row.typoCandidate ? (
