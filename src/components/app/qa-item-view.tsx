@@ -78,19 +78,23 @@ function extractAiSummary(evidence: unknown): string | null {
 }
 
 function AiSummaryText({ text }: { text: string }) {
-  const parts = text.split(/(`[^`]+`)/g);
+  const sentences = text.split(/(?<=\.)\s+/).filter(Boolean);
   return (
-    <p className="mt-3 text-pretty text-[13px] leading-[1.7] text-[#3c4757]">
-      {parts.map((part, index) =>
-        part.startsWith("`") && part.endsWith("`") ? (
-          <code key={index} className="font-mono text-[12.5px]">
-            {part.slice(1, -1)}
-          </code>
-        ) : (
-          part
-        ),
-      )}
-    </p>
+    <div className="mt-3 space-y-1 text-pretty text-[13px] leading-[1.7] text-[#3c4757]">
+      {sentences.map((sentence, sentenceIndex) => (
+        <p key={sentenceIndex}>
+          {sentence.split(/(`[^`]+`)/g).map((part, partIndex) =>
+            part.startsWith("`") && part.endsWith("`") ? (
+              <code key={partIndex} className="font-mono text-[12.5px]">
+                {part.slice(1, -1)}
+              </code>
+            ) : (
+              part
+            ),
+          )}
+        </p>
+      ))}
+    </div>
   );
 }
 
@@ -383,18 +387,22 @@ export function QaItemView({
 
       <div className="flex flex-wrap items-start gap-4">
         <div className="min-w-0 flex-[1_1_660px] space-y-4">
-          <section className="overflow-hidden rounded-[14px] border border-[#e3e8ef] bg-white">
-            <header className="flex items-center gap-2.5 border-b border-[#eef1f5] px-5 py-3.5">
-              <h3 className="text-[14px] font-bold tracking-[-0.2px]">판정 요약</h3>
-              <span
-                className="rounded-full px-2.5 py-[3px] text-[11px] font-bold"
-                style={{ color: verdictStyle.fg, backgroundColor: verdictStyle.bg }}
-              >
-                {verdictLabel}
+          <Panel
+            className="overflow-hidden"
+            title={
+              <span className="flex items-center gap-2.5">
+                <span>판정 요약</span>
+                <span
+                  className="rounded-full px-2.5 py-[3px] text-[11px] font-bold"
+                  style={{ color: verdictStyle.fg, backgroundColor: verdictStyle.bg }}
+                >
+                  {verdictLabel}
+                </span>
               </span>
-            </header>
+            }
+          >
             <div className="@container grid grid-cols-[repeat(auto-fit,minmax(min(360px,100%),1fr))]">
-              <div className="border-b border-[#eef1f5] px-5 pb-[18px] pt-4 @[720px]:border-b-0 @[720px]:border-r">
+              <div className="border-b px-5 pb-[18px] pt-4 @[720px]:border-b-0 @[720px]:border-r">
                 <div className="flex items-center gap-2">
                   <span className="size-1.5 rounded-[2px] bg-[#8b97a8]" />
                   <h4 className="text-[12.5px] font-bold">Rule based 분석</h4>
@@ -419,7 +427,7 @@ export function QaItemView({
                   ))}
                 </div>
               </div>
-              <div className="bg-[#fdfbf9] px-5 pb-[18px] pt-4">
+              <div className="px-5 pb-[18px] pt-4">
                 <div className="flex items-center gap-2">
                   <span className="size-1.5 rounded-full bg-[#b45309]" />
                   <h4 className="text-[12.5px] font-bold">AI 분석</h4>
@@ -431,7 +439,7 @@ export function QaItemView({
                 )}
               </div>
             </div>
-          </section>
+          </Panel>
 
           <Panel
             title="근거 로그"
