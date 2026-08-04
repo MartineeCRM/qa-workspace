@@ -120,8 +120,8 @@ describe("buildMergedTimeline", () => {
       status: "captured",
       payload: { cart_item_count: 0 },
       previous_snapshot_id: null,
-      requested_at: "2026-07-31T22:03:00Z",
-      captured_at: "2026-07-31T22:03:11Z",
+      requested_at: "2026-07-31T13:03:00Z",
+      captured_at: "2026-07-31T13:03:11Z",
     },
     {
       id: "sn2",
@@ -131,8 +131,8 @@ describe("buildMergedTimeline", () => {
       status: "captured",
       payload: { cart_item_count: 1 },
       previous_snapshot_id: "sn1",
-      requested_at: "2026-07-31T22:06:40Z",
-      captured_at: "2026-07-31T22:06:52Z",
+      requested_at: "2026-07-31T13:06:40Z",
+      captured_at: "2026-07-31T13:06:52Z",
     },
   ];
 

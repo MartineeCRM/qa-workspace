@@ -129,6 +129,13 @@ function isSameValue(before: unknown, after: unknown): boolean {
   return JSON.stringify(before) === JSON.stringify(after);
 }
 
+const KST_OFFSET_MS = 9 * 60 * 60 * 1_000;
+
+function mergedTimelineSortTime(row: MergedTimelineRow): number {
+  const time = Date.parse(row.occurredAt);
+  return time + (row.source === "snapshot" ? KST_OFFSET_MS : 0);
+}
+
 export function buildMergedTimeline(
   runEvents: QaRunEvent[],
   snapshots: QaAttributeSnapshot[],
@@ -168,7 +175,9 @@ export function buildMergedTimeline(
     }
   });
 
-  return [...snapshotRows, ...eventRows].sort((a, b) => a.occurredAt.localeCompare(b.occurredAt));
+  return [...snapshotRows, ...eventRows].sort(
+    (a, b) => mergedTimelineSortTime(a) - mergedTimelineSortTime(b),
+  );
 }
 
 export function nextChecklistItemId(orderedIds: string[], currentId: string): string {

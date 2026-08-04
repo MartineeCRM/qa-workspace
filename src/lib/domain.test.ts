@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { formatDate, formatDateTime, formatRawLogTime } from "@/lib/domain";
+import {
+  formatDate,
+  formatDateTime,
+  formatMergedTimelineTime,
+  formatRawLogTime,
+} from "@/lib/domain";
 
 describe("formatDate / formatDateTime", () => {
   it("formats in Asia/Seoul time regardless of the runtime's local timezone", () => {
@@ -34,5 +39,16 @@ describe("formatRawLogTime", () => {
   it("returns a placeholder for missing values", () => {
     expect(formatRawLogTime(null)).toBe("—");
     expect(formatRawLogTime(undefined)).toBe("—");
+  });
+});
+
+describe("formatMergedTimelineTime", () => {
+  it("keeps event wall-clock time but converts snapshot capture time to Korea time", () => {
+    const stored = "2026-08-01T15:12:00.000Z";
+
+    expect(formatMergedTimelineTime("event", stored)).toContain("8. 1.");
+    expect(formatMergedTimelineTime("event", stored)).toContain("3:12");
+    expect(formatMergedTimelineTime("snapshot", stored)).toContain("8. 2.");
+    expect(formatMergedTimelineTime("snapshot", stored)).toContain("12:12");
   });
 });

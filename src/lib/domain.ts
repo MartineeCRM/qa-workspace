@@ -181,6 +181,13 @@ export function formatRawLogTime(value: string | null | undefined) {
   }).format(new Date(value));
 }
 
+export function formatMergedTimelineTime(
+  source: "event" | "snapshot",
+  value: string | null | undefined,
+) {
+  return source === "snapshot" ? formatDateTime(value) : formatRawLogTime(value);
+}
+
 export function formatPercent(value: number) {
   return `${(Math.round(value * 1000) / 10).toFixed(1)}%`;
 }

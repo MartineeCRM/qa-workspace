@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
-import { errorMessage, formatDateTime, formatRawLogTime } from "@/lib/domain";
+import { errorMessage, formatDateTime, formatMergedTimelineTime } from "@/lib/domain";
 import { normalizeFlatAttributeArrays } from "@/lib/checklist-judge";
 import {
   aiFailedTaxonomyPropertyIds,
@@ -263,7 +263,7 @@ export function QaItemView({
   function copyEvidenceLog() {
     const text = evidenceRows
       .map((row) => {
-        const header = `${row.name} | ${row.source === "snapshot" ? "어트리뷰트" : "이벤트"} | ${formatRawLogTime(row.occurredAt)}`;
+        const header = `${row.name} | ${row.source === "snapshot" ? "어트리뷰트" : "이벤트"} | ${formatMergedTimelineTime(row.source, row.occurredAt)}`;
         if (row.source === "event") return `${header}\n${JSON.stringify(row.raw ?? {}, null, 2)}`;
         return `${header} ${row.change}`;
       })
@@ -475,7 +475,9 @@ export function QaItemView({
                             {row.source === "snapshot" ? "어트리뷰트" : "이벤트"}
                           </span>
                           <span className="text-[#6e7681]"> | </span>
-                          <span className="text-[#6e7681]">{formatRawLogTime(row.occurredAt)}</span>
+                          <span className="text-[#6e7681]">
+                            {formatMergedTimelineTime(row.source, row.occurredAt)}
+                          </span>
                           {row.source === "snapshot" ? (
                             <>
                               <span> </span>
