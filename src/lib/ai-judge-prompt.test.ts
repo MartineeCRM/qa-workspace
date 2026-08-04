@@ -60,6 +60,13 @@ describe("buildJudgePrompt", () => {
     expect(prompt).toContain("임의로 기대값에 맞춰 해석하지 마세요");
     expect(prompt).toContain("mismatch_dimensions");
     expect(prompt).toContain("불확실하거나 근거가 부족하면 보수적으로 실패");
+    expect(prompt).toContain("occurred_at은 이벤트 발생 시각");
+    expect(prompt).toContain("captured_at은 스냅샷을 조회한 시각");
+    expect(prompt).toContain("스냅샷 captured_at과 비교하지 마세요");
+    expect(prompt).toContain("명시가 없으면 오름차순과 내림차순 모두 허용");
+    expect(prompt).toContain(
+      "정의되지 않은 시간 관계나 배열 순서 규칙을 새로 만들어 실패시키지 마세요",
+    );
     expect(prompt).toContain("쉬운 한국어로 핵심만 1~2문장");
     expect(prompt).toContain("자세한 분석은 evidence에만 넣으세요");
     expect(prompt).toContain("`referral_source`가 없습니다");
