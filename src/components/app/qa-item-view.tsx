@@ -13,9 +13,9 @@ import { errorMessage, formatDateTime, formatRawLogTime } from "@/lib/domain";
 import { normalizeFlatAttributeArrays } from "@/lib/checklist-judge";
 import {
   aiFailedTaxonomyPropertyIds,
+  buildEventSpecDiffRows,
   buildMergedTimeline,
   compressRoundHistory,
-  groupVerdictReason,
   nextChecklistItemId,
   previousChecklistItemId,
   resolveEvidenceHighlightTone,
@@ -50,51 +50,47 @@ const VERDICT_STYLE = {
   not_collected: { border: "#f0dfc0", bg: "#fdf9f1", fg: "#b45309" },
 } as const;
 
-function VerdictReasonSummary({ reason }: { reason: string }) {
-  const { groups, ungrouped, detailCount } = groupVerdictReason(reason);
-  if (groups.length === 0) {
-    return (
-      <p className="whitespace-pre-line text-[13.5px] leading-[1.7] text-[#3c4757]">{reason}</p>
-    );
-  }
+type RuleCounts = {
+  required: number;
+  undefined: number;
+  type: number;
+  format: number;
+  passed: number;
+};
+
+function extractAiSummary(evidence: unknown): string | null {
+  const nested =
+    evidence && typeof evidence === "object" && !Array.isArray(evidence)
+      ? (evidence as { qualitative?: unknown }).qualitative
+      : evidence;
+  if (!Array.isArray(nested)) return null;
+  const lines = nested
+    .filter(
+      (entry): entry is { verdict: string; reasoning: string } =>
+        Boolean(entry) &&
+        typeof entry === "object" &&
+        (entry as { verdict?: unknown }).verdict === "failed" &&
+        typeof (entry as { reasoning?: unknown }).reasoning === "string",
+    )
+    .map((entry) => entry.reasoning.trim())
+    .filter(Boolean);
+  return lines.length > 0 ? lines.join(" ") : null;
+}
+
+function AiSummaryText({ text }: { text: string }) {
+  const parts = text.split(/(`[^`]+`)/g);
   return (
-    <div className="space-y-2.5">
-      <div className="flex flex-wrap gap-2">
-        {groups.map((group) => {
-          const preview = group.targets.slice(0, 4).join(", ");
-          const remaining = group.targets.length - 4;
-          return (
-            <div
-              key={group.reason}
-              className="min-w-[190px] flex-1 rounded-lg border border-[#e3e8ef] bg-white px-3 py-2.5"
-            >
-              <p className="text-[12.5px] font-semibold text-[#dc2626]">
-                {group.label} {group.targets.length}개
-              </p>
-              <p className="mt-0.5 truncate font-mono text-[11.5px] text-[#64748b]">
-                {preview}
-                {remaining > 0 ? ` 외 ${remaining}개` : ""}
-              </p>
-            </div>
-          );
-        })}
-      </div>
-      {ungrouped.map((line) => (
-        <p key={line} className="text-[13px] leading-[1.65] text-[#3c4757]">
-          {line}
-        </p>
-      ))}
-      <details className="group rounded-lg border border-[#e3e8ef] bg-white">
-        <summary className="cursor-pointer list-none px-3 py-2 text-[12px] font-semibold text-[#64748b] marker:content-none">
-          프로퍼티별 상세 보기 ({detailCount}건)
-          <span className="ml-1 group-open:hidden">↓</span>
-          <span className="ml-1 hidden group-open:inline">↑</span>
-        </summary>
-        <p className="max-h-72 overflow-y-auto whitespace-pre-line border-t border-black/10 px-3 py-2.5 font-mono text-[11.5px] leading-[1.65] text-[#475569]">
-          {reason}
-        </p>
-      </details>
-    </div>
+    <p className="mt-3 text-pretty text-[13px] leading-[1.7] text-[#3c4757]">
+      {parts.map((part, index) =>
+        part.startsWith("`") && part.endsWith("`") ? (
+          <code key={index} className="font-mono text-[12.5px]">
+            {part.slice(1, -1)}
+          </code>
+        ) : (
+          part
+        ),
+      )}
+    </p>
   );
 }
 
@@ -160,11 +156,6 @@ export function QaItemView({
   const verdictStyle = VERDICT_STYLE[finalStatus];
   const verdictLabel =
     finalStatus === "passed" ? "통과" : finalStatus === "failed" ? "오류" : "미발생";
-  const summaryReason =
-    result?.ai_reasoning ??
-    (finalStatus === "passed"
-      ? "택소노미와 검증 규칙에 어긋나는 항목을 찾지 못했어요."
-      : "판단 이유가 없어요.");
   const selectedIssue =
     discussions.find((discussion) => discussion.id === selectedIssueId) ?? discussions[0] ?? null;
 
@@ -207,6 +198,57 @@ export function QaItemView({
           .sort((a, b) => b.occurred_at.localeCompare(a.occurred_at))
           .map((e) => e.raw_properties)
       : [];
+  const summaryDiffRows =
+    item.target_type === "event"
+      ? buildEventSpecDiffRows({
+          properties: thisEventProperties.map((property) => ({
+            id: property.id,
+            technical_name: property.technical_name,
+            data_type: property.data_type,
+            is_required: property.is_required,
+            allowed_values: Array.isArray(property.allowed_values)
+              ? (property.allowed_values as string[])
+              : null,
+            example_value: property.example_value,
+          })),
+          rawPropertiesList: matchedRawPropertiesList,
+          aiFailedPropertyIds,
+        })
+      : [];
+  const ruleCounts: RuleCounts = {
+    required: summaryDiffRows.filter((row) => row.verdict === "missing_required").length,
+    undefined: summaryDiffRows.filter((row) => row.verdict === "undefined_property").length,
+    type: summaryDiffRows.filter((row) => row.verdict === "type_mismatch").length,
+    format: summaryDiffRows.filter(
+      (row) => row.verdict === "value_mismatch" || row.verdict === "semantic_mismatch",
+    ).length,
+    passed:
+      item.target_type === "event"
+        ? summaryDiffRows.filter((row) => row.verdict === "pass").length
+        : finalStatus === "passed"
+          ? 1
+          : 0,
+  };
+  if (item.target_type === "custom_attribute" && finalStatus === "failed") {
+    const structural =
+      result?.ai_evidence &&
+      typeof result.ai_evidence === "object" &&
+      !Array.isArray(result.ai_evidence)
+        ? (result.ai_evidence as { structural?: unknown }).structural
+        : null;
+    const reasons = Array.isArray(structural)
+      ? structural
+          .map((entry) =>
+            entry && typeof entry === "object" ? (entry as { reason?: unknown }).reason : null,
+          )
+          .filter((reason): reason is string => typeof reason === "string")
+      : [];
+    ruleCounts.type = reasons.filter((reason) => reason.startsWith("타입이 ")).length;
+    ruleCounts.format = Math.max(0, reasons.length - ruleCounts.type);
+  }
+  const aiSummary =
+    extractAiSummary(result?.ai_evidence) ??
+    (result?.judged_by === "ai" && result.ai_evidence == null ? result.ai_reasoning : null);
   const compressedHistory = compressRoundHistory(
     history,
     new Map(eventProperties.map((property) => [property.id, property.technical_name])),
@@ -310,19 +352,7 @@ export function QaItemView({
     <div className="space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <div className="flex flex-wrap items-center gap-2.5">
-            <h2 className="mono-token text-xl font-bold">{label ?? item.target_id}</h2>
-            <span
-              className="rounded-full border px-2.5 py-0.5 text-[11px] font-semibold"
-              style={{
-                color: verdictStyle.fg,
-                borderColor: verdictStyle.border,
-                backgroundColor: verdictStyle.bg,
-              }}
-            >
-              {verdictLabel}
-            </span>
-          </div>
+          <h2 className="mono-token text-xl font-bold">{label ?? item.target_id}</h2>
           <p className="mt-1 text-[12.5px] text-[#8b97a8]">
             {item.target_type === "event" ? "이벤트" : "어트리뷰트"} · 마지막 판정{" "}
             {result ? formatDateTime(result.updated_at) : "없음"}
@@ -353,25 +383,55 @@ export function QaItemView({
 
       <div className="flex flex-wrap items-start gap-4">
         <div className="min-w-0 flex-[1_1_660px] space-y-4">
-          <Panel
-            title="판정 요약"
-            description="문제 유형과 핵심 이유만 먼저 확인하세요. 세부 내용은 펼쳐서 볼 수 있어요."
-          >
-            <div className="border-t border-[#eef1f5] px-[18px] py-4">
-              <div className="mb-3 flex flex-wrap items-center gap-2">
-                <span className="text-[11.5px] font-semibold text-[#64748b]">판정 기준</span>
-                <span className="rounded-md bg-[#f1f4f8] px-2 py-1 text-[11.5px] font-semibold text-[#475569]">
-                  {result?.judged_by === "rule" ? "택소노미 규칙" : "택소노미 규칙 + AI"}
-                </span>
-              </div>
-              <div
-                className="rounded-xl border px-4 py-3.5"
-                style={{ borderColor: verdictStyle.border, backgroundColor: verdictStyle.bg }}
+          <section className="overflow-hidden rounded-[14px] border border-[#e3e8ef] bg-white">
+            <header className="flex items-center gap-2.5 border-b border-[#eef1f5] px-5 py-3.5">
+              <h3 className="text-[14px] font-bold tracking-[-0.2px]">판정 요약</h3>
+              <span
+                className="rounded-full px-2.5 py-[3px] text-[11px] font-bold"
+                style={{ color: verdictStyle.fg, backgroundColor: verdictStyle.bg }}
               >
-                <VerdictReasonSummary reason={summaryReason} />
+                {verdictLabel}
+              </span>
+            </header>
+            <div className="@container grid grid-cols-[repeat(auto-fit,minmax(min(360px,100%),1fr))]">
+              <div className="border-b border-[#eef1f5] px-5 pb-[18px] pt-4 @[720px]:border-b-0 @[720px]:border-r">
+                <div className="flex items-center gap-2">
+                  <span className="size-1.5 rounded-[2px] bg-[#8b97a8]" />
+                  <h4 className="text-[12.5px] font-bold">Rule based 분석</h4>
+                </div>
+                <div className="mt-3.5 flex flex-wrap gap-x-6 gap-y-2">
+                  {[
+                    { label: "필수 누락", value: ruleCounts.required, color: "#dc2626" },
+                    { label: "미정의", value: ruleCounts.undefined, color: "#b45309" },
+                    { label: "타입", value: ruleCounts.type, color: "#dc2626" },
+                    { label: "값 형식", value: ruleCounts.format, color: "#dc2626" },
+                    { label: "통과", value: ruleCounts.passed, color: "#16a34a" },
+                  ].map((stat) => (
+                    <div key={stat.label}>
+                      <p className="whitespace-nowrap text-[11.5px] text-[#8b97a8]">{stat.label}</p>
+                      <p
+                        className="mt-0.5 text-[21px] font-bold tabular-nums"
+                        style={{ color: stat.value === 0 ? "#c3ccd8" : stat.color }}
+                      >
+                        {stat.value}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="bg-[#fdfbf9] px-5 pb-[18px] pt-4">
+                <div className="flex items-center gap-2">
+                  <span className="size-1.5 rounded-full bg-[#b45309]" />
+                  <h4 className="text-[12.5px] font-bold">AI 분석</h4>
+                </div>
+                {aiSummary ? (
+                  <AiSummaryText text={aiSummary} />
+                ) : (
+                  <p className="mt-3 text-[13px] leading-[1.7] text-[#a3adbb]">추가 분석 없음</p>
+                )}
               </div>
             </div>
-          </Panel>
+          </section>
 
           <Panel
             title="근거 로그"
