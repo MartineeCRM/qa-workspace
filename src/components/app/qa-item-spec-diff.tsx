@@ -295,12 +295,8 @@ export function QaItemSpecDiffTable({
         </div>
       }
     >
-      {/* Fixed-pixel action/badge columns need real minimum width — on a narrow
-          left column this scrolls internally instead of bleeding into the right
-          column (min-width:0 on the row grid alone isn't enough to fix that; the
-          columns themselves have a floor via minmax(...)). */}
       <div className="overflow-x-auto">
-        <div className="grid min-w-[700px] grid-cols-[minmax(150px,1fr)_minmax(110px,1fr)_minmax(150px,1.2fr)_66px_170px] gap-3 bg-[#fbfcfd] px-4 py-2 text-[11px] tracking-wide text-[#64748b]">
+        <div className="grid min-w-[820px] grid-cols-[minmax(150px,1fr)_minmax(155px,1fr)_minmax(180px,1.15fr)_minmax(72px,0.55fr)_minmax(165px,1fr)] gap-4 bg-[#fbfcfd] px-4 py-2.5 text-[11.5px] font-semibold tracking-wide text-[#64748b]">
           <div>프로퍼티</div>
           <div>AS-IS · 실제 수신</div>
           <div>TO-BE · 택소노미 정의</div>
@@ -309,20 +305,24 @@ export function QaItemSpecDiffTable({
         </div>
 
         {shown.length === 0 ? (
-          <p className="min-w-[700px] px-4 py-6 text-center text-[12.5px] text-[#8b97a8]">
+          <p className="min-w-[820px] px-4 py-6 text-center text-[12.5px] text-[#8b97a8]">
             이 필터에 해당하는 프로퍼티가 없어요.
           </p>
         ) : (
-          <ul className="min-w-[700px]">
+          <ul className="min-w-[820px]">
             {shown.map((row) => {
               const chosen = fixes[row.name] ?? null;
               const badge = verdictBadge(row.verdict);
+              const observedValueHasIssue =
+                row.verdict === "type_mismatch" ||
+                row.verdict === "value_mismatch" ||
+                row.verdict === "semantic_mismatch";
               return (
                 <li
                   key={row.name}
                   className={cn("border-b border-[#f4f6f9]", chosen ? "bg-[#fbfdfb]" : "bg-white")}
                 >
-                  <div className="grid grid-cols-[minmax(150px,1fr)_minmax(110px,1fr)_minmax(150px,1.2fr)_66px_170px] items-start gap-3 px-4 py-2.5">
+                  <div className="grid grid-cols-[minmax(150px,1fr)_minmax(155px,1fr)_minmax(180px,1.15fr)_minmax(72px,0.55fr)_minmax(165px,1fr)] items-start gap-4 px-4 py-3">
                     <div className="min-w-0">
                       <code className="mono-token break-all text-[12.5px]">{row.name}</code>
                       {row.typoCandidate ? (
@@ -337,7 +337,12 @@ export function QaItemSpecDiffTable({
                         row.verdict === "type_mismatch" ? "mismatch" : "as-is",
                       )}
                       {row.observedSample !== undefined ? (
-                        <p className="mt-0.5 truncate text-[11px] text-[#a3adbb]">
+                        <p
+                          className={cn(
+                            "mt-1 break-words text-[12.5px] leading-[1.45]",
+                            observedValueHasIssue ? "font-bold text-[#dc2626]" : "text-[#64748b]",
+                          )}
+                        >
                           수신 값: {JSON.stringify(row.observedSample)}
                         </p>
                       ) : null}
@@ -350,7 +355,7 @@ export function QaItemSpecDiffTable({
                           정의 없음
                         </code>
                       )}
-                      <p className="mt-0.5 truncate text-[11px] text-[#a3adbb]">
+                      <p className="mt-1 break-words text-[12.5px] leading-[1.45] text-[#64748b]">
                         {!row.expectedType
                           ? "스펙에 누락"
                           : row.expectedExample !== null && row.expectedExample !== undefined
