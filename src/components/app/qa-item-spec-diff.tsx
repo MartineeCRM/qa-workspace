@@ -364,7 +364,7 @@ export function QaItemSpecDiffTable({
                     <div>
                       <span
                         className={cn(
-                          "inline-block whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold",
+                          "inline-flex w-[68px] items-center justify-center whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold",
                           badge.className,
                         )}
                       >
