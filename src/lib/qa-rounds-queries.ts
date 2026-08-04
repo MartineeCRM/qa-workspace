@@ -477,6 +477,7 @@ export type QaRunEvent = {
   event_id: string | null;
   raw_event_name: string;
   occurred_at: string;
+  created_at: string;
   external_user_id: string;
   raw_properties: Record<string, unknown>;
 };

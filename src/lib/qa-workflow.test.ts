@@ -106,6 +106,7 @@ describe("buildMergedTimeline", () => {
       event_id: "ev1",
       raw_event_name: "cart_item_added",
       occurred_at: "2026-07-31T22:05:18Z",
+      created_at: "2026-07-31T22:07:00Z",
       external_user_id: "u1",
       raw_properties: { sku: "A-2213", qty: 1 },
     },

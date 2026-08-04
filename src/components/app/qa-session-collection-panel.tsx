@@ -61,10 +61,13 @@ export function QaSessionCollectionPanel({
       })),
     ];
     if (runEvents.length > 0) {
-      const latest = runEvents[runEvents.length - 1];
+      const latestUploadTime = runEvents.reduce(
+        (latest, event) => (event.created_at > latest ? event.created_at : latest),
+        runEvents[0].created_at,
+      );
       entries.push({
         key: "csv",
-        time: latest.occurred_at,
+        time: latestUploadTime,
         title: "CSV 업로드",
         desc: `${runEvents.length}행`,
         tag: "CSV",
@@ -211,7 +214,8 @@ export function QaSessionCollectionPanel({
           {session.ended_at ? "수집 완료 표시됨" : "수집 완료로 표시"}
         </Button>
         <p className="mt-1.5 text-center text-[11px] text-[#8b97a8]">
-          분석은 CSV를 올리는 즉시 언제든 돌릴 수 있어요 — 이건 이 세션의 수집이 끝났다는 표시일 뿐이에요.
+          분석은 CSV를 올리는 즉시 언제든 돌릴 수 있어요 — 이건 이 세션의 수집이 끝났다는 표시일
+          뿐이에요.
         </p>
       </div>
     </Panel>
