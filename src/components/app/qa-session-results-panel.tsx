@@ -1,10 +1,8 @@
 import { Link } from "@tanstack/react-router";
-import { toast } from "sonner";
 import { Panel } from "@/components/app/layout-parts";
-import { Button } from "@/components/ui/button";
-import { useAuth } from "@/lib/auth";
-import { useCarryOverItems, useQaChecklistItems, type QaSession } from "@/lib/qa-rounds-queries";
+import { useQaChecklistItems, type QaSession } from "@/lib/qa-rounds-queries";
 import { useTaxonomyCustomAttributes, useTaxonomyEvents } from "@/lib/queries";
+import { compactVerdictReason } from "@/lib/qa-workflow";
 
 function verdictBadge(finalStatus: "passed" | "failed" | "not_collected") {
   const map = {
@@ -23,38 +21,16 @@ function verdictBadge(finalStatus: "passed" | "failed" | "not_collected") {
   );
 }
 
-function dispositionBadge(disposition: string) {
-  const map: Record<string, { label: string; bg: string; fg: string }> = {
-    unresolved: { label: "미처리", bg: "#f1f4f8", fg: "#64748b" },
-    passed_override: { label: "통과 처리", bg: "#f2faf5", fg: "#16a34a" },
-    carried_over: { label: "다음 차수 이월", bg: "#eef0fb", fg: "#5b5fc7" },
-    discussing: { label: "논의 중", bg: "#fdf9f1", fg: "#b45309" },
-  };
-  const style = map[disposition] ?? map.unresolved;
-  return (
-    <span
-      className="rounded-full px-2 py-0.5 text-[11px] font-semibold"
-      style={{ backgroundColor: style.bg, color: style.fg }}
-    >
-      {style.label}
-    </span>
-  );
-}
-
 export function QaSessionResultsPanel({
   projectId,
-  environmentId,
   session,
 }: {
   projectId: string;
-  environmentId: string;
   session: QaSession;
 }) {
-  const { user } = useAuth();
   const { data: events = [] } = useTaxonomyEvents(projectId);
   const { data: customAttributes = [] } = useTaxonomyCustomAttributes(projectId);
   const { data: checklistItems = [] } = useQaChecklistItems(session.id);
-  const carryOver = useCarryOverItems(environmentId);
 
   function itemLabel(targetType: "event" | "custom_attribute", targetId: string): string {
     const label =
@@ -64,56 +40,41 @@ export function QaSessionResultsPanel({
     return label ?? targetId;
   }
 
-  const unresolvedFailures = checklistItems.filter((item) => {
-    const finalStatus = item.qa_checklist_item_results[0]?.final_status ?? "not_collected";
-    return item.disposition === "unresolved" && finalStatus !== "passed";
-  });
-
   return (
     <Panel
       title="판정 결과"
-      description="항목을 누르면 로그 페이지로 이동해 논의·처리할 수 있어요"
-      actions={
-        unresolvedFailures.length > 0 ? (
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={!user || carryOver.isPending}
-            onClick={() =>
-              user &&
-              carryOver.mutate(
-                {
-                  items: unresolvedFailures.map((i) => ({
-                    id: i.id,
-                  })),
-                  assigneeId: null,
-                },
-                { onSuccess: () => toast.success("다음 차수로 이월했어요") },
-              )
-            }
-          >
-            미해결 {unresolvedFailures.length}건 다음 차수로 이월
-          </Button>
-        ) : null
-      }
+      description="항목을 눌러 검증 근거를 확인하고 필요한 대상을 이슈로 등록하세요. 상태 변경과 다음 차수 검증은 이슈 모아보기에서 관리합니다."
     >
+      <div className="grid grid-cols-[minmax(240px,360px)_minmax(320px,1fr)_96px_20px] items-center gap-3 border-y border-[#e3e8ef] bg-[#f8fafc] px-[18px] py-2 text-[11.5px] font-semibold text-[#64748b]">
+        <span>대상</span>
+        <span>판정 요약</span>
+        <span className="text-center">결과</span>
+        <span />
+      </div>
       {checklistItems.map((item) => {
         const result = item.qa_checklist_item_results[0];
         const finalStatus = result?.final_status ?? "not_collected";
+        const summary =
+          result?.ai_reasoning ??
+          (finalStatus === "passed"
+            ? "택소노미와 검증 규칙에 어긋나는 항목을 찾지 못했어요."
+            : "판단 이유가 없어요.");
+        const compactSummary = compactVerdictReason(summary);
         return (
           <Link
             key={item.id}
             from="/w/$wsId/p/$projectId/qa/$stageSlug/$roundId/$sessionId"
             to="/w/$wsId/p/$projectId/qa/$stageSlug/$roundId/$sessionId/$itemId"
             params={(prev) => ({ ...prev, itemId: item.id })}
-            className="grid grid-cols-[minmax(0,1fr)_150px_96px_120px_20px] items-center gap-3 border-b border-[#f1f4f8] px-[18px] py-3 hover:bg-[#f7f9fc]"
+            className="grid grid-cols-[minmax(240px,360px)_minmax(320px,1fr)_96px_20px] items-center gap-3 border-b border-[#f1f4f8] px-[18px] py-3 hover:bg-[#f7f9fc]"
           >
             <span className="mono-token truncate text-[13px]">
               {itemLabel(item.target_type, item.target_id)}
             </span>
-            <span className="truncate text-xs text-[#64748b]">{result?.ai_reasoning ?? "—"}</span>
+            <span title={summary} className="line-clamp-2 text-xs leading-[1.55] text-[#475569]">
+              {compactSummary}
+            </span>
             {verdictBadge(finalStatus)}
-            {dispositionBadge(item.disposition)}
             <span className="text-[#c3ccd8]">›</span>
           </Link>
         );

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildJudgePrompt, parseJudgeResponse } from "./ai-judge-prompt";
+import { buildJudgePrompt, JUDGE_RESPONSE_FORMAT, parseJudgeResponse } from "./ai-judge-prompt";
 
 describe("buildJudgePrompt", () => {
   it("includes the rule description and every target's evidence", () => {
@@ -55,8 +55,43 @@ describe("buildJudgePrompt", () => {
     expect(prompt).toContain("rule-b");
     expect(prompt).toContain("A가 없으면 통과");
     expect(prompt).toContain("A가 있는데 B가 없으면 실패");
-    expect(prompt).toContain('기대 예시가 "일본"인데 실제값이 "OKA"');
+    expect(prompt).toContain("데이터 타입, 구조, 표현 체계, 의미 영역, 정규화 규칙");
+    expect(prompt).toContain("사람이 읽는 명칭과 URL");
+    expect(prompt).toContain("임의로 기대값에 맞춰 해석하지 마세요");
+    expect(prompt).toContain("mismatch_dimensions");
     expect(prompt).toContain("불확실하거나 근거가 부족하면 보수적으로 실패");
+    expect(prompt).toContain("쉬운 한국어로 핵심만 1~2문장");
+    expect(prompt).toContain("자세한 분석은 evidence에만 넣으세요");
+    expect(prompt).toContain("`referral_source`가 없습니다");
+    expect(prompt).toContain("통과한 규칙의 reasoning은 빈 문자열");
+    expect(prompt).toContain("원본 로그나 배열을 다시 복사하지 마세요");
+  });
+
+  it("summarizes long arrays instead of asking the model to echo every value", () => {
+    const values = Array.from({ length: 20 }, (_, index) => `search-${index}`);
+    const prompt = buildJudgePrompt({
+      rules: [{ id: "rule-1", name: "검색 기록", description: "검색어 배열" }],
+      targets: [
+        {
+          kind: "custom_attribute",
+          technicalName: "search_history",
+          snapshots: [{ payload: { search_history: values } }],
+        },
+      ],
+    });
+
+    expect(prompt).toContain('"__kind":"array_summary"');
+    expect(prompt).toContain('"length":20');
+    expect(prompt).toContain("search-0");
+    expect(prompt).toContain("search-19");
+    expect(prompt).not.toContain("search-10");
+  });
+
+  it("defines a strict structured-output schema without raw evidence fields", () => {
+    expect(JUDGE_RESPONSE_FORMAT).toMatchObject({ type: "json_schema", strict: true });
+    expect(JSON.stringify(JUDGE_RESPONSE_FORMAT)).not.toContain("expected_contract");
+    expect(JSON.stringify(JUDGE_RESPONSE_FORMAT)).toContain("observed_summary");
+    expect(JSON.stringify(JUDGE_RESPONSE_FORMAT)).toContain("refs");
   });
 });
 

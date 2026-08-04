@@ -109,7 +109,9 @@ export function TaxonomyImport({
       if (createdEvents === 0 && createdAttrs === 0) {
         toast.info("이미 등록된 항목이라 새로 추가된 내용은 없어요");
       } else {
-        toast.success(`이벤트 ${createdEvents}개, 속성 ${createdAttrs}개를 추가했어요`);
+        toast.success(
+          `이벤트 ${createdEvents}개, 프로퍼티·어트리뷰트 ${createdAttrs}개를 추가했어요`,
+        );
       }
     } catch (error) {
       toast.error(errorMessage(error, "파일을 읽지 못했어요"));
@@ -146,7 +148,7 @@ export function TaxonomyImport({
               <Upload className="size-4" /> 파일로 일괄 등록
             </span>
             <span className="text-xs font-normal text-muted-foreground">
-              CSV·JSON·YAML 파일을 올려서 이벤트와 속성을 한 번에 추가해요
+              CSV·JSON·YAML 파일을 올려서 이벤트·프로퍼티·어트리뷰트를 한 번에 추가해요
             </span>
           </DropdownMenuItem>
           <DropdownMenuSeparator />

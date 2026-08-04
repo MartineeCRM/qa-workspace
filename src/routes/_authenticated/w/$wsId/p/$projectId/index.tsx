@@ -81,7 +81,7 @@ function ProjectOverview() {
 
       <div className="grid gap-3 sm:grid-cols-2">
         <Stat icon={ListTree} label="이벤트" value={activeEvents} />
-        <Stat icon={Layers} label="속성" value={activeAttributes} />
+        <Stat icon={Layers} label="어트리뷰트" value={activeAttributes} />
       </div>
 
       <Panel

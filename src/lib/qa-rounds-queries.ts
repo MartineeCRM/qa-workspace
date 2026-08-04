@@ -989,8 +989,14 @@ export function useDeleteQaIssue(projectId: string, resultId?: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (issueId: string) => {
-      const { error } = await db.from("qa_discussions").delete().eq("id", issueId);
+      const { data, error } = await db
+        .from("qa_discussions")
+        .delete()
+        .eq("id", issueId)
+        .select("id")
+        .maybeSingle();
       if (error) throw error;
+      if (!data) throw new Error("이슈를 삭제할 권한이 없거나 이미 삭제된 이슈예요.");
     },
     onSuccess: () => {
       if (resultId) qc.invalidateQueries({ queryKey: ["qa-discussions", resultId] });

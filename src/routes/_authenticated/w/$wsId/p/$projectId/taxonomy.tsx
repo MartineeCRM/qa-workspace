@@ -24,12 +24,13 @@ export const Route = createFileRoute("/_authenticated/w/$wsId/p/$projectId/taxon
       { title: "택소노미 — 단일 기준" },
       {
         name: "description",
-        content: "전체 트래킹 커버리지를 정의하는 이벤트, 속성, 검증 규칙을 관리해요.",
+        content:
+          "전체 트래킹 커버리지를 정의하는 이벤트, 프로퍼티, 어트리뷰트, 검증 규칙을 관리해요.",
       },
       { property: "og:title", content: "택소노미 — 단일 기준" },
       {
         property: "og:description",
-        content: "모든 QA 환경이 함께 쓰는 이벤트, 속성, 검증 규칙이에요.",
+        content: "모든 QA 환경이 함께 쓰는 이벤트, 프로퍼티, 어트리뷰트, 검증 규칙이에요.",
       },
     ],
   }),
@@ -73,7 +74,7 @@ function TaxonomyPage() {
           value={view}
           onValueChange={setView}
           options={[
-            { value: "structure", label: "이벤트·속성" },
+            { value: "structure", label: "이벤트·프로퍼티·어트리뷰트" },
             { value: "rules", label: "검증 규칙" },
           ]}
         />

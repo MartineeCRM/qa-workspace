@@ -1,5 +1,10 @@
 import { createServerFn } from "@tanstack/react-start";
-import { buildJudgePrompt, parseJudgeResponse, type JudgePromptInput } from "@/lib/ai-judge-prompt";
+import {
+  buildJudgePrompt,
+  JUDGE_RESPONSE_FORMAT,
+  parseJudgeResponse,
+  type JudgePromptInput,
+} from "@/lib/ai-judge-prompt";
 
 type Json = string | number | boolean | null | Json[] | { [key: string]: Json };
 
@@ -46,6 +51,7 @@ export const judgeChecklistItemWithAI = createServerFn({ method: "POST" })
           model: process.env.OPENAI_MODEL ?? "gpt-5.6-sol",
           input: buildJudgePrompt(data),
           reasoning: { effort: "low" },
+          text: { format: JUDGE_RESPONSE_FORMAT },
           max_output_tokens: 1024,
         }),
         signal: controller.signal,

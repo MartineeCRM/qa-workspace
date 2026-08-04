@@ -125,7 +125,7 @@ export function RulesTab({
           <EmptyState
             icon={ShieldCheck}
             title="아직 검증 규칙이 없어요"
-            description="이벤트나 속성에 규칙을 달아두면 AI가 그 기준으로 실제 값을 판단해요."
+            description="이벤트·프로퍼티·어트리뷰트에 규칙을 달아두면 AI가 그 기준으로 실제 값을 판단해요."
           />
         ) : (
           <Table>
@@ -275,26 +275,26 @@ function RuleDialog({
 
   const searchCandidates: RuleTarget[] = useMemo(() => {
     const q = search.trim().toLowerCase();
-    const eventTargets: RuleTarget[] = events.map((e) => ({
-      kind: "event",
-      id: e.id,
-      label: e.technical_name,
-    }));
-    const propTargets: RuleTarget[] = eventProperties.map((p) => ({
-      kind: "property",
-      id: p.id,
-      label: `${eventById.get(p.event_id)?.technical_name ?? "?"}.${p.technical_name}`,
-    }));
-    const attrTargets: RuleTarget[] = customAttributes.map((a) => ({
-      kind: "custom_attribute",
-      id: a.id,
-      label: a.technical_name,
-    }));
-    const all = [...eventTargets, ...propTargets, ...attrTargets].filter(
-      (t) => !stagedKeys.has(`${t.kind}:${t.id}`),
-    );
-    if (!q) return all;
-    return all.filter((t) => t.label.toLowerCase().includes(q));
+    const matches = (target: RuleTarget) =>
+      !stagedKeys.has(`${target.kind}:${target.id}`) &&
+      (!q || target.label.toLowerCase().includes(q));
+    const eventTargets: RuleTarget[] = events
+      .map((e) => ({ kind: "event" as const, id: e.id, label: e.technical_name }))
+      .filter(matches)
+      .slice(0, 20);
+    const propTargets: RuleTarget[] = eventProperties
+      .map((p) => ({
+        kind: "property" as const,
+        id: p.id,
+        label: `${eventById.get(p.event_id)?.technical_name ?? "?"}.${p.technical_name}`,
+      }))
+      .filter(matches)
+      .slice(0, 20);
+    const attrTargets: RuleTarget[] = customAttributes
+      .map((a) => ({ kind: "custom_attribute" as const, id: a.id, label: a.technical_name }))
+      .filter(matches)
+      .slice(0, 20);
+    return [...eventTargets, ...propTargets, ...attrTargets];
   }, [search, events, eventProperties, customAttributes, stagedKeys, eventById]);
 
   function stageTarget(target: RuleTarget) {
@@ -384,11 +384,11 @@ function RuleDialog({
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               onKeyDown={handleSearchKeyDown}
-              placeholder="이벤트·속성 이름을 입력하고 엔터"
+              placeholder="이벤트·프로퍼티·어트리뷰트 이름을 입력하고 엔터"
             />
             {search.trim() && searchCandidates.length > 0 ? (
               <ul className="max-h-40 divide-y overflow-y-auto rounded-md border">
-                {searchCandidates.slice(0, 20).map((t) => {
+                {searchCandidates.map((t) => {
                   const key = `${t.kind}:${t.id}`;
                   return (
                     <li key={key}>
@@ -401,8 +401,8 @@ function RuleDialog({
                           {t.kind === "event"
                             ? "이벤트"
                             : t.kind === "property"
-                              ? "속성"
-                              : "사용자 속성"}
+                              ? "프로퍼티"
+                              : "어트리뷰트"}
                         </span>
                         <span className="mono-token text-xs">{t.label}</span>
                       </button>
@@ -435,8 +435,8 @@ function RuleDialog({
               </ul>
             ) : null}
             <p className="text-xs text-muted-foreground">
-              여러 이벤트·속성을 함께 골라서 서로 간의 관계(예: "이 값이 다른 이벤트의 값과 같아야
-              한다")도 이 규칙 하나로 표현할 수 있어요.
+              여러 이벤트·프로퍼티·어트리뷰트를 함께 골라서 서로 간의 관계(예: "이 값이 다른
+              이벤트의 값과 같아야 한다")도 이 규칙 하나로 표현할 수 있어요.
             </p>
           </div>
           <div className="space-y-1.5">

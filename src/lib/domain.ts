@@ -46,7 +46,7 @@ export const RULE_TYPE_LABEL: Record<RuleType, string> = {
   allowed_values: "허용 값",
   numeric_range: "숫자 범위",
   string_pattern: "문자열 패턴",
-  event_attribute_consistency: "이벤트·속성 일관성",
+  event_attribute_consistency: "이벤트·프로퍼티/어트리뷰트 일관성",
   cross_event_consistency: "이벤트 간 일관성",
   temporal_consistency: "시간 순서 일관성",
   custom: "커스텀",
@@ -59,8 +59,9 @@ export const RULE_TYPE_HINT: Record<RuleType, string> = {
   allowed_values: "수집된 값이 정해진 목록 안에 있어야 해요.",
   numeric_range: "수집된 숫자가 지정한 범위 안에 들어와야 해요.",
   string_pattern: "수집된 문자열이 정규식 패턴과 맞아야 해요.",
-  event_attribute_consistency: "한 속성이 다른 속성과 서로 어긋나지 않아야 해요.",
-  cross_event_consistency: "두 이벤트 사이에서 같은 속성 값이 유지돼야 해요.",
+  event_attribute_consistency:
+    "한 프로퍼티 또는 어트리뷰트 값이 다른 값과 서로 어긋나지 않아야 해요.",
+  cross_event_consistency: "두 이벤트 사이에서 같은 프로퍼티 값이 유지돼야 해요.",
   temporal_consistency: "한 이벤트가 다른 이벤트 이후 정해진 시간 안에 발생해야 해요.",
   custom: "JSON으로 직접 정의하는 고급 규칙이에요. 실행은 다음 단계에서 지원돼요.",
 };

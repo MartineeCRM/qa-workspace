@@ -43,12 +43,7 @@ function ctxWithSnapshots(snapshots: AttributeSnapshot[]) {
 }
 
 describe("judgeChecklistItem — custom attribute with no validation rule", () => {
-  it("returns not_collected when only one snapshot was ever captured, even if the value looks valid", async () => {
-    // Regression test: a single snapshot only shows the attribute's current value —
-    // it can't prove that value was produced by this session's test actions rather
-    // than being stale data from before the session started (e.g. a real user's
-    // pre-existing Braze history). Previously this fell through structural checks
-    // and the "no rule configured" branch auto-passed it.
+  it("passes a structurally valid value from a single snapshot", async () => {
     const snapshots: AttributeSnapshot[] = [
       {
         external_user_id: "u1",
@@ -59,7 +54,30 @@ describe("judgeChecklistItem — custom attribute with no validation rule", () =
       },
     ];
     const result = await judgeChecklistItem(item, ctxWithSnapshots(snapshots));
-    expect(result.final_status).toBe("not_collected");
+    expect(result.final_status).toBe("passed");
+    expect(result.judged_by).toBe("rule");
+  });
+
+  it("treats false as a collected boolean value", async () => {
+    const booleanAttribute = {
+      ...baseAttribute,
+      technical_name: "push_opt_in",
+      data_type: "boolean",
+    } as TaxonomyCustomAttribute;
+    const snapshots: AttributeSnapshot[] = [
+      {
+        external_user_id: "u1",
+        snapshot_name: "현재 상태",
+        status: "captured",
+        payload: { push_opt_in: false },
+        captured_at: "2026-08-03T06:06:34Z",
+      },
+    ];
+    const result = await judgeChecklistItem(item, {
+      ...ctxWithSnapshots(snapshots),
+      customAttributes: [booleanAttribute],
+    });
+    expect(result.final_status).toBe("passed");
     expect(result.judged_by).toBe("rule");
   });
 

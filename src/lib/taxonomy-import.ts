@@ -268,7 +268,7 @@ const SAMPLE: ImportedTaxonomy = {
     {
       technical_name: "user_grade",
       display_name: "회원 등급",
-      description: "이벤트와 무관하게 유지되는 사용자 속성이에요.",
+      description: "이벤트와 무관하게 유지되는 어트리뷰트예요.",
       data_type: "string",
       is_required: false,
       allowed_values: ["bronze", "silver", "gold"],

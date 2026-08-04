@@ -230,11 +230,7 @@ export function QaSessionView({
       ) : null}
       {effectiveStep === 3 ? <QaSessionAnalysisPanel session={session} /> : null}
       {effectiveStep === 4 ? (
-        <QaSessionResultsPanel
-          projectId={projectId}
-          environmentId={environmentId}
-          session={session}
-        />
+        <QaSessionResultsPanel projectId={projectId} session={session} />
       ) : null}
     </div>
   );

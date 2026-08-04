@@ -49,6 +49,69 @@ export type MergedTimelineRow = {
   raw?: Record<string, unknown>;
 };
 
+export type VerdictReasonGroup = {
+  reason: string;
+  label: string;
+  targets: string[];
+};
+
+export function resolveEvidenceHighlightTone(input: {
+  issueHovered: boolean;
+  selected: boolean;
+  selectedTone?: "pass" | "issue";
+}): "hover" | "pass" | "issue" | null {
+  if (input.issueHovered) return "hover";
+  if (input.selected && input.selectedTone) return input.selectedTone;
+  return null;
+}
+
+const VERDICT_REASON_LABELS: Record<string, string> = {
+  "필수 프로퍼티가 로그에 없습니다": "필수 누락",
+  "필수 프로퍼티 값이 비어 있습니다": "필수값 누락",
+  "택소노미에 정의되지 않은 프로퍼티입니다": "미정의 프로퍼티",
+};
+
+export function groupVerdictReason(reason: string): {
+  groups: VerdictReasonGroup[];
+  ungrouped: string[];
+  detailCount: number;
+} {
+  const byReason = new Map<string, string[]>();
+  const ungrouped: string[] = [];
+  for (const line of reason
+    .split("\n")
+    .map((value) => value.trim())
+    .filter(Boolean)) {
+    const match = line.match(/^([A-Za-z0-9_.-]+):\s+(.+)$/);
+    if (!match) {
+      ungrouped.push(line);
+      continue;
+    }
+    const [, target, targetReason] = match;
+    byReason.set(targetReason, [...(byReason.get(targetReason) ?? []), target]);
+  }
+  const groups = [...byReason].map(([groupReason, targets]) => ({
+    reason: groupReason,
+    label: VERDICT_REASON_LABELS[groupReason] ?? groupReason,
+    targets,
+  }));
+  return {
+    groups,
+    ungrouped,
+    detailCount:
+      groups.reduce((count, group) => count + group.targets.length, 0) + ungrouped.length,
+  };
+}
+
+export function compactVerdictReason(reason: string): string {
+  const { groups, ungrouped } = groupVerdictReason(reason);
+  if (groups.length === 0) return reason;
+  return [
+    ...groups.map((group) => `${group.label} ${group.targets.length}개`),
+    ...ungrouped.slice(0, 1),
+  ].join(" · ");
+}
+
 function formatValue(value: unknown): string {
   if (value === undefined) return "—";
   if (typeof value === "object") return JSON.stringify(value);
@@ -87,9 +150,8 @@ export function buildMergedTimeline(
 
   const snapshotRows: MergedTimelineRow[] = [];
   capturedSnapshots.forEach((snapshot, index) => {
-    if (index === 0) return; // 첫 스냅샷은 비교 대상이 없어 변화를 낼 수 없다.
     const previous = capturedSnapshots[index - 1];
-    const prevPayload = previous.payload ?? {};
+    const prevPayload = previous?.payload ?? {};
     const payload = snapshot.payload ?? {};
     const keys = new Set([...Object.keys(prevPayload), ...Object.keys(payload)]);
     for (const key of keys) {

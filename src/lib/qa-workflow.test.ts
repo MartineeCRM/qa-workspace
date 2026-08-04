@@ -16,6 +16,9 @@ import {
   parseReasonLines,
   summarizeRoundValidationItems,
   compressRoundHistory,
+  compactVerdictReason,
+  groupVerdictReason,
+  resolveEvidenceHighlightTone,
   buildEventSpecDiffRows,
   type ChecklistCoverageRow,
 } from "@/lib/qa-workflow";
@@ -134,21 +137,37 @@ describe("buildMergedTimeline", () => {
 
   it("orders rows chronologically and only emits changed attribute keys per snapshot", () => {
     const rows = buildMergedTimeline(runEvents, snapshots);
-    expect(rows.map((r) => r.name)).toEqual(["cart_item_added", "cart_item_count"]);
+    expect(rows.map((r) => r.name)).toEqual([
+      "cart_item_count",
+      "cart_item_added",
+      "cart_item_count",
+    ]);
     expect(rows[0]).toMatchObject({
+      source: "snapshot",
+      name: "cart_item_count",
+      change: "— → 0",
+    });
+    expect(rows[1]).toMatchObject({
       source: "event",
       name: "cart_item_added",
     });
-    expect(rows[1]).toMatchObject({
+    expect(rows[2]).toMatchObject({
       source: "snapshot",
       name: "cart_item_count",
       change: "0 → 1",
     });
   });
 
-  it("emits no row for the first snapshot (nothing to diff against)", () => {
+  it("emits every received attribute from the first snapshot", () => {
     const rows = buildMergedTimeline([], [snapshots[0]]);
-    expect(rows).toEqual([]);
+    expect(rows).toMatchObject([
+      {
+        key: "snapshot:sn1:cart_item_count",
+        source: "snapshot",
+        name: "cart_item_count",
+        change: "— → 0",
+      },
+    ]);
   });
 
   it("does not report a spurious change for an object/array attribute with the same content across different instances", () => {
@@ -180,7 +199,7 @@ describe("buildMergedTimeline", () => {
     ];
 
     const rows = buildMergedTimeline([], unchangedObjectSnapshots);
-    expect(rows).toEqual([]);
+    expect(rows.map((row) => row.key)).toEqual(["snapshot:sn1:tags", "snapshot:sn1:meta"]);
   });
 
   it("still detects a real change in an object/array attribute's content", () => {
@@ -210,8 +229,8 @@ describe("buildMergedTimeline", () => {
     ];
 
     const rows = buildMergedTimeline([], changedObjectSnapshots);
-    expect(rows.map((r) => r.name)).toEqual(["tags"]);
-    expect(rows[0].change).toBe('["a","b"] → ["a","b","c"]');
+    expect(rows.map((r) => r.name)).toEqual(["tags", "meta", "tags"]);
+    expect(rows[2].change).toBe('["a","b"] → ["a","b","c"]');
   });
 
   it("anchors each diff to its immediate predecessor across a 3-snapshot chain", () => {
@@ -257,7 +276,10 @@ describe("buildMergedTimeline", () => {
     // If sn3 were (incorrectly) diffed against sn1 instead of sn2, it would
     // also show 0 -> 1 and produce a second row — so asserting exactly one
     // row here confirms each snapshot anchors to its immediate predecessor.
-    expect(rows.map((r) => r.key)).toEqual(["snapshot:sn2:cart_item_count"]);
+    expect(rows.map((r) => r.key)).toEqual([
+      "snapshot:sn1:cart_item_count",
+      "snapshot:sn2:cart_item_count",
+    ]);
   });
 });
 
@@ -947,5 +969,40 @@ describe("aiFailedTaxonomyPropertyIds", () => {
         ],
       }),
     ).toEqual(new Set(["p2"]));
+  });
+});
+
+describe("groupVerdictReason", () => {
+  it("groups repeated structural errors and keeps narrative reasoning", () => {
+    const reason = [
+      "content_name: 필수 프로퍼티가 로그에 없습니다",
+      "event_name: 필수 프로퍼티가 로그에 없습니다",
+      "page_title: 택소노미에 정의되지 않은 프로퍼티입니다",
+      "값의 표현 체계도 기대 계약과 다릅니다.",
+    ].join("\n");
+
+    expect(groupVerdictReason(reason)).toMatchObject({
+      groups: [
+        { label: "필수 누락", targets: ["content_name", "event_name"] },
+        { label: "미정의 프로퍼티", targets: ["page_title"] },
+      ],
+      ungrouped: ["값의 표현 체계도 기대 계약과 다릅니다."],
+      detailCount: 4,
+    });
+    expect(compactVerdictReason(reason)).toBe(
+      "필수 누락 2개 · 미정의 프로퍼티 1개 · 값의 표현 체계도 기대 계약과 다릅니다.",
+    );
+  });
+});
+
+describe("resolveEvidenceHighlightTone", () => {
+  it("leaves all-tab evidence unhighlighted and gives issue hover priority", () => {
+    expect(resolveEvidenceHighlightTone({ issueHovered: false, selected: false })).toBeNull();
+    expect(
+      resolveEvidenceHighlightTone({ issueHovered: false, selected: true, selectedTone: "issue" }),
+    ).toBe("issue");
+    expect(
+      resolveEvidenceHighlightTone({ issueHovered: true, selected: true, selectedTone: "pass" }),
+    ).toBe("hover");
   });
 });

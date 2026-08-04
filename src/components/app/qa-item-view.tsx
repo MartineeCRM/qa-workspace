@@ -15,8 +15,10 @@ import {
   aiFailedTaxonomyPropertyIds,
   buildMergedTimeline,
   compressRoundHistory,
+  groupVerdictReason,
   nextChecklistItemId,
   previousChecklistItemId,
+  resolveEvidenceHighlightTone,
   type MergedTimelineRow,
 } from "@/lib/qa-workflow";
 import {
@@ -47,6 +49,54 @@ const VERDICT_STYLE = {
   failed: { border: "#f4d0d0", bg: "#fdf5f5", fg: "#dc2626" },
   not_collected: { border: "#f0dfc0", bg: "#fdf9f1", fg: "#b45309" },
 } as const;
+
+function VerdictReasonSummary({ reason }: { reason: string }) {
+  const { groups, ungrouped, detailCount } = groupVerdictReason(reason);
+  if (groups.length === 0) {
+    return (
+      <p className="whitespace-pre-line text-[13.5px] leading-[1.7] text-[#3c4757]">{reason}</p>
+    );
+  }
+  return (
+    <div className="space-y-2.5">
+      <div className="flex flex-wrap gap-2">
+        {groups.map((group) => {
+          const preview = group.targets.slice(0, 4).join(", ");
+          const remaining = group.targets.length - 4;
+          return (
+            <div
+              key={group.reason}
+              className="min-w-[190px] flex-1 rounded-lg border border-[#e3e8ef] bg-white px-3 py-2.5"
+            >
+              <p className="text-[12.5px] font-semibold text-[#dc2626]">
+                {group.label} {group.targets.length}개
+              </p>
+              <p className="mt-0.5 truncate font-mono text-[11.5px] text-[#64748b]">
+                {preview}
+                {remaining > 0 ? ` 외 ${remaining}개` : ""}
+              </p>
+            </div>
+          );
+        })}
+      </div>
+      {ungrouped.map((line) => (
+        <p key={line} className="text-[13px] leading-[1.65] text-[#3c4757]">
+          {line}
+        </p>
+      ))}
+      <details className="group rounded-lg border border-[#e3e8ef] bg-white">
+        <summary className="cursor-pointer list-none px-3 py-2 text-[12px] font-semibold text-[#64748b] marker:content-none">
+          프로퍼티별 상세 보기 ({detailCount}건)
+          <span className="ml-1 group-open:hidden">↓</span>
+          <span className="ml-1 hidden group-open:inline">↑</span>
+        </summary>
+        <p className="max-h-72 overflow-y-auto whitespace-pre-line border-t border-black/10 px-3 py-2.5 font-mono text-[11.5px] leading-[1.65] text-[#475569]">
+          {reason}
+        </p>
+      </details>
+    </div>
+  );
+}
 
 export function QaItemView({
   projectId,
@@ -108,6 +158,13 @@ export function QaItemView({
       : customAttributes.find((a) => a.id === item.target_id)?.technical_name;
   const finalStatus = result?.final_status ?? "not_collected";
   const verdictStyle = VERDICT_STYLE[finalStatus];
+  const verdictLabel =
+    finalStatus === "passed" ? "통과" : finalStatus === "failed" ? "오류" : "미발생";
+  const summaryReason =
+    result?.ai_reasoning ??
+    (finalStatus === "passed"
+      ? "택소노미와 검증 규칙에 어긋나는 항목을 찾지 못했어요."
+      : "판단 이유가 없어요.");
   const selectedIssue =
     discussions.find((discussion) => discussion.id === selectedIssueId) ?? discussions[0] ?? null;
 
@@ -131,14 +188,6 @@ export function QaItemView({
       (length, row) => length + JSON.stringify(row.raw ?? row.change ?? "").length,
       0,
     ) > 3_000;
-  const violatingProperties = new Set(
-    result?.judged_by === "rule" && result?.ai_reasoning
-      ? result.ai_reasoning
-          .split("\n")
-          .map((line) => line.split(":")[0]?.trim())
-          .filter((v): v is string => Boolean(v))
-      : [],
-  );
   const thisEventProperties =
     item.target_type === "event"
       ? eventProperties.filter(
@@ -168,7 +217,7 @@ export function QaItemView({
   function copyEvidenceLog() {
     const text = evidenceRows
       .map((row) => {
-        const header = `${row.name} | ${row.source === "snapshot" ? "스냅샷" : "이벤트"} | ${formatRawLogTime(row.occurredAt)}`;
+        const header = `${row.name} | ${row.source === "snapshot" ? "어트리뷰트" : "이벤트"} | ${formatRawLogTime(row.occurredAt)}`;
         if (row.source === "event") return `${header}\n${JSON.stringify(row.raw ?? {}, null, 2)}`;
         return `${header} ${row.change}`;
       })
@@ -192,18 +241,18 @@ export function QaItemView({
         {entries.map(([k, v], i) => {
           const issueHovered = hoveredIssueProperty === k;
           const selected = evidenceHighlight?.propertyNames.has(k) ?? false;
-          const highlighted = violatingProperties.has(k);
+          const highlightTone = resolveEvidenceHighlightTone({
+            issueHovered,
+            selected,
+            selectedTone: evidenceHighlight?.tone,
+          });
           return (
             <div key={k} className="pl-4">
               <span
                 className={cn(
-                  issueHovered && "rounded-sm bg-red-400/20 px-0.5",
-                  !issueHovered &&
-                    selected &&
-                    (evidenceHighlight?.tone === "pass"
-                      ? "rounded-sm bg-emerald-400/20 px-0.5"
-                      : "rounded-sm bg-amber-300/20 px-0.5"),
-                  !issueHovered && !selected && highlighted && "rounded-sm bg-red-400/20 px-0.5",
+                  highlightTone === "hover" && "rounded-sm bg-red-400/20 px-0.5",
+                  highlightTone === "pass" && "rounded-sm bg-emerald-400/20 px-0.5",
+                  highlightTone === "issue" && "rounded-sm bg-amber-300/20 px-0.5",
                 )}
               >
                 {JSON.stringify(k)}: {JSON.stringify(v)}
@@ -218,10 +267,21 @@ export function QaItemView({
   }
 
   function renderSnapshotChange(row: MergedTimelineRow) {
-    const highlighted = violatingProperties.has(row.name);
+    const highlightTone = resolveEvidenceHighlightTone({
+      issueHovered: hoveredIssueProperty === row.name,
+      selected: evidenceHighlight?.propertyNames.has(row.name) ?? false,
+      selectedTone: evidenceHighlight?.tone,
+    });
     return (
-      <span className={highlighted ? "rounded-sm bg-red-400/20 px-0.5" : undefined}>
-        {row.change}
+      <span
+        className={cn(
+          "whitespace-pre-wrap",
+          highlightTone === "hover" && "rounded-sm bg-red-400/20 px-0.5",
+          highlightTone === "pass" && "rounded-sm bg-emerald-400/20 px-0.5",
+          highlightTone === "issue" && "rounded-sm bg-amber-300/20 px-0.5",
+        )}
+      >
+        {row.change.replace(/,\s*/g, ",\n")}
       </span>
     );
   }
@@ -250,9 +310,21 @@ export function QaItemView({
     <div className="space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="mono-token text-xl font-bold">{label ?? item.target_id}</h2>
+          <div className="flex flex-wrap items-center gap-2.5">
+            <h2 className="mono-token text-xl font-bold">{label ?? item.target_id}</h2>
+            <span
+              className="rounded-full border px-2.5 py-0.5 text-[11px] font-semibold"
+              style={{
+                color: verdictStyle.fg,
+                borderColor: verdictStyle.border,
+                backgroundColor: verdictStyle.bg,
+              }}
+            >
+              {verdictLabel}
+            </span>
+          </div>
           <p className="mt-1 text-[12.5px] text-[#8b97a8]">
-            {item.target_type === "event" ? "이벤트" : "attribute"} · 마지막 판정{" "}
+            {item.target_type === "event" ? "이벤트" : "어트리뷰트"} · 마지막 판정{" "}
             {result ? formatDateTime(result.updated_at) : "없음"}
           </p>
         </div>
@@ -281,6 +353,26 @@ export function QaItemView({
 
       <div className="flex flex-wrap items-start gap-4">
         <div className="min-w-0 flex-[1_1_660px] space-y-4">
+          <Panel
+            title="판정 요약"
+            description="문제 유형과 핵심 이유만 먼저 확인하세요. 세부 내용은 펼쳐서 볼 수 있어요."
+          >
+            <div className="border-t border-[#eef1f5] px-[18px] py-4">
+              <div className="mb-3 flex flex-wrap items-center gap-2">
+                <span className="text-[11.5px] font-semibold text-[#64748b]">판정 기준</span>
+                <span className="rounded-md bg-[#f1f4f8] px-2 py-1 text-[11.5px] font-semibold text-[#475569]">
+                  {result?.judged_by === "rule" ? "택소노미 규칙" : "택소노미 규칙 + AI"}
+                </span>
+              </div>
+              <div
+                className="rounded-xl border px-4 py-3.5"
+                style={{ borderColor: verdictStyle.border, backgroundColor: verdictStyle.bg }}
+              >
+                <VerdictReasonSummary reason={summaryReason} />
+              </div>
+            </div>
+          </Panel>
+
           <Panel
             title="근거 로그"
             description="이 항목과 관련된 병합 타임라인 구간"
@@ -312,7 +404,7 @@ export function QaItemView({
                           <span>{row.name}</span>
                           <span className="text-[#6e7681]"> | </span>
                           <span className="text-[#7ee787]">
-                            {row.source === "snapshot" ? "스냅샷" : "이벤트"}
+                            {row.source === "snapshot" ? "어트리뷰트" : "이벤트"}
                           </span>
                           <span className="text-[#6e7681]"> | </span>
                           <span className="text-[#6e7681]">{formatRawLogTime(row.occurredAt)}</span>
@@ -371,19 +463,7 @@ export function QaItemView({
                 );
               }}
             />
-          ) : (
-            <div
-              className="rounded-[14px] border px-[18px] py-4"
-              style={{ borderColor: verdictStyle.border, backgroundColor: verdictStyle.bg }}
-            >
-              <p className="text-xs font-bold" style={{ color: verdictStyle.fg }}>
-                {result?.judged_by === "rule" ? "Rule 기반 판정" : "AI 판정"}
-              </p>
-              <p className="mt-1.5 whitespace-pre-line text-[13.5px] leading-[1.7] text-[#3c4757]">
-                {result?.ai_reasoning ?? "판단 이유가 없어요."}
-              </p>
-            </div>
-          )}
+          ) : null}
 
           <Panel
             title="라운드 이력"

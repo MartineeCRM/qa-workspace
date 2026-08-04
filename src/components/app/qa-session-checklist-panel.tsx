@@ -335,7 +335,7 @@ export function QaSessionChecklistPanel({
                 {itemLabel(item.target_type, item.target_id)}
               </span>
               <span className="text-xs text-[#64748b]">
-                {item.target_type === "event" ? "이벤트" : "속성"}
+                {item.target_type === "event" ? "이벤트" : "어트리뷰트"}
               </span>
               <span className="truncate text-[11.5px] text-[#8b97a8]">—</span>
               <SourceBadge carried={Boolean(item.carried_from_item_id)} />
