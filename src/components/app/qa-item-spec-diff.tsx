@@ -55,15 +55,13 @@ function verdictBadge(verdict: SpecDiffVerdict) {
   return { label: "통과", className: "bg-[#e8f5ec] text-[#16a34a]" };
 }
 
-function typeChip(type: string, tone: "as-is" | "mismatch" | "undefined" | "pass") {
+function typeChip(type: string, tone: "as-is" | "mismatch" | "undefined") {
   const toneClass =
     tone === "mismatch"
       ? "bg-[#fdecec] text-[#dc2626] font-semibold"
       : tone === "undefined"
         ? "bg-[#fdf3e3] text-[#b45309] font-semibold"
-        : tone === "pass"
-          ? "bg-[#e8f5ec] text-[#16a34a] font-semibold"
-          : "bg-[#f1f4f8] text-[#64748b]";
+        : "bg-[#f1f4f8] text-[#64748b]";
   return (
     <code className={cn("rounded-md px-1.5 py-0.5 font-mono text-[12.5px]", toneClass)}>
       {type}
@@ -296,7 +294,7 @@ export function QaItemSpecDiffTable({
       }
     >
       <div className="overflow-x-auto">
-        <div className="grid min-w-[820px] grid-cols-[minmax(150px,1fr)_minmax(155px,1fr)_minmax(180px,1.15fr)_minmax(72px,0.55fr)_minmax(165px,1fr)] gap-4 bg-[#fbfcfd] px-4 py-2.5 text-[11.5px] font-semibold tracking-wide text-[#64748b]">
+        <div className="grid min-w-[800px] grid-cols-[minmax(150px,1fr)_minmax(155px,1fr)_minmax(180px,1.15fr)_minmax(72px,0.55fr)_minmax(145px,0.8fr)] gap-4 bg-[#fbfcfd] px-4 py-2.5 text-[11.5px] font-semibold tracking-wide text-[#64748b]">
           <div>프로퍼티</div>
           <div>AS-IS · 실제 수신</div>
           <div>TO-BE · 택소노미 정의</div>
@@ -305,11 +303,11 @@ export function QaItemSpecDiffTable({
         </div>
 
         {shown.length === 0 ? (
-          <p className="min-w-[820px] px-4 py-6 text-center text-[12.5px] text-[#8b97a8]">
+          <p className="min-w-[800px] px-4 py-6 text-center text-[12.5px] text-[#8b97a8]">
             이 필터에 해당하는 프로퍼티가 없어요.
           </p>
         ) : (
-          <ul className="min-w-[820px]">
+          <ul className="min-w-[800px]">
             {shown.map((row) => {
               const chosen = fixes[row.name] ?? null;
               const badge = verdictBadge(row.verdict);
@@ -322,7 +320,7 @@ export function QaItemSpecDiffTable({
                   key={row.name}
                   className={cn("border-b border-[#f4f6f9]", chosen ? "bg-[#fbfdfb]" : "bg-white")}
                 >
-                  <div className="grid grid-cols-[minmax(150px,1fr)_minmax(155px,1fr)_minmax(180px,1.15fr)_minmax(72px,0.55fr)_minmax(165px,1fr)] items-start gap-4 px-4 py-3">
+                  <div className="grid grid-cols-[minmax(150px,1fr)_minmax(155px,1fr)_minmax(180px,1.15fr)_minmax(72px,0.55fr)_minmax(145px,0.8fr)] items-start gap-4 px-4 py-3">
                     <div className="min-w-0">
                       <code className="mono-token break-all text-[12.5px]">{row.name}</code>
                       {row.typoCandidate ? (
@@ -349,7 +347,7 @@ export function QaItemSpecDiffTable({
                     </div>
                     <div className="min-w-0">
                       {row.expectedType ? (
-                        typeChip(row.expectedType, row.verdict === "pass" ? "pass" : "as-is")
+                        typeChip(row.expectedType, "as-is")
                       ) : (
                         <code className="rounded-md bg-[#f1f4f8] px-1.5 py-0.5 text-[12.5px] text-[#a3adbb]">
                           정의 없음
