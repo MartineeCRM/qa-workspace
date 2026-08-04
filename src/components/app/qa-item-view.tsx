@@ -86,6 +86,7 @@ export function QaItemView({
     propertyNames: Set<string>;
     tone: "pass" | "issue";
   } | null>(null);
+  const [hoveredIssueProperty, setHoveredIssueProperty] = useState<string | null>(null);
 
   // "이전/다음 항목" links only change the :itemId path param, so this component
   // doesn't remount between items.
@@ -94,6 +95,7 @@ export function QaItemView({
     setSelectedIssueId(null);
     setCommentBody("");
     setEvidenceHighlight(null);
+    setHoveredIssueProperty(null);
   }, [item.id]);
 
   const label =
@@ -184,17 +186,23 @@ export function QaItemView({
       <div className="pl-4">
         <div>{"{"}</div>
         {entries.map(([k, v], i) => {
+          const issueHovered = hoveredIssueProperty === k;
           const selected = evidenceHighlight?.propertyNames.has(k) ?? false;
           const highlighted = violatingProperties.has(k);
           return (
             <div key={k} className="pl-4">
               <span
                 className={cn(
-                  selected &&
+                  issueHovered && "rounded-sm bg-red-400/20 px-0.5",
+                  !issueHovered &&
+                    selected &&
                     (evidenceHighlight?.tone === "pass"
                       ? "rounded-sm bg-emerald-400/20 px-0.5"
                       : "rounded-sm bg-amber-300/20 px-0.5"),
-                  !selected && highlighted && "rounded-sm bg-[#4a3f00] px-0.5 text-[#f2d675]",
+                  !issueHovered &&
+                    !selected &&
+                    highlighted &&
+                    "rounded-sm bg-[#4a3f00] px-0.5 text-[#f2d675]",
                 )}
               >
                 {JSON.stringify(k)}: {JSON.stringify(v)}
@@ -533,18 +541,23 @@ export function QaItemView({
                       <button
                         key={discussion.id}
                         type="button"
+                        title={`${label}.${discussion.target_label}`}
+                        onMouseEnter={() => setHoveredIssueProperty(discussion.target_label)}
+                        onMouseLeave={() => setHoveredIssueProperty(null)}
                         onClick={() => {
                           setSelectedIssueId(discussion.id);
                           setCommentBody("");
                         }}
                         className={cn(
-                          "rounded-md border px-2 py-1 font-mono text-[11.5px]",
+                          "max-w-full rounded-md border px-2 py-1 font-mono text-[11.5px]",
                           selectedIssue?.id === discussion.id
                             ? "border-[#4b4f8a] bg-[#f6f7fd] font-semibold text-[#4b4f8a]"
                             : "border-[#e3e8ef] text-[#64748b]",
                         )}
                       >
-                        {label}.{discussion.target_label}
+                        <span className="block truncate">
+                          {label}.{discussion.target_label}
+                        </span>
                       </button>
                     ))}
                   </div>
@@ -552,7 +565,12 @@ export function QaItemView({
                   {selectedIssue ? (
                     <div className="space-y-3">
                       <div className="flex items-center justify-between gap-2">
-                        <p className="truncate font-mono text-[12px] font-semibold text-[#4b4f8a]">
+                        <p
+                          title={`${label}.${selectedIssue.target_label}`}
+                          onMouseEnter={() => setHoveredIssueProperty(selectedIssue.target_label)}
+                          onMouseLeave={() => setHoveredIssueProperty(null)}
+                          className="truncate font-mono text-[12px] font-semibold text-[#4b4f8a]"
+                        >
                           {label}.{selectedIssue.target_label}
                         </p>
                         <QaIssueDeleteButton
