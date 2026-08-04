@@ -18,11 +18,13 @@ export function QaIssueDeleteButton({
   pending,
   onDelete,
   compact = false,
+  muted = false,
 }: {
   targetLabel: string;
   pending: boolean;
   onDelete: () => void;
   compact?: boolean;
+  muted?: boolean;
 }) {
   return (
     <AlertDialog>
@@ -31,9 +33,11 @@ export function QaIssueDeleteButton({
           size="sm"
           variant="ghost"
           className={
-            compact
-              ? "h-7 text-[#dc2626] hover:text-[#dc2626]"
-              : "text-[#dc2626] hover:text-[#dc2626]"
+            muted
+              ? "text-[#a3adbb] hover:bg-[#fdf5f5] hover:text-[#dc2626]"
+              : compact
+                ? "h-7 text-[#dc2626] hover:text-[#dc2626]"
+                : "text-[#dc2626] hover:text-[#dc2626]"
           }
           disabled={pending}
         >

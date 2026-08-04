@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { createFileRoute, Link, useParams } from "@tanstack/react-router";
-import { AlertTriangle, CheckCircle2, Clock3, Pencil } from "lucide-react";
+import { Check, CheckCircle2, Pencil } from "lucide-react";
 import { toast } from "sonner";
 
-import { EmptyState, Panel } from "@/components/app/layout-parts";
+import { EmptyState } from "@/components/app/layout-parts";
 import { QaIssueDeleteButton } from "@/components/app/qa-issue-delete-button";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -14,8 +14,10 @@ import {
   useDeleteQaIssue,
   useProjectQaIssues,
   useQaChannels,
-  useUpdateQaIssue,
+  useSubmitQaIssues,
   useUpdateDiscussionComment,
+  useUpdateQaIssue,
+  type ProjectQaIssue,
 } from "@/lib/qa-rounds-queries";
 import { useEnvironments, useTaxonomyEvents } from "@/lib/queries";
 import { cn } from "@/lib/utils";
@@ -24,21 +26,17 @@ export const Route = createFileRoute("/_authenticated/w/$wsId/p/$projectId/issue
   component: QaIssuesPage,
 });
 
-const STATUS_LABEL = {
-  needs_review: "확인 필요",
-  still_issue: "여전히 이슈",
-  next_validation: "다음 검증 대기",
-  dismissed: "오탐·종료",
-  verified: "검증 완료",
-} as const;
+type IssueStatus = "open" | "talk" | "fixing" | "done";
+type IssueFilter = "all" | IssueStatus;
 
-const STATUS_STYLE: Record<keyof typeof STATUS_LABEL, string> = {
-  needs_review: "border-amber-200 bg-amber-50 text-amber-700",
-  still_issue: "border-red-200 bg-red-50 text-red-700",
-  next_validation: "border-indigo-200 bg-indigo-50 text-indigo-700",
-  dismissed: "border-slate-200 bg-slate-50 text-slate-600",
-  verified: "border-emerald-200 bg-emerald-50 text-emerald-700",
-};
+const STATUS = {
+  open: { label: "이슈 있음", color: "#dc2626", bg: "#fdf5f5" },
+  talk: { label: "논의중", color: "#b45309", bg: "#fdf9f1" },
+  fixing: { label: "개발 수정 중", color: "#2b6a9c", bg: "#eaf1f8" },
+  done: { label: "해결", color: "#16a34a", bg: "#f2faf5" },
+} as const;
+const STATUSES = Object.keys(STATUS) as IssueStatus[];
+const SUBMITTABLE = new Set<IssueStatus>(["fixing", "done"]);
 
 function QaIssuesPage() {
   const { wsId, projectId } = useParams({ from: "/_authenticated/w/$wsId/p/$projectId/issues" });
@@ -48,230 +46,442 @@ function QaIssuesPage() {
   const { data: environments = [] } = useEnvironments(projectId);
   const { data: channels = [] } = useQaChannels(projectId);
   const updateIssue = useUpdateQaIssue(projectId);
+  const submitIssues = useSubmitQaIssues(projectId);
   const deleteIssue = useDeleteQaIssue(projectId);
   const updateComment = useUpdateDiscussionComment();
+  const [filter, setFilter] = useState<IssueFilter>("all");
+  const [checked, setChecked] = useState<Set<string>>(new Set());
+  const [openNotes, setOpenNotes] = useState<Set<string>>(new Set());
   const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const [statusOverrides, setStatusOverrides] = useState<Record<string, IssueStatus>>({});
   const [editingComment, setEditingComment] = useState<{ id: string; body: string } | null>(null);
   const eventById = new Map(events.map((event) => [event.id, event]));
   const environmentById = new Map(environments.map((environment) => [environment.id, environment]));
   const channelById = new Map(channels.map((channel) => [channel.id, channel]));
-  const openIssues = issues.filter(
-    (issue) => issue.workflow_status !== "dismissed" && issue.workflow_status !== "verified",
+  const activeIssues = issues.filter(
+    (issue): issue is ProjectQaIssue & { workflow_status: IssueStatus } =>
+      issue.workflow_status !== "dismissed" && issue.workflow_status !== "verified",
   );
+  const statusOf = (issue: ProjectQaIssue): IssueStatus =>
+    statusOverrides[issue.id] ?? (issue.workflow_status as IssueStatus);
+  const count = (status: IssueStatus) =>
+    activeIssues.filter((issue) => statusOf(issue) === status).length;
+  const submittable = activeIssues.filter((issue) => SUBMITTABLE.has(statusOf(issue)));
+  const selected = submittable.filter((issue) => checked.has(issue.id));
+  const allChecked = submittable.length > 0 && selected.length === submittable.length;
+  const shown = activeIssues.filter((issue) => filter === "all" || statusOf(issue) === filter);
+  const nextRounds = new Set(selected.map((issue) => issue.round_number + 1));
+  const nextRoundLabel = nextRounds.size === 1 ? `${[...nextRounds][0]}차` : "다음 차수";
+
+  function toggleChecked(issueId: string) {
+    setChecked((current) => {
+      const next = new Set(current);
+      if (next.has(issueId)) next.delete(issueId);
+      else next.add(issueId);
+      return next;
+    });
+  }
+
+  function changeStatus(issue: ProjectQaIssue, status: IssueStatus) {
+    const previous = statusOf(issue);
+    setStatusOverrides((current) => ({ ...current, [issue.id]: status }));
+    if (!SUBMITTABLE.has(status)) {
+      setChecked((current) => {
+        const next = new Set(current);
+        next.delete(issue.id);
+        return next;
+      });
+    }
+    updateIssue.mutate(
+      { issueId: issue.id, status },
+      {
+        onSuccess: () => toast.success(`상태를 ${STATUS[status].label}(으)로 바꿨어요`),
+        onError: (error) => {
+          setStatusOverrides((current) => ({ ...current, [issue.id]: previous }));
+          toast.error(errorMessage(error));
+        },
+      },
+    );
+  }
 
   return (
-    <div className="space-y-5 p-6">
-      <div>
-        <h2 className="text-lg font-semibold">이슈 모아보기</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          검증 결과에서 표시한 프로퍼티를 논의하고, 다음 차수에서 다시 검증할지 결정합니다.
-        </p>
-      </div>
+    <div className="p-6">
+      <section className="max-w-[1080px] overflow-hidden rounded-[14px] border border-[#e3e8ef] bg-white">
+        <header className="flex flex-wrap items-center gap-4 border-b border-[#eef1f5] px-5 py-4">
+          <div>
+            <h2 className="text-[15px] font-bold tracking-[-0.2px]">처리할 이슈</h2>
+            <p className="mt-0.5 text-[12.5px] text-[#8b97a8]">
+              이슈는 그대로 두면 계속 남아요. 개발 수정이 끝난 항목만 골라서 다음 차수 검증 목록으로
+              제출합니다.
+            </p>
+          </div>
+          <div className="flex-1" />
+          <div className="flex items-center gap-[18px]">
+            {STATUSES.map((status) => {
+              const value = count(status);
+              return (
+                <div key={status} className="text-right">
+                  <p className="whitespace-nowrap text-[11.5px] text-[#8b97a8]">
+                    {STATUS[status].label}
+                  </p>
+                  <p
+                    className="text-[19px] font-bold tabular-nums"
+                    style={{ color: value ? STATUS[status].color : "#8b97a8" }}
+                  >
+                    {value}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        </header>
 
-      <Panel
-        title={`처리할 이슈 ${openIssues.length}`}
-        description="이슈를 등록하는 것만으로는 다음 차수에 이월되지 않아요."
-      >
-        {openIssues.length === 0 ? (
+        <div className="flex flex-wrap items-center gap-3 border-b border-[#eef1f5] bg-[#fbfcfd] px-5 py-[11px]">
+          <label className="flex cursor-pointer items-center gap-2 text-xs text-[#64748b]">
+            <button
+              type="button"
+              aria-label="수정 완료 항목 전체 선택"
+              onClick={() =>
+                setChecked(allChecked ? new Set() : new Set(submittable.map((i) => i.id)))
+              }
+              className={cn(
+                "flex size-4 items-center justify-center rounded border-[1.5px]",
+                allChecked
+                  ? "border-[#2b6a9c] bg-[#2b6a9c] text-white"
+                  : "border-[#c3ccd8] bg-white",
+              )}
+            >
+              {allChecked ? <Check className="size-3" /> : null}
+            </button>
+            수정 완료 항목 전체 선택
+          </label>
+          <div className="h-[18px] w-px bg-[#e3e8ef]" />
+          <div className="flex flex-wrap gap-1 rounded-[9px] bg-[#eef1f5] p-[3px]">
+            {(["all", ...STATUSES] as IssueFilter[]).map((key) => {
+              const label = key === "all" ? "전체" : STATUS[key].label;
+              const value = key === "all" ? activeIssues.length : count(key);
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setFilter(key)}
+                  className={cn(
+                    "whitespace-nowrap rounded-[7px] px-[11px] py-1.5 text-xs",
+                    filter === key
+                      ? "bg-white font-semibold text-[#1c2431] shadow-sm"
+                      : "text-[#8b97a8]",
+                  )}
+                >
+                  {label} {value}
+                </button>
+              );
+            })}
+          </div>
+          <div className="flex-1" />
+          <p className="text-xs text-[#8b97a8]">
+            개발 수정 중·해결 {submittable.length}건이 제출 대상이에요
+          </p>
+        </div>
+
+        {activeIssues.length === 0 ? (
           <EmptyState icon={CheckCircle2} title="처리할 이슈가 없어요" />
+        ) : shown.length === 0 ? (
+          <p className="px-5 py-12 text-center text-[12.5px] text-[#8b97a8]">
+            이 상태의 이슈가 없어요.
+          </p>
         ) : (
-          <ul className="divide-y">
-            {openIssues.map((issue) => {
-              const event = eventById.get(issue.event_id);
+          <ul>
+            {shown.map((issue) => {
+              const status = statusOf(issue);
+              const canSubmit = SUBMITTABLE.has(status);
+              const isChecked = checked.has(issue.id);
+              const noteOpen = openNotes.has(issue.id);
+              const eventName = eventById.get(issue.event_id)?.technical_name ?? issue.event_id;
               const environment = environmentById.get(issue.qa_environment_id);
               const channel = issue.qa_channel_id ? channelById.get(issue.qa_channel_id) : null;
+              const comments = [...issue.qa_discussion_comments].sort((a, b) =>
+                a.created_at.localeCompare(b.created_at),
+              );
+              const reason = comments.at(-1);
               return (
-                <li key={issue.id} className="space-y-3 p-4">
-                  <div className="flex flex-wrap items-start gap-2">
-                    <AlertTriangle className="mt-0.5 size-4 text-[#b45309]" />
-                    <div className="min-w-0 flex-1">
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <code className="mono-token text-sm font-semibold">
-                            {event?.technical_name ?? issue.event_id}.{issue.target_label}
-                          </code>
-                          <span
-                            className={cn(
-                              "inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold",
-                              STATUS_STYLE[issue.workflow_status],
-                            )}
-                          >
-                            {STATUS_LABEL[issue.workflow_status]}
-                          </span>
-                        </div>
-                        <p className="mt-1 text-[11px] text-muted-foreground">
-                          {[environment?.name, channel?.name ?? "채널 미지정", issue.session_name]
-                            .filter(Boolean)
-                            .join(" · ")}
-                        </p>
+                <li
+                  key={issue.id}
+                  className={cn(
+                    "border-b border-[#f1f4f8]",
+                    isChecked ? "bg-[#f7fbfd]" : "bg-white",
+                  )}
+                >
+                  <div className="grid grid-cols-[30px_minmax(0,1fr)_300px] items-start gap-5 px-5 py-[18px] max-md:grid-cols-[30px_minmax(0,1fr)]">
+                    <button
+                      type="button"
+                      disabled={!canSubmit}
+                      aria-label={`${eventName}.${issue.target_label} 제출 선택`}
+                      onClick={() => toggleChecked(issue.id)}
+                      className={cn(
+                        "mt-0.5 flex size-[18px] items-center justify-center rounded-[5px] border-[1.5px]",
+                        isChecked
+                          ? "border-[#2b6a9c] bg-[#2b6a9c] text-white"
+                          : canSubmit
+                            ? "border-[#c3ccd8] bg-white"
+                            : "cursor-not-allowed border-[#e8edf3] bg-white opacity-55",
+                      )}
+                    >
+                      {isChecked ? <Check className="size-3" /> : null}
+                    </button>
+
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-[9px]">
+                        <code className="break-all text-sm font-semibold tracking-[-0.2px] text-[#1c2431]">
+                          {eventName}
+                        </code>
+                        <span className="text-[#c3ccd8]">·</span>
+                        <code className="break-all text-sm font-semibold tracking-[-0.2px] text-[#2b6a9c]">
+                          {issue.target_label}
+                        </code>
                       </div>
-                      <Link
-                        to="/w/$wsId/p/$projectId/qa/$stageSlug/$roundId/$sessionId/$itemId"
-                        params={{
-                          wsId,
-                          projectId,
-                          stageSlug: environment?.slug ?? "-",
-                          roundId: issue.round_id,
-                          sessionId: issue.qa_session_id,
-                          itemId: issue.checklist_item_id,
-                        }}
-                        className="mt-1 inline-block text-xs text-[#4b4f8a] hover:underline"
-                      >
-                        검증 근거 보기
-                      </Link>
-                    </div>
-                  </div>
+                      <p className="mt-[7px] text-xs text-[#8b97a8]">
+                        {[
+                          environment?.name,
+                          channel?.name ?? "채널 미지정",
+                          issue.session_name,
+                          `${issue.round_number}차`,
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </p>
 
-                  {issue.qa_discussion_comments.length > 0 ? (
-                    <div className="space-y-2 rounded-lg bg-[#f8fafc] p-3">
-                      {issue.qa_discussion_comments.map((comment) => (
-                        <div key={comment.id}>
-                          <div className="flex items-center justify-between gap-2">
-                            <p className="text-[11px] text-muted-foreground">
-                              {formatDateTime(comment.created_at)}
-                            </p>
-                            {comment.author_id === user?.id && editingComment?.id !== comment.id ? (
-                              <button
-                                type="button"
-                                aria-label="댓글 수정"
-                                onClick={() =>
-                                  setEditingComment({ id: comment.id, body: comment.body })
-                                }
-                                className="text-muted-foreground hover:text-[#4b4f8a]"
-                              >
-                                <Pencil className="size-3" />
-                              </button>
-                            ) : null}
-                          </div>
-                          {editingComment?.id === comment.id ? (
-                            <div className="mt-1 space-y-1.5">
-                              <Textarea
-                                value={editingComment.body}
-                                onChange={(event) =>
-                                  setEditingComment({ id: comment.id, body: event.target.value })
-                                }
-                                className="min-h-[60px] bg-white"
-                              />
-                              <div className="flex justify-end gap-1.5">
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={() => setEditingComment(null)}
-                                >
-                                  취소
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  disabled={!editingComment.body.trim() || updateComment.isPending}
-                                  onClick={() =>
-                                    updateComment.mutate(
-                                      { commentId: comment.id, body: editingComment.body },
-                                      {
-                                        onSuccess: () => {
-                                          setEditingComment(null);
-                                          toast.success("댓글을 수정했어요");
-                                        },
-                                        onError: (error) => toast.error(errorMessage(error)),
-                                      },
-                                    )
-                                  }
-                                >
-                                  저장
-                                </Button>
-                              </div>
-                            </div>
-                          ) : (
-                            <p className="text-[13px] text-[#4a5666]">{comment.body}</p>
-                          )}
+                      {reason ? (
+                        <div className="mt-[11px] rounded-[10px] border border-[#eef1f5] bg-[#fbfcfd] px-3 py-2.5">
+                          <p className="text-[11.5px] text-[#8b97a8]">
+                            {formatDateTime(reason.created_at)}
+                          </p>
+                          <p className="mt-0.5 text-[13px] leading-[1.6] text-[#3c4757]">
+                            {reason.body}
+                          </p>
                         </div>
-                      ))}
+                      ) : null}
+
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() =>
+                            setOpenNotes((current) => {
+                              const next = new Set(current);
+                              if (next.has(issue.id)) next.delete(issue.id);
+                              else next.add(issue.id);
+                              return next;
+                            })
+                          }
+                          className={cn(
+                            "h-8 text-xs",
+                            noteOpen && "border-[#2b6a9c] text-[#2b6a9c]",
+                          )}
+                        >
+                          {noteOpen ? "메모 닫기" : "메모 남기기"}
+                        </Button>
+                        <Button asChild size="sm" variant="outline" className="h-8 text-xs">
+                          <Link
+                            to="/w/$wsId/p/$projectId/qa/$stageSlug/$roundId/$sessionId/$itemId"
+                            params={{
+                              wsId,
+                              projectId,
+                              stageSlug: environment?.slug ?? "-",
+                              roundId: issue.round_id,
+                              sessionId: issue.qa_session_id,
+                              itemId: issue.checklist_item_id,
+                            }}
+                          >
+                            검증 근거 보기
+                          </Link>
+                        </Button>
+                        <span
+                          className="text-[11.5px] font-semibold"
+                          style={{ color: STATUS[status].color }}
+                        >
+                          {STATUS[status].label} ·{" "}
+                          {formatDateTime(issue.updated_at ?? issue.created_at)} 업데이트
+                        </span>
+                        <div className="flex-1" />
+                        <QaIssueDeleteButton
+                          muted
+                          targetLabel={`${eventName}.${issue.target_label}`}
+                          pending={deleteIssue.isPending}
+                          onDelete={() =>
+                            deleteIssue.mutate(issue.id, {
+                              onSuccess: () => toast.success("이슈를 삭제했어요"),
+                              onError: (error) => toast.error(errorMessage(error)),
+                            })
+                          }
+                        />
+                      </div>
+
+                      {noteOpen ? (
+                        <div className="mt-2.5 space-y-2">
+                          {comments.length > 0 ? (
+                            <div className="max-h-52 space-y-2 overflow-y-auto rounded-[10px] bg-[#fbfcfd] p-3">
+                              {comments.map((comment) => (
+                                <div key={comment.id}>
+                                  <div className="flex items-center justify-between gap-2">
+                                    <p className="text-[11px] text-[#8b97a8]">
+                                      {formatDateTime(comment.created_at)}
+                                    </p>
+                                    {comment.author_id === user?.id &&
+                                    editingComment?.id !== comment.id ? (
+                                      <button
+                                        type="button"
+                                        aria-label="댓글 수정"
+                                        onClick={() =>
+                                          setEditingComment({ id: comment.id, body: comment.body })
+                                        }
+                                        className="text-[#8b97a8] hover:text-[#4b4f8a]"
+                                      >
+                                        <Pencil className="size-3" />
+                                      </button>
+                                    ) : null}
+                                  </div>
+                                  {editingComment?.id === comment.id ? (
+                                    <div className="mt-1 space-y-1.5">
+                                      <Textarea
+                                        value={editingComment.body}
+                                        onChange={(event) =>
+                                          setEditingComment({
+                                            id: comment.id,
+                                            body: event.target.value,
+                                          })
+                                        }
+                                        className="min-h-16 bg-white"
+                                      />
+                                      <div className="flex justify-end gap-1.5">
+                                        <Button
+                                          size="sm"
+                                          variant="ghost"
+                                          onClick={() => setEditingComment(null)}
+                                        >
+                                          취소
+                                        </Button>
+                                        <Button
+                                          size="sm"
+                                          disabled={
+                                            !editingComment.body.trim() || updateComment.isPending
+                                          }
+                                          onClick={() =>
+                                            updateComment.mutate(
+                                              { commentId: comment.id, body: editingComment.body },
+                                              {
+                                                onSuccess: () => {
+                                                  setEditingComment(null);
+                                                  toast.success("댓글을 수정했어요");
+                                                },
+                                                onError: (error) =>
+                                                  toast.error(errorMessage(error)),
+                                              },
+                                            )
+                                          }
+                                        >
+                                          저장
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <p className="text-[12.5px] leading-relaxed text-[#4a5666]">
+                                      {comment.body}
+                                    </p>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          ) : null}
+                          <IssueCommentBox
+                            issueId={issue.id}
+                            resultId={issue.checklist_item_result_id}
+                            userId={user?.id}
+                            value={drafts[issue.id] ?? ""}
+                            onChange={(value) =>
+                              setDrafts((current) => ({ ...current, [issue.id]: value }))
+                            }
+                            onSaved={() => {
+                              setDrafts((current) => ({ ...current, [issue.id]: "" }));
+                              setOpenNotes((current) => {
+                                const next = new Set(current);
+                                next.delete(issue.id);
+                                return next;
+                              });
+                            }}
+                          />
+                        </div>
+                      ) : null}
                     </div>
-                  ) : null}
 
-                  <IssueCommentBox
-                    issueId={issue.id}
-                    resultId={issue.checklist_item_result_id}
-                    userId={user?.id}
-                    value={drafts[issue.id] ?? ""}
-                    onChange={(value) =>
-                      setDrafts((current) => ({ ...current, [issue.id]: value }))
-                    }
-                    onSaved={() => setDrafts((current) => ({ ...current, [issue.id]: "" }))}
-                  />
-
-                  <div className="flex flex-wrap gap-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={updateIssue.isPending}
-                      onClick={() =>
-                        updateIssue.mutate(
-                          {
-                            issueId: issue.id,
-                            status: "still_issue",
-                            checklistItemId: issue.checklist_item_id,
-                          },
-                          {
-                            onSuccess: () => toast.success("이슈를 계속 확인할 항목으로 남겼어요"),
-                          },
-                        )
-                      }
-                    >
-                      여전히 이슈로 남기기
-                    </Button>
-                    <Button
-                      size="sm"
-                      disabled={updateIssue.isPending}
-                      onClick={() =>
-                        updateIssue.mutate(
-                          {
-                            issueId: issue.id,
-                            status: "next_validation",
-                            checklistItemId: issue.checklist_item_id,
-                          },
-                          {
-                            onSuccess: () => toast.success("다음 차수 검증 대상으로 이월했어요"),
-                            onError: (error) => toast.error(errorMessage(error)),
-                          },
-                        )
-                      }
-                    >
-                      <Clock3 className="size-4" /> 다음 차수에서 검증
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      disabled={updateIssue.isPending}
-                      onClick={() =>
-                        updateIssue.mutate(
-                          {
-                            issueId: issue.id,
-                            status: "dismissed",
-                            checklistItemId: issue.checklist_item_id,
-                          },
-                          { onSuccess: () => toast.success("오탐으로 종료했어요") },
-                        )
-                      }
-                    >
-                      오탐·종료
-                    </Button>
-                    <QaIssueDeleteButton
-                      targetLabel={`${event?.technical_name ?? issue.event_id}.${issue.target_label}`}
-                      pending={deleteIssue.isPending}
-                      onDelete={() => {
-                        deleteIssue.mutate(issue.id, {
-                          onSuccess: () => toast.success("이슈를 삭제했어요"),
-                          onError: (error) => toast.error(errorMessage(error)),
-                        });
-                      }}
-                    />
+                    <div className="border-l border-[#f1f4f8] pl-5 max-md:col-start-2 max-md:border-l-0 max-md:pl-0">
+                      <p className="text-[11.5px] text-[#8b97a8]">상태</p>
+                      <div className="mt-[9px] flex flex-col gap-[5px]">
+                        {STATUSES.map((option) => {
+                          const active = status === option;
+                          return (
+                            <button
+                              key={option}
+                              type="button"
+                              disabled={updateIssue.isPending}
+                              onClick={() => changeStatus(issue, option)}
+                              className="flex items-center gap-[9px] rounded-[10px] border px-[11px] py-[9px] text-left"
+                              style={{
+                                color: active ? STATUS[option].color : "#64748b",
+                                background: active ? STATUS[option].bg : "#fff",
+                                borderColor: active ? STATUS[option].color : "#e3e8ef",
+                              }}
+                            >
+                              <span
+                                className="size-2 shrink-0 rounded-full"
+                                style={{ background: active ? STATUS[option].color : "#d6dde6" }}
+                              />
+                              <span className="text-[12.5px] font-semibold">
+                                {STATUS[option].label}
+                              </span>
+                              <span className="flex-1" />
+                              {active && SUBMITTABLE.has(option) ? (
+                                <span className="text-[10.5px] font-medium text-[#8b97a8]">
+                                  제출 가능
+                                </span>
+                              ) : null}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
                   </div>
                 </li>
               );
             })}
           </ul>
         )}
-      </Panel>
+
+        <footer className="flex flex-wrap items-center gap-3.5 border-t border-[#eef1f5] bg-[#fbfcfd] px-5 py-[15px]">
+          <p className="text-[12.5px] text-[#5c6878]">
+            {selected.length
+              ? `선택한 ${selected.length}건이 ${nextRoundLabel} 체크리스트에 편입돼요.`
+              : "제출할 항목을 선택해주세요. 선택하지 않은 이슈는 그대로 남습니다."}
+          </p>
+          <div className="flex-1" />
+          <Button
+            disabled={selected.length === 0 || submitIssues.isPending}
+            onClick={() =>
+              submitIssues.mutate(selected, {
+                onSuccess: () => {
+                  setChecked(new Set());
+                  toast.success(`${selected.length}건을 다음 차수 검증 목록에 제출했어요`);
+                },
+                onError: (error) => toast.error(errorMessage(error)),
+              })
+            }
+            className="bg-[#2b6a9c] hover:bg-[#235a86] disabled:bg-[#e8edf3] disabled:text-[#a3adbb]"
+          >
+            {selected.length
+              ? `다음 차수에서 확인할 항목 ${selected.length}건 제출하기`
+              : "다음 차수에서 확인할 항목 제출하기"}
+          </Button>
+        </footer>
+      </section>
     </div>
   );
 }
@@ -293,26 +503,32 @@ function IssueCommentBox({
 }) {
   const addComment = useAddDiscussionComment(resultId);
   return (
-    <div className="flex gap-2">
+    <div>
       <Textarea
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder="원인, 수정 내용, 담당자를 남겨보세요"
-        className="min-h-[42px] flex-1"
+        className="min-h-16 text-[12.5px]"
       />
-      <Button
-        variant="outline"
-        disabled={!userId || !value.trim() || addComment.isPending}
-        onClick={() => {
-          if (!userId || !value.trim()) return;
-          addComment.mutate(
-            { discussionId: issueId, body: value.trim(), authorId: userId },
-            { onSuccess: onSaved, onError: (error) => toast.error(errorMessage(error)) },
-          );
-        }}
-      >
-        댓글
-      </Button>
+      <div className="mt-[7px] flex gap-2">
+        <Button
+          size="sm"
+          disabled={!userId || !value.trim() || addComment.isPending}
+          className="bg-[#1c2431] hover:bg-[#2c3648]"
+          onClick={() => {
+            if (!userId || !value.trim()) return;
+            addComment.mutate(
+              { discussionId: issueId, body: value.trim(), authorId: userId },
+              { onSuccess: onSaved, onError: (error) => toast.error(errorMessage(error)) },
+            );
+          }}
+        >
+          메모 저장
+        </Button>
+        <Button size="sm" variant="ghost" onClick={onSaved}>
+          취소
+        </Button>
+      </div>
     </div>
   );
 }

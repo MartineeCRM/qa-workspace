@@ -161,7 +161,7 @@ function ProjectOverview() {
                     <div className="flex items-start gap-2">
                       <AlertTriangle
                         className={
-                          issue.workflow_status === "needs_review"
+                          issue.workflow_status === "open"
                             ? "mt-0.5 size-4 text-destructive"
                             : "mt-0.5 size-4 text-muted-foreground"
                         }
@@ -182,9 +182,13 @@ function ProjectOverview() {
                           <Pill>{channel?.name ?? "채널 미지정"}</Pill>
                           <Pill>{issue.session_name}</Pill>
                           <Pill>
-                            {issue.workflow_status === "next_validation"
-                              ? "다음 검증 대기"
-                              : "확인 필요"}
+                            {issue.workflow_status === "open"
+                              ? "이슈 있음"
+                              : issue.workflow_status === "talk"
+                                ? "논의중"
+                                : issue.workflow_status === "fixing"
+                                  ? "개발 수정 중"
+                                  : "해결"}
                           </Pill>
                         </div>
                       </div>

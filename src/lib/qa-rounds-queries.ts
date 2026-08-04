@@ -661,7 +661,8 @@ export type QaDiscussion = {
   target_type: "event" | "property";
   target_id: string;
   target_label: string;
-  workflow_status: "needs_review" | "still_issue" | "next_validation" | "dismissed" | "verified";
+  workflow_status: "open" | "talk" | "fixing" | "done" | "dismissed" | "verified";
+  updated_at: string;
   qa_discussion_comments: QaDiscussionComment[];
 };
 
@@ -692,7 +693,7 @@ export function useCreateQaIssue(resultId: string, userId: string | undefined) {
           target_type: target.type,
           target_id: target.id,
           target_label: target.label,
-          workflow_status: "needs_review",
+          workflow_status: "open",
           created_by: userId,
         },
         { onConflict: "checklist_item_result_id,target_type,target_id", ignoreDuplicates: true },
@@ -840,6 +841,7 @@ export type ProjectQaIssue = QaDiscussion & {
   session_name: string;
   qa_environment_id: string;
   round_id: string;
+  round_number: number;
 };
 
 export function useProjectQaIssues(projectId: string) {
@@ -849,10 +851,10 @@ export function useProjectQaIssues(projectId: string) {
     queryFn: async (): Promise<ProjectQaIssue[]> => {
       const { data: rounds, error: roundsError } = await db
         .from("qa_rounds")
-        .select("id, qa_environment_id")
+        .select("id, qa_environment_id, round_number")
         .eq("project_id", projectId);
       if (roundsError) throw roundsError;
-      type IssueRoundRow = { id: string; qa_environment_id: string };
+      type IssueRoundRow = { id: string; qa_environment_id: string; round_number: number };
       type IssueSessionRow = {
         id: string;
         qa_round_id: string;
@@ -862,7 +864,10 @@ export function useProjectQaIssues(projectId: string) {
       type IssueItemRow = { id: string; qa_session_id: string; target_id: string };
       type IssueResultRow = { id: string; checklist_item_id: string };
       const roundById = new Map<string, IssueRoundRow>(
-        (rounds ?? []).map((r: { id: string; qa_environment_id: string }) => [r.id, r]),
+        (rounds ?? []).map((r: { id: string; qa_environment_id: string; round_number: number }) => [
+          r.id,
+          r,
+        ]),
       );
       if (roundById.size === 0) return [];
 
@@ -923,6 +928,7 @@ export function useProjectQaIssues(projectId: string) {
             session_name: session.name,
             qa_environment_id: round.qa_environment_id,
             round_id: session.qa_round_id,
+            round_number: round.round_number,
           },
         ];
       });
@@ -936,28 +942,44 @@ export function useUpdateQaIssue(projectId: string) {
     mutationFn: async ({
       issueId,
       status,
-      checklistItemId,
     }: {
       issueId: string;
       status: ProjectQaIssue["workflow_status"];
-      checklistItemId: string;
     }) => {
-      if (status === "next_validation") {
-        const { error: carryError } = await db.rpc("carry_over_qa_checklist_items", {
-          _item_ids: [checklistItemId],
-          _assignee_id: null,
-        });
-        if (carryError) throw carryError;
-      }
       const { error } = await db
         .from("qa_discussions")
-        .update({ workflow_status: status })
+        .update({ workflow_status: status, updated_at: new Date().toISOString() })
         .eq("id", issueId);
       if (error) throw error;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["project-qa-issues", projectId] });
       qc.invalidateQueries({ queryKey: ["qa-checklist-items"] });
+      qc.invalidateQueries({ queryKey: ["project-checklist-coverage"] });
+    },
+  });
+}
+
+export function useSubmitQaIssues(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (issues: ProjectQaIssue[]) => {
+      const bySession = new Map<string, ProjectQaIssue[]>();
+      for (const issue of issues) {
+        bySession.set(issue.qa_session_id, [...(bySession.get(issue.qa_session_id) ?? []), issue]);
+      }
+      for (const sessionIssues of bySession.values()) {
+        const { error } = await db.rpc("carry_over_qa_checklist_items", {
+          _item_ids: [...new Set(sessionIssues.map((issue) => issue.checklist_item_id))],
+          _assignee_id: null,
+        });
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["project-qa-issues", projectId] });
+      qc.invalidateQueries({ queryKey: ["qa-checklist-items"] });
+      qc.invalidateQueries({ queryKey: ["qa-rounds"] });
       qc.invalidateQueries({ queryKey: ["project-checklist-coverage"] });
     },
   });
