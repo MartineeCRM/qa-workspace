@@ -1,8 +1,12 @@
+import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { Panel } from "@/components/app/layout-parts";
+import { cn } from "@/lib/utils";
 import { useQaChecklistItems, type QaSession } from "@/lib/qa-rounds-queries";
 import { useTaxonomyCustomAttributes, useTaxonomyEvents } from "@/lib/queries";
 import { compactVerdictReason } from "@/lib/qa-workflow";
+
+type ResultFilter = "all" | "failed" | "not_collected" | "passed";
 
 function verdictBadge(finalStatus: "passed" | "failed" | "not_collected") {
   const map = {
@@ -31,6 +35,32 @@ export function QaSessionResultsPanel({
   const { data: events = [] } = useTaxonomyEvents(projectId);
   const { data: customAttributes = [] } = useTaxonomyCustomAttributes(projectId);
   const { data: checklistItems = [] } = useQaChecklistItems(session.id);
+  const [filter, setFilter] = useState<ResultFilter>("all");
+
+  const rows = checklistItems.map((item) => ({
+    item,
+    result: item.qa_checklist_item_results[0],
+    finalStatus: item.qa_checklist_item_results[0]?.final_status ?? "not_collected",
+  }));
+  const filters: Array<{ key: ResultFilter; label: string; count: number }> = [
+    { key: "all", label: "전체", count: rows.length },
+    {
+      key: "failed",
+      label: "오류",
+      count: rows.filter((row) => row.finalStatus === "failed").length,
+    },
+    {
+      key: "not_collected",
+      label: "미발생",
+      count: rows.filter((row) => row.finalStatus === "not_collected").length,
+    },
+    {
+      key: "passed",
+      label: "통과",
+      count: rows.filter((row) => row.finalStatus === "passed").length,
+    },
+  ];
+  const shownRows = filter === "all" ? rows : rows.filter((row) => row.finalStatus === filter);
 
   function itemLabel(targetType: "event" | "custom_attribute", targetId: string): string {
     const label =
@@ -44,6 +74,26 @@ export function QaSessionResultsPanel({
     <Panel
       title="판정 결과"
       description="항목을 눌러 검증 근거를 확인하고 필요한 대상을 이슈로 등록하세요. 상태 변경과 다음 차수 검증은 이슈 모아보기에서 관리합니다."
+      actions={
+        <div className="flex flex-wrap gap-1 rounded-lg bg-[#f1f4f8] p-[3px]">
+          {filters.map((option) => (
+            <button
+              key={option.key}
+              type="button"
+              aria-pressed={filter === option.key}
+              onClick={() => setFilter(option.key)}
+              className={cn(
+                "rounded-md px-2.5 py-1 text-xs",
+                filter === option.key
+                  ? "bg-white font-semibold text-[#1c2431] shadow-sm"
+                  : "text-[#8b97a8]",
+              )}
+            >
+              {option.label} {option.count}
+            </button>
+          ))}
+        </div>
+      }
     >
       <div className="grid grid-cols-[minmax(240px,360px)_minmax(320px,1fr)_96px_20px] items-center gap-3 border-y border-[#e3e8ef] bg-[#f8fafc] px-[18px] py-2 text-[11.5px] font-semibold text-[#64748b]">
         <span>대상</span>
@@ -51,9 +101,7 @@ export function QaSessionResultsPanel({
         <span className="text-center">결과</span>
         <span />
       </div>
-      {checklistItems.map((item) => {
-        const result = item.qa_checklist_item_results[0];
-        const finalStatus = result?.final_status ?? "not_collected";
+      {shownRows.map(({ item, result, finalStatus }) => {
         const summary =
           result?.ai_reasoning ??
           (finalStatus === "passed"
@@ -79,6 +127,11 @@ export function QaSessionResultsPanel({
           </Link>
         );
       })}
+      {shownRows.length === 0 ? (
+        <p className="px-4 py-10 text-center text-sm text-muted-foreground">
+          해당 판정 결과가 없어요.
+        </p>
+      ) : null}
     </Panel>
   );
 }
