@@ -203,10 +203,7 @@ export function QaItemView({
                     (evidenceHighlight?.tone === "pass"
                       ? "rounded-sm bg-emerald-400/20 px-0.5"
                       : "rounded-sm bg-amber-300/20 px-0.5"),
-                  !issueHovered &&
-                    !selected &&
-                    highlighted &&
-                    "rounded-sm bg-[#4a3f00] px-0.5 text-[#f2d675]",
+                  !issueHovered && !selected && highlighted && "rounded-sm bg-red-400/20 px-0.5",
                 )}
               >
                 {JSON.stringify(k)}: {JSON.stringify(v)}
@@ -223,7 +220,7 @@ export function QaItemView({
   function renderSnapshotChange(row: MergedTimelineRow) {
     const highlighted = violatingProperties.has(row.name);
     return (
-      <span className={highlighted ? "rounded-sm bg-[#4a3f00] px-0.5 text-[#f2d675]" : undefined}>
+      <span className={highlighted ? "rounded-sm bg-red-400/20 px-0.5" : undefined}>
         {row.change}
       </span>
     );
