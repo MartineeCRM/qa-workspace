@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { Copy } from "lucide-react";
+import { Copy, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { Panel } from "@/components/app/layout-parts";
 import { QaItemSpecDiffTable } from "@/components/app/qa-item-spec-diff";
@@ -30,6 +30,7 @@ import {
   useQaChecklistItems,
   useQaDiscussions,
   useQaRunEvents,
+  useUpdateDiscussionComment,
   type QaChecklistItemWithDisposition,
   type QaChecklistItemResult,
   type QaSession,
@@ -77,6 +78,7 @@ export function QaItemView({
   const createIssue = useCreateQaIssue(result?.id ?? "", user?.id);
   const deleteIssue = useDeleteQaIssue(projectId, result?.id);
   const addComment = useAddDiscussionComment(result?.id ?? "");
+  const updateComment = useUpdateDiscussionComment();
   const analyze = useAnalyzeChecklist(session.id);
   const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null);
   const [commentBody, setCommentBody] = useState("");
@@ -87,6 +89,7 @@ export function QaItemView({
     tone: "pass" | "issue";
   } | null>(null);
   const [hoveredIssueProperty, setHoveredIssueProperty] = useState<string | null>(null);
+  const [editingComment, setEditingComment] = useState<{ id: string; body: string } | null>(null);
 
   // "이전/다음 항목" links only change the :itemId path param, so this component
   // doesn't remount between items.
@@ -96,6 +99,7 @@ export function QaItemView({
     setCommentBody("");
     setEvidenceHighlight(null);
     setHoveredIssueProperty(null);
+    setEditingComment(null);
   }, [item.id]);
 
   const label =
@@ -593,12 +597,71 @@ export function QaItemView({
                         <div className="max-h-52 space-y-2 overflow-y-auto rounded-lg bg-[#f8fafc] p-3">
                           {selectedIssue.qa_discussion_comments.map((comment) => (
                             <div key={comment.id}>
-                              <p className="text-[11px] text-[#8b97a8]">
-                                {formatDateTime(comment.created_at)}
-                              </p>
-                              <p className="text-[12.5px] leading-relaxed text-[#4a5666]">
-                                {comment.body}
-                              </p>
+                              <div className="flex items-center justify-between gap-2">
+                                <p className="text-[11px] text-[#8b97a8]">
+                                  {formatDateTime(comment.created_at)}
+                                </p>
+                                {comment.author_id === user?.id &&
+                                editingComment?.id !== comment.id ? (
+                                  <button
+                                    type="button"
+                                    aria-label="댓글 수정"
+                                    onClick={() =>
+                                      setEditingComment({ id: comment.id, body: comment.body })
+                                    }
+                                    className="text-[#8b97a8] hover:text-[#4b4f8a]"
+                                  >
+                                    <Pencil className="size-3" />
+                                  </button>
+                                ) : null}
+                              </div>
+                              {editingComment?.id === comment.id ? (
+                                <div className="mt-1 space-y-1.5">
+                                  <Textarea
+                                    value={editingComment.body}
+                                    onChange={(event) =>
+                                      setEditingComment({
+                                        id: comment.id,
+                                        body: event.target.value,
+                                      })
+                                    }
+                                    className="min-h-[60px] bg-white"
+                                  />
+                                  <div className="flex justify-end gap-1.5">
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => setEditingComment(null)}
+                                    >
+                                      취소
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      disabled={
+                                        !editingComment.body.trim() || updateComment.isPending
+                                      }
+                                      onClick={() =>
+                                        updateComment.mutate(
+                                          { commentId: comment.id, body: editingComment.body },
+                                          {
+                                            onSuccess: () => {
+                                              setEditingComment(null);
+                                              toast.success("댓글을 수정했어요");
+                                            },
+                                            onError: (error) => toast.error(errorMessage(error)),
+                                          },
+                                        )
+                                      }
+                                    >
+                                      저장
+                                    </Button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <p className="text-[12.5px] leading-relaxed text-[#4a5666]">
+                                  {comment.body}
+                                </p>
+                              )}
                             </div>
                           ))}
                         </div>

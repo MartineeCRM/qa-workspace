@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { createFileRoute, Link, useParams } from "@tanstack/react-router";
-import { AlertTriangle, CheckCircle2, Clock3 } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Clock3, Pencil } from "lucide-react";
 import { toast } from "sonner";
 
 import { EmptyState, Panel } from "@/components/app/layout-parts";
@@ -15,6 +15,7 @@ import {
   useProjectQaIssues,
   useQaChannels,
   useUpdateQaIssue,
+  useUpdateDiscussionComment,
 } from "@/lib/qa-rounds-queries";
 import { useEnvironments, useTaxonomyEvents } from "@/lib/queries";
 import { cn } from "@/lib/utils";
@@ -48,7 +49,9 @@ function QaIssuesPage() {
   const { data: channels = [] } = useQaChannels(projectId);
   const updateIssue = useUpdateQaIssue(projectId);
   const deleteIssue = useDeleteQaIssue(projectId);
+  const updateComment = useUpdateDiscussionComment();
   const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const [editingComment, setEditingComment] = useState<{ id: string; body: string } | null>(null);
   const eventById = new Map(events.map((event) => [event.id, event]));
   const environmentById = new Map(environments.map((environment) => [environment.id, environment]));
   const channelById = new Map(channels.map((channel) => [channel.id, channel]));
@@ -123,10 +126,63 @@ function QaIssuesPage() {
                     <div className="space-y-2 rounded-lg bg-[#f8fafc] p-3">
                       {issue.qa_discussion_comments.map((comment) => (
                         <div key={comment.id}>
-                          <p className="text-[11px] text-muted-foreground">
-                            {formatDateTime(comment.created_at)}
-                          </p>
-                          <p className="text-[13px] text-[#4a5666]">{comment.body}</p>
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="text-[11px] text-muted-foreground">
+                              {formatDateTime(comment.created_at)}
+                            </p>
+                            {comment.author_id === user?.id && editingComment?.id !== comment.id ? (
+                              <button
+                                type="button"
+                                aria-label="댓글 수정"
+                                onClick={() =>
+                                  setEditingComment({ id: comment.id, body: comment.body })
+                                }
+                                className="text-muted-foreground hover:text-[#4b4f8a]"
+                              >
+                                <Pencil className="size-3" />
+                              </button>
+                            ) : null}
+                          </div>
+                          {editingComment?.id === comment.id ? (
+                            <div className="mt-1 space-y-1.5">
+                              <Textarea
+                                value={editingComment.body}
+                                onChange={(event) =>
+                                  setEditingComment({ id: comment.id, body: event.target.value })
+                                }
+                                className="min-h-[60px] bg-white"
+                              />
+                              <div className="flex justify-end gap-1.5">
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => setEditingComment(null)}
+                                >
+                                  취소
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  disabled={!editingComment.body.trim() || updateComment.isPending}
+                                  onClick={() =>
+                                    updateComment.mutate(
+                                      { commentId: comment.id, body: editingComment.body },
+                                      {
+                                        onSuccess: () => {
+                                          setEditingComment(null);
+                                          toast.success("댓글을 수정했어요");
+                                        },
+                                        onError: (error) => toast.error(errorMessage(error)),
+                                      },
+                                    )
+                                  }
+                                >
+                                  저장
+                                </Button>
+                              </div>
+                            </div>
+                          ) : (
+                            <p className="text-[13px] text-[#4a5666]">{comment.body}</p>
+                          )}
                         </div>
                       ))}
                     </div>

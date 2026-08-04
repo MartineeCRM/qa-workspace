@@ -815,6 +815,23 @@ export function useAddDiscussionComment(resultId: string) {
   });
 }
 
+export function useUpdateDiscussionComment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ commentId, body }: { commentId: string; body: string }) => {
+      const { error } = await db
+        .from("qa_discussion_comments")
+        .update({ body: body.trim() })
+        .eq("id", commentId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["qa-discussions"] });
+      qc.invalidateQueries({ queryKey: ["project-qa-issues"] });
+    },
+  });
+}
+
 export type ProjectQaIssue = QaDiscussion & {
   checklist_item_id: string;
   event_id: string;
