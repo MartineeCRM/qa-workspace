@@ -85,6 +85,27 @@ describe("judgeChecklistItem — custom attribute with no validation rule", () =
     expect(result.judged_by).toBe("rule");
   });
 
+  it("parses a comma-separated flat array attribute before judging", async () => {
+    const snapshots: AttributeSnapshot[] = [
+      {
+        external_user_id: "u1",
+        snapshot_name: "before",
+        status: "captured",
+        payload: { item_viewed_history: "item-a" },
+        captured_at: "2026-08-03T06:00:00Z",
+      },
+      {
+        external_user_id: "u1",
+        snapshot_name: "after",
+        status: "captured",
+        payload: { item_viewed_history: "item-a, item-b,  item-c" },
+        captured_at: "2026-08-03T06:06:34Z",
+      },
+    ];
+    const result = await judgeChecklistItem(item, ctxWithSnapshots(snapshots));
+    expect(result.final_status).toBe("passed");
+  });
+
   it("still returns not_collected when the attribute never shows up in any snapshot", async () => {
     const snapshots: AttributeSnapshot[] = [
       {

@@ -4,6 +4,7 @@ import {
   judgeEventStructural,
   matchEventLogs,
   matchLatestSnapshotValue,
+  normalizeFlatAttributeArrays,
   type AttributeSnapshot,
   type RunEvent,
   type TaxonomyAttributeLite,
@@ -39,6 +40,10 @@ export async function judgeChecklistItem(
     snapshots: AttributeSnapshot[];
   },
 ): Promise<ChecklistItemVerdict> {
+  ctx = {
+    ...ctx,
+    snapshots: normalizeFlatAttributeArrays(ctx.snapshots, ctx.customAttributes),
+  };
   const base = { checklist_item_id: item.id };
 
   if (item.target_type === "event") {

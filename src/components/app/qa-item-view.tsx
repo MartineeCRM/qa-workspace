@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 import { errorMessage, formatDateTime, formatRawLogTime } from "@/lib/domain";
+import { normalizeFlatAttributeArrays } from "@/lib/checklist-judge";
 import {
   aiFailedTaxonomyPropertyIds,
   buildMergedTimeline,
@@ -104,7 +105,8 @@ export function QaItemView({
   const selectedIssue =
     discussions.find((discussion) => discussion.id === selectedIssueId) ?? discussions[0] ?? null;
 
-  const timeline = buildMergedTimeline(runEvents, snapshots);
+  const normalizedSnapshots = normalizeFlatAttributeArrays(snapshots, customAttributes);
+  const timeline = buildMergedTimeline(runEvents, normalizedSnapshots);
   // Scope the evidence log to this item's own target — never fall back to showing
   // the whole session's CSV/snapshot history for items with no ai_evidence (e.g.
   // passed verdicts), which is what a size-0-relevantKeys fallback used to do.
@@ -231,7 +233,7 @@ export function QaItemView({
       customAttributes,
       rules,
       runEvents,
-      snapshots,
+      snapshots: normalizedSnapshots,
     });
   }
 

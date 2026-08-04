@@ -63,6 +63,31 @@ export function matchLatestSnapshotValue(
   return captured[0]?.payload?.[technicalName];
 }
 
+export function normalizeFlatAttributeArrays<T extends { payload: Record<string, unknown> | null }>(
+  snapshots: T[],
+  attributes: Array<{ technical_name: string; data_type: string }>,
+): T[] {
+  const arrayNames = new Set(
+    attributes.filter((attribute) => attribute.data_type === "array").map((a) => a.technical_name),
+  );
+  return snapshots.map((snapshot) => ({
+    ...snapshot,
+    payload: snapshot.payload
+      ? Object.fromEntries(
+          Object.entries(snapshot.payload).map(([name, value]) => [
+            name,
+            arrayNames.has(name) && typeof value === "string"
+              ? value
+                  .split(",")
+                  .map((item) => item.trim())
+                  .filter(Boolean)
+              : value,
+          ]),
+        )
+      : null,
+  }));
+}
+
 export function matchesDataType(value: unknown, dataType: string): boolean {
   switch (dataType) {
     case "string":
