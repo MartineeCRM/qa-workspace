@@ -298,7 +298,7 @@ export function QaItemSpecDiffTable({
           <div>프로퍼티</div>
           <div>AS-IS · 실제 수신</div>
           <div>TO-BE · 택소노미 정의</div>
-          <div>판정</div>
+          <div className="text-center">판정</div>
           <div>확인 및 처리</div>
         </div>
 
@@ -361,10 +361,10 @@ export function QaItemSpecDiffTable({
                             : "예시값 없음 · 택소노미에 추가해주세요"}
                       </p>
                     </div>
-                    <div>
+                    <div className="flex justify-center">
                       <span
                         className={cn(
-                          "inline-flex w-[68px] items-center justify-center whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold",
+                          "inline-block whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold",
                           badge.className,
                         )}
                       >
