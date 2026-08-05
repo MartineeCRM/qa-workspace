@@ -1010,6 +1010,16 @@ describe("buildEventSpecDiffRows", () => {
     });
     expect(rows.find((row) => row.propertyId === "p2")?.verdict).toBe("semantic_mismatch");
   });
+
+  it("does not call a property passed when its AI validation did not finish", () => {
+    const rows = buildEventSpecDiffRows({
+      properties,
+      rawPropertiesList: [{ item_final_price_krw: "15661", platform: "android_app" }],
+      aiPendingPropertyIds: new Set(["p2"]),
+    });
+    expect(rows.find((row) => row.propertyId === "p2")?.verdict).toBe("ai_pending");
+    expect(rows.find((row) => row.propertyId === "p1")?.verdict).toBe("pass");
+  });
 });
 
 describe("aiFailedTaxonomyPropertyIds", () => {

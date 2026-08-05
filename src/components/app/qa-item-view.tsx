@@ -56,10 +56,19 @@ type RuleCounts = {
   undefined: number;
   type: number;
   format: number;
+  aiPending: number;
   passed: number;
 };
 
 function extractAiSummary(evidence: unknown): string | null {
+  if (
+    evidence &&
+    typeof evidence === "object" &&
+    !Array.isArray(evidence) &&
+    typeof (evidence as { qualitative_error?: unknown }).qualitative_error === "string"
+  ) {
+    return (evidence as { qualitative_error: string }).qualitative_error;
+  }
   const nested =
     evidence && typeof evidence === "object" && !Array.isArray(evidence)
       ? (evidence as { qualitative?: unknown }).qualitative
@@ -178,6 +187,12 @@ export function QaItemView({
   );
   const evidenceRows = timeline.filter((row) => relevantKeys.has(row.key));
   const aiFailedPropertyIds = aiFailedTaxonomyPropertyIds(result?.ai_evidence);
+  const aiAnalysisIncomplete = Boolean(
+    result?.ai_evidence &&
+    typeof result.ai_evidence === "object" &&
+    !Array.isArray(result.ai_evidence) &&
+    (result.ai_evidence as { qualitative_error?: unknown }).qualitative_error,
+  );
   const evidenceIsLong =
     evidenceRows.length > 6 ||
     evidenceRows.reduce(
@@ -193,6 +208,15 @@ export function QaItemView({
               !exclusions?.properties.has(`${property.id}:${session.qa_channel_id}`)),
         )
       : [];
+  const aiPendingPropertyIds = aiAnalysisIncomplete
+    ? new Set(
+        thisEventProperties
+          .filter(
+            (property) => Boolean(property.description?.trim()) || property.example_value != null,
+          )
+          .map((property) => property.id),
+      )
+    : undefined;
   // Newest-first: buildEventSpecDiffRows uses this as the representative sample
   // value shown per property, and the most recent occurrence is the most
   // relevant one to show.
@@ -218,6 +242,7 @@ export function QaItemView({
           })),
           rawPropertiesList: matchedRawPropertiesList,
           aiFailedPropertyIds,
+          aiPendingPropertyIds,
         })
       : [];
   const ruleCounts: RuleCounts = {
@@ -227,6 +252,7 @@ export function QaItemView({
     format: summaryDiffRows.filter(
       (row) => row.verdict === "value_mismatch" || row.verdict === "semantic_mismatch",
     ).length,
+    aiPending: summaryDiffRows.filter((row) => row.verdict === "ai_pending").length,
     passed:
       item.target_type === "event"
         ? summaryDiffRows.filter((row) => row.verdict === "pass").length
@@ -414,6 +440,7 @@ export function QaItemView({
                     { label: "미정의", value: ruleCounts.undefined, color: "#b45309" },
                     { label: "타입", value: ruleCounts.type, color: "#dc2626" },
                     { label: "값 형식", value: ruleCounts.format, color: "#dc2626" },
+                    { label: "AI 확인 필요", value: ruleCounts.aiPending, color: "#a4550a" },
                     { label: "통과", value: ruleCounts.passed, color: "#16a34a" },
                   ].map((stat) => (
                     <div key={stat.label}>
@@ -516,6 +543,7 @@ export function QaItemView({
               properties={thisEventProperties}
               rawPropertiesList={matchedRawPropertiesList}
               aiFailedPropertyIds={aiFailedPropertyIds}
+              aiPendingPropertyIds={aiPendingPropertyIds}
               onReanalyze={reanalyzeAfterTaxonomyChange}
               onHighlightChange={(propertyNames, tone) =>
                 setEvidenceHighlight(tone ? { propertyNames: new Set(propertyNames), tone } : null)

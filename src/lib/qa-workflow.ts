@@ -593,6 +593,7 @@ export type SpecDiffVerdict =
   | "type_mismatch"
   | "value_mismatch"
   | "semantic_mismatch"
+  | "ai_pending"
   | "undefined_property";
 
 export type SpecDiffRow = {
@@ -629,6 +630,7 @@ export function buildEventSpecDiffRows(input: {
   // a property only counts as "observed" once some occurrence actually carried it.
   rawPropertiesList: Array<Record<string, unknown>>;
   aiFailedPropertyIds?: Set<string>;
+  aiPendingPropertyIds?: Set<string>;
 }): SpecDiffRow[] {
   const knownNames = input.properties.map((p) => p.technical_name);
   const rows: SpecDiffRow[] = [];
@@ -659,9 +661,13 @@ export function buildEventSpecDiffRows(input: {
             ? "value_mismatch"
             : "pass";
     const verdict: SpecDiffVerdict =
-      structuralVerdict === "pass" && input.aiFailedPropertyIds?.has(prop.id)
-        ? "semantic_mismatch"
-        : structuralVerdict;
+      structuralVerdict !== "pass"
+        ? structuralVerdict
+        : input.aiFailedPropertyIds?.has(prop.id)
+          ? "semantic_mismatch"
+          : input.aiPendingPropertyIds?.has(prop.id)
+            ? "ai_pending"
+            : "pass";
     rows.push({
       propertyId: prop.id,
       name: prop.technical_name,

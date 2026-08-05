@@ -16,7 +16,7 @@ import {
   type TaxonomyEventProperty,
 } from "@/lib/queries";
 
-type FilterKey = "필수 누락" | "미정의" | "타입" | "값·형식" | "통과" | "전체";
+type FilterKey = "필수 누락" | "미정의" | "타입" | "값·형식" | "AI 확인 필요" | "통과" | "전체";
 type FixAction = "type" | "optional" | "allow_value" | "add" | "rename";
 
 const OBSERVED_TYPE_TO_TAXONOMY_TYPE: Record<string, string> = {
@@ -49,6 +49,9 @@ function verdictBadge(verdict: SpecDiffVerdict) {
   if (verdict === "semantic_mismatch") {
     return { label: "형식·의미", className: "bg-[#fdecec] text-[#dc2626]" };
   }
+  if (verdict === "ai_pending") {
+    return { label: "AI 확인 필요", className: "bg-[#fff7e6] text-[#a4550a]" };
+  }
   if (verdict === "undefined_property") {
     return { label: "미정의", className: "bg-[#fdf3e3] text-[#b45309]" };
   }
@@ -75,6 +78,7 @@ export function QaItemSpecDiffTable({
   properties,
   rawPropertiesList,
   aiFailedPropertyIds,
+  aiPendingPropertyIds,
   onReanalyze,
   onCreateIssue,
   onHighlightChange,
@@ -84,6 +88,7 @@ export function QaItemSpecDiffTable({
   properties: TaxonomyEventProperty[];
   rawPropertiesList: Record<string, unknown>[];
   aiFailedPropertyIds: Set<string>;
+  aiPendingPropertyIds?: Set<string>;
   onReanalyze: () => Promise<void>;
   onCreateIssue: (target: { id: string; label: string }) => void;
   onHighlightChange: (propertyNames: string[], tone: "pass" | "issue" | null) => void;
@@ -116,8 +121,9 @@ export function QaItemSpecDiffTable({
         })),
         rawPropertiesList,
         aiFailedPropertyIds,
+        aiPendingPropertyIds,
       }),
-    [properties, rawPropertiesList, aiFailedPropertyIds],
+    [properties, rawPropertiesList, aiFailedPropertyIds, aiPendingPropertyIds],
   );
 
   const typeMismatchRows = rows.filter((r) => r.verdict === "type_mismatch");
@@ -126,6 +132,7 @@ export function QaItemSpecDiffTable({
   const valueRows = rows.filter(
     (r) => r.verdict === "value_mismatch" || r.verdict === "semantic_mismatch",
   );
+  const aiPendingRows = rows.filter((r) => r.verdict === "ai_pending");
   const passedRows = rows.filter((r) => r.verdict === "pass");
   const mismatchRows = rows.filter((r) => r.verdict !== "pass");
   const mismatchTotal = mismatchRows.length;
@@ -135,6 +142,7 @@ export function QaItemSpecDiffTable({
     { key: "미정의", label: `미정의 ${undefinedRows.length}` },
     { key: "타입", label: `타입 ${typeMismatchRows.length}` },
     { key: "값·형식", label: `값·형식 ${valueRows.length}` },
+    { key: "AI 확인 필요", label: `AI 확인 필요 ${aiPendingRows.length}` },
     { key: "통과", label: `통과 ${passedRows.length}` },
     { key: "전체", label: `전체 ${rows.length}` },
   ];
@@ -150,7 +158,9 @@ export function QaItemSpecDiffTable({
             ? undefinedRows
             : filter === "값·형식"
               ? valueRows
-              : passedRows;
+              : filter === "AI 확인 필요"
+                ? aiPendingRows
+                : passedRows;
 
   function selectFilter(nextFilter: FilterKey) {
     setFilter(nextFilter);
@@ -165,7 +175,9 @@ export function QaItemSpecDiffTable({
               ? undefinedRows
               : nextFilter === "값·형식"
                 ? valueRows
-                : passedRows;
+                : nextFilter === "AI 확인 필요"
+                  ? aiPendingRows
+                  : passedRows;
     onHighlightChange(
       selectedRows.map((row) => row.name),
       nextFilter === "전체" ? null : nextFilter === "통과" ? "pass" : "issue",
@@ -190,7 +202,7 @@ export function QaItemSpecDiffTable({
     if (row.verdict === "value_mismatch") {
       return [{ key: "allow_value", label: `${JSON.stringify(row.observedSample)} 허용값 추가` }];
     }
-    if (row.verdict === "semantic_mismatch") {
+    if (row.verdict === "semantic_mismatch" || row.verdict === "ai_pending") {
       return [];
     }
     // undefined_property
