@@ -70,6 +70,7 @@ export function QaSessionChecklistPanel({
   const adoptCarryOver = useAdoptCarryOverItems(session.id);
   const capture = useCaptureAttributeSnapshot(session.id, projectId);
   const [search, setSearch] = useState("");
+  const [taxonomyTab, setTaxonomyTab] = useState<"events" | "attributes">("events");
   const [brazeId, setBrazeId] = useState("");
   const [now, setNow] = useState(Date.now());
   const [aiSuggestions, setAiSuggestions] = useState<SuggestedAttribute[]>([]);
@@ -173,13 +174,22 @@ export function QaSessionChecklistPanel({
     (event) =>
       !q ||
       event.technical_name.toLowerCase().includes(q) ||
-      (event.display_name ?? "").toLowerCase().includes(q),
+      (event.display_name ?? "").toLowerCase().includes(q) ||
+      (event.description ?? "").toLowerCase().includes(q) ||
+      eventProperties.some(
+        (property) =>
+          property.event_id === event.id &&
+          (property.technical_name.toLowerCase().includes(q) ||
+            (property.display_name ?? "").toLowerCase().includes(q) ||
+            (property.description ?? "").toLowerCase().includes(q)),
+      ),
   );
   const visibleAttributes = attributes.filter(
     (attribute) =>
       !q ||
       attribute.technical_name.toLowerCase().includes(q) ||
-      (attribute.display_name ?? "").toLowerCase().includes(q),
+      (attribute.display_name ?? "").toLowerCase().includes(q) ||
+      (attribute.description ?? "").toLowerCase().includes(q),
   );
 
   function toggleTarget(targetType: "event" | "custom_attribute", targetId: string) {
@@ -249,93 +259,145 @@ export function QaSessionChecklistPanel({
                 className="border-0 bg-transparent px-0 shadow-none focus-visible:ring-0"
               />
             </label>
+            <div
+              className="mt-3 grid grid-cols-2 rounded-lg bg-[#eef2f6] p-1"
+              role="tablist"
+              aria-label="택소노미 유형"
+            >
+              <button
+                type="button"
+                role="tab"
+                aria-selected={taxonomyTab === "events"}
+                onClick={() => setTaxonomyTab("events")}
+                className={cn(
+                  "rounded-md px-3 py-2 text-xs font-semibold transition-colors",
+                  taxonomyTab === "events"
+                    ? "bg-white text-[#1f5f8b] shadow-sm"
+                    : "text-[#64748b] hover:text-[#334155]",
+                )}
+              >
+                이벤트 {visibleEvents.length}
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={taxonomyTab === "attributes"}
+                onClick={() => setTaxonomyTab("attributes")}
+                className={cn(
+                  "rounded-md px-3 py-2 text-xs font-semibold transition-colors",
+                  taxonomyTab === "attributes"
+                    ? "bg-white text-[#5b5fc7] shadow-sm"
+                    : "text-[#64748b] hover:text-[#334155]",
+                )}
+              >
+                어트리뷰트 {visibleAttributes.length}
+              </button>
+            </div>
           </header>
 
           <div className="max-h-[560px] overflow-y-auto">
-            <p className="sticky top-0 z-10 border-b bg-[#f8fafc] px-5 py-2 text-[11px] font-bold text-[#64748b]">
-              이벤트 {visibleEvents.length}
-            </p>
-            {visibleEvents.map((event) => {
-              const item = itemByKey.get(`event:${event.id}`);
-              const properties = eventProperties.filter(
-                (property) => property.event_id === event.id && property.is_active,
-              );
-              return (
-                <details key={event.id} className="group border-b border-[#eef1f5]">
-                  <summary className="flex list-none items-center gap-3 px-5 py-3 hover:bg-[#f8fafc]">
-                    <input
-                      type="checkbox"
-                      checked={Boolean(item?.executed_at)}
-                      onClick={(clickEvent) => clickEvent.stopPropagation()}
-                      onChange={() => toggleTarget("event", event.id)}
-                      className="size-4 shrink-0 accent-[#1f5f8b]"
-                      aria-label={`${event.technical_name} 실행 기록`}
-                    />
-                    <span className="min-w-0 flex-1">
-                      <span className="mono-token block truncate text-[13px] font-semibold">
-                        {event.technical_name}
-                      </span>
-                      {event.display_name ? (
-                        <span className="block truncate text-[11.5px] text-[#8b97a8]">
-                          {event.display_name}
-                        </span>
-                      ) : null}
-                    </span>
-                    <span className="text-[11px] text-[#94a3b8]">{properties.length}개</span>
-                    <ChevronDown className="size-4 text-[#94a3b8] transition-transform group-open:rotate-180" />
-                  </summary>
-                  <div className="border-t border-[#eef1f5] bg-[#fbfcfd] px-5 py-3 pl-12">
-                    {properties.length === 0 ? (
-                      <p className="text-xs text-[#94a3b8]">등록된 프로퍼티가 없어요.</p>
-                    ) : (
-                      <ul className="space-y-2">
-                        {properties.map((property) => (
-                          <li key={property.id} className="flex items-center gap-2 text-xs">
-                            <span className="mono-token min-w-0 flex-1 truncate">
-                              {property.technical_name}
+            {taxonomyTab === "events"
+              ? visibleEvents.map((event) => {
+                  const item = itemByKey.get(`event:${event.id}`);
+                  const properties = eventProperties.filter(
+                    (property) => property.event_id === event.id && property.is_active,
+                  );
+                  const eventDescription = [event.display_name, event.description]
+                    .filter(Boolean)
+                    .join(" · ");
+                  return (
+                    <details key={event.id} className="group border-b border-[#eef1f5]">
+                      <summary className="flex list-none items-center gap-3 px-5 py-3 hover:bg-[#f8fafc]">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(item?.executed_at)}
+                          onClick={(clickEvent) => clickEvent.stopPropagation()}
+                          onChange={() => toggleTarget("event", event.id)}
+                          className="size-4 shrink-0 accent-[#1f5f8b]"
+                          aria-label={`${event.technical_name} 실행 기록`}
+                        />
+                        <span className="min-w-0 flex-1">
+                          <span className="mono-token block truncate text-[13px] font-semibold">
+                            {event.technical_name}
+                          </span>
+                          {eventDescription ? (
+                            <span className="mt-0.5 block line-clamp-2 text-[11.5px] leading-4 text-[#7b8798]">
+                              {eventDescription}
                             </span>
-                            <span className="text-[#8b97a8]">{property.data_type}</span>
-                            {property.is_required ? (
-                              <span className="font-semibold text-[#b45309]">필수</span>
-                            ) : null}
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                </details>
-              );
-            })}
-
-            <p className="sticky top-0 z-10 border-y bg-[#f8fafc] px-5 py-2 text-[11px] font-bold text-[#64748b]">
-              어트리뷰트 {visibleAttributes.length}
-            </p>
-            {visibleAttributes.map((attribute) => {
-              const checked = Boolean(
-                itemByKey.get(`custom_attribute:${attribute.id}`)?.executed_at,
-              );
-              return (
-                <label
-                  key={attribute.id}
-                  className="flex cursor-pointer items-center gap-3 border-b border-[#eef1f5] px-5 py-3 hover:bg-[#f8fafc]"
-                >
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    onChange={() => toggleTarget("custom_attribute", attribute.id)}
-                    className="size-4 accent-[#5b5fc7]"
-                  />
-                  <span className="min-w-0 flex-1">
-                    <span className="mono-token block truncate text-[13px] font-semibold">
-                      {attribute.technical_name}
-                    </span>
-                    <span className="text-[11.5px] text-[#8b97a8]">
-                      {attribute.display_name ?? attribute.data_type}
-                    </span>
-                  </span>
-                </label>
-              );
-            })}
+                          ) : null}
+                        </span>
+                        <span className="text-[11px] text-[#94a3b8]">{properties.length}개</span>
+                        <ChevronDown className="size-4 text-[#94a3b8] transition-transform group-open:rotate-180" />
+                      </summary>
+                      <div className="border-t border-[#eef1f5] bg-[#fbfcfd] px-5 py-3 pl-12">
+                        {properties.length === 0 ? (
+                          <p className="text-xs text-[#94a3b8]">등록된 프로퍼티가 없어요.</p>
+                        ) : (
+                          <ul>
+                            {properties.map((property) => {
+                              const propertyDescription = [
+                                property.display_name,
+                                property.description,
+                              ]
+                                .filter(Boolean)
+                                .join(" · ");
+                              return (
+                                <li
+                                  key={property.id}
+                                  className="border-b border-[#eef1f5] py-2 first:pt-0 last:border-0 last:pb-0"
+                                >
+                                  <div className="flex items-center gap-2 text-xs">
+                                    <span className="mono-token min-w-0 flex-1 truncate">
+                                      {property.technical_name}
+                                    </span>
+                                    <span className="text-[#8b97a8]">{property.data_type}</span>
+                                    {property.is_required ? (
+                                      <span className="font-semibold text-[#b45309]">필수</span>
+                                    ) : null}
+                                  </div>
+                                  {propertyDescription ? (
+                                    <p className="mt-1 line-clamp-2 text-[11.5px] leading-4 text-[#7b8798]">
+                                      {propertyDescription}
+                                    </p>
+                                  ) : null}
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        )}
+                      </div>
+                    </details>
+                  );
+                })
+              : visibleAttributes.map((attribute) => {
+                  const checked = Boolean(
+                    itemByKey.get(`custom_attribute:${attribute.id}`)?.executed_at,
+                  );
+                  const attributeDescription = [attribute.display_name, attribute.description]
+                    .filter(Boolean)
+                    .join(" · ");
+                  return (
+                    <label
+                      key={attribute.id}
+                      className="flex cursor-pointer items-center gap-3 border-b border-[#eef1f5] px-5 py-3 hover:bg-[#f8fafc]"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => toggleTarget("custom_attribute", attribute.id)}
+                        className="size-4 accent-[#5b5fc7]"
+                      />
+                      <span className="min-w-0 flex-1">
+                        <span className="mono-token block truncate text-[13px] font-semibold">
+                          {attribute.technical_name}
+                        </span>
+                        <span className="mt-0.5 block line-clamp-2 text-[11.5px] leading-4 text-[#7b8798]">
+                          {attributeDescription || attribute.data_type}
+                        </span>
+                      </span>
+                    </label>
+                  );
+                })}
           </div>
         </section>
 
