@@ -567,16 +567,23 @@ export function useAnalyzeChecklist(sessionId: string) {
       if (itemsToJudge.length === 0) return;
       let completed = 0;
       input.onProgress?.(completed, itemsToJudge.length);
-      const results = await Promise.all(
-        itemsToJudge.map(async (item) => {
-          try {
-            return await judgeChecklistItem(item, input);
-          } finally {
-            completed += 1;
-            input.onProgress?.(completed, itemsToJudge.length);
-          }
-        }),
-      );
+      const results = [];
+      const batchSize = 3;
+      for (let offset = 0; offset < itemsToJudge.length; offset += batchSize) {
+        const batch = itemsToJudge.slice(offset, offset + batchSize);
+        results.push(
+          ...(await Promise.all(
+            batch.map(async (item) => {
+              try {
+                return await judgeChecklistItem(item, input);
+              } finally {
+                completed += 1;
+                input.onProgress?.(completed, itemsToJudge.length);
+              }
+            }),
+          )),
+        );
+      }
       const { error } = await db
         .from("qa_checklist_item_results")
         .upsert(results, { onConflict: "checklist_item_id" });

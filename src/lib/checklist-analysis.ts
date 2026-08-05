@@ -75,16 +75,25 @@ export async function judgeChecklistItem(
     const qualitative = await judgeQualitative(base.checklist_item_id, event.id, "event", ctx);
     if (violations.length > 0) {
       const structuralReason = violations.map((v) => `${v.property}: ${v.reason}`).join("\n");
+      const qualitativeError =
+        qualitative.final_status === "not_collected" && qualitative.ai_reasoning
+          ? `AI 분석 미완료: ${qualitative.ai_reasoning}`
+          : null;
       return {
         ...base,
         ai_verdict: "failed",
         ai_reasoning: [
           structuralReason,
           qualitative.final_status === "failed" ? qualitative.ai_reasoning : null,
+          qualitativeError,
         ]
           .filter(Boolean)
           .join("\n"),
-        ai_evidence: { structural: violations, qualitative: qualitative.ai_evidence },
+        ai_evidence: {
+          structural: violations,
+          qualitative: qualitative.ai_evidence,
+          qualitative_error: qualitativeError,
+        },
         failed_layer: "structural",
         final_status: "failed",
         judged_by:
@@ -128,16 +137,26 @@ export async function judgeChecklistItem(
     ctx,
   );
   if (violations.length > 0) {
+    const qualitativeError =
+      qualitative.final_status === "not_collected" && qualitative.ai_reasoning
+        ? `AI 분석 미완료: ${qualitative.ai_reasoning}`
+        : null;
     return {
       ...base,
       ai_verdict: "failed",
       ai_reasoning: [
         violations.map((v) => v.reason).join("\n"),
         qualitative.final_status === "failed" ? qualitative.ai_reasoning : null,
+        qualitativeError,
       ]
         .filter(Boolean)
         .join("\n"),
-      ai_evidence: { value, structural: violations, qualitative: qualitative.ai_evidence },
+      ai_evidence: {
+        value,
+        structural: violations,
+        qualitative: qualitative.ai_evidence,
+        qualitative_error: qualitativeError,
+      },
       failed_layer: "structural",
       final_status: "failed",
       judged_by: qualitative.judged_by === "ai" && qualitative.ai_evidence !== null ? "ai" : "rule",

@@ -214,4 +214,50 @@ describe("judgeChecklistItem — taxonomy example format", () => {
       judged_by: "ai",
     });
   });
+
+  it("does not hide an AI failure behind a structural error", async () => {
+    judgeWithAI.mockResolvedValue({ ok: false, error: "OpenAI 판정 시간이 30초를 초과했어요." });
+    const event = {
+      id: "event-1",
+      technical_name: "signup_completed",
+    } as TaxonomyEvent;
+    const property = {
+      id: "property-1",
+      event_id: event.id,
+      technical_name: "referral_source",
+      data_type: "string",
+      is_required: true,
+      description: "URL은 허용하지 않음",
+      example_value: '"혜택", "랭킹"',
+      allowed_values: null,
+    } as TaxonomyEventProperty;
+
+    const result = await judgeChecklistItem(
+      { ...item, target_type: "event", target_id: event.id },
+      {
+        events: [event],
+        eventProperties: [property],
+        customAttributes: [],
+        rules: [],
+        runEvents: [
+          {
+            event_id: event.id,
+            raw_event_name: event.technical_name,
+            occurred_at: "2026-08-03T00:00:00Z",
+            external_user_id: "u1",
+            raw_properties: {
+              referral_source: "https://example.com/main",
+              undefined_property: true,
+            },
+          },
+        ],
+        snapshots: [],
+      },
+    );
+
+    expect(result.ai_reasoning).toContain("AI 분석 미완료");
+    expect(result.ai_evidence).toMatchObject({
+      qualitative_error: expect.stringContaining("30초"),
+    });
+  });
 });
