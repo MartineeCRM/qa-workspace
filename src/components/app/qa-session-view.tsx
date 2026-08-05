@@ -46,25 +46,21 @@ export function QaSessionView({
 }) {
   const { data: rounds = [] } = useQaRounds(environmentId);
   const round = rounds.find((r) => r.id === roundId);
-  const { data: checklistItems = [] } = useQaChecklistItems(session.id);
-  const { data: runEvents = [] } = useQaRunEvents(session.id);
-  const { data: snapshots = [] } = useQaAttributeSnapshots(session.id);
-  const { data: events = [] } = useTaxonomyEvents(projectId);
-  const { data: eventProperties = [] } = useTaxonomyEventProperties(projectId);
-  const { data: exclusions } = useQaChannelExclusions(
+  const { data: checklistItems = [], refetch: refetchChecklistItems } = useQaChecklistItems(
+    session.id,
+  );
+  const { data: runEvents = [], refetch: refetchRunEvents } = useQaRunEvents(session.id);
+  const { data: snapshots = [], refetch: refetchSnapshots } = useQaAttributeSnapshots(session.id);
+  const { data: events = [], refetch: refetchEvents } = useTaxonomyEvents(projectId);
+  const { data: eventProperties = [], refetch: refetchEventProperties } =
+    useTaxonomyEventProperties(projectId);
+  const { data: exclusions, refetch: refetchExclusions } = useQaChannelExclusions(
     events.map((event) => event.id),
     eventProperties.map((property) => property.id),
   );
-  const applicableEvents = session.qa_channel_id
-    ? events.filter((event) => !exclusions?.events.has(`${event.id}:${session.qa_channel_id}`))
-    : events;
-  const applicableEventProperties = session.qa_channel_id
-    ? eventProperties.filter(
-        (property) => !exclusions?.properties.has(`${property.id}:${session.qa_channel_id}`),
-      )
-    : eventProperties;
-  const { data: customAttributes = [] } = useTaxonomyCustomAttributes(projectId);
-  const { data: rules = [] } = useRules(projectId);
+  const { data: customAttributes = [], refetch: refetchCustomAttributes } =
+    useTaxonomyCustomAttributes(projectId);
+  const { data: rules = [], refetch: refetchRules } = useRules(projectId);
   const analyze = useAnalyzeChecklist(session.id);
   const executedChecklistItems = checklistItems.filter((item) => item.executed_at);
   const hasResults = executedChecklistItems.some(hasCurrentChecklistResult);
@@ -96,14 +92,48 @@ export function QaSessionView({
 
   async function runAnalysis() {
     try {
+      const [
+        freshChecklistResult,
+        freshRunEventsResult,
+        freshSnapshotsResult,
+        freshEventsResult,
+        freshPropertiesResult,
+        freshAttributesResult,
+        freshRulesResult,
+        freshExclusionsResult,
+      ] = await Promise.all([
+        refetchChecklistItems(),
+        refetchRunEvents(),
+        refetchSnapshots(),
+        refetchEvents(),
+        refetchEventProperties(),
+        refetchCustomAttributes(),
+        refetchRules(),
+        refetchExclusions(),
+      ]);
+      const freshChecklistItems = freshChecklistResult.data ?? checklistItems;
+      const freshEvents = freshEventsResult.data ?? events;
+      const freshProperties = freshPropertiesResult.data ?? eventProperties;
+      const freshExclusions = freshExclusionsResult.data ?? exclusions;
+      const freshApplicableEvents = session.qa_channel_id
+        ? freshEvents.filter(
+            (event) => !freshExclusions?.events.has(`${event.id}:${session.qa_channel_id}`),
+          )
+        : freshEvents;
+      const freshApplicableProperties = session.qa_channel_id
+        ? freshProperties.filter(
+            (property) =>
+              !freshExclusions?.properties.has(`${property.id}:${session.qa_channel_id}`),
+          )
+        : freshProperties;
       await analyze.mutateAsync({
-        checklistItems: executedChecklistItems,
-        events: applicableEvents,
-        eventProperties: applicableEventProperties,
-        customAttributes,
-        rules,
-        runEvents,
-        snapshots,
+        checklistItems: freshChecklistItems.filter((item) => item.executed_at),
+        events: freshApplicableEvents,
+        eventProperties: freshApplicableProperties,
+        customAttributes: freshAttributesResult.data ?? customAttributes,
+        rules: freshRulesResult.data ?? rules,
+        runEvents: freshRunEventsResult.data ?? runEvents,
+        snapshots: freshSnapshotsResult.data ?? snapshots,
         onProgress: (completed, total) => setAnalysisProgress({ completed, total }),
       });
       toast.success("판정을 완료했어요");

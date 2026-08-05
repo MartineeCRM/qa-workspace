@@ -16,6 +16,7 @@ import {
   buildEventSpecDiffRows,
   buildMergedTimeline,
   compressRoundHistory,
+  hasCurrentChecklistResult,
   nextChecklistItemId,
   previousChecklistItemId,
   resolveEvidenceHighlightTone,
@@ -258,7 +259,7 @@ export function QaItemView({
     new Map(eventProperties.map((property) => [property.id, property.technical_name])),
   );
 
-  const orderedIds = checklistItems.map((i) => i.id);
+  const orderedIds = checklistItems.filter(hasCurrentChecklistResult).map((i) => i.id);
 
   function copyEvidenceLog() {
     const text = evidenceRows
