@@ -103,12 +103,22 @@ export function matchesDataType(value: unknown, dataType: string): boolean {
   }
 }
 
+export function isBlankString(value: unknown): boolean {
+  return typeof value === "string" && value.trim().length === 0;
+}
+
 function checkValue(
   value: unknown,
   propertyName: string,
   dataType: string,
   allowedValues: string[] | null,
 ): StructuralViolation | null {
+  if (isBlankString(value)) {
+    return {
+      property: propertyName,
+      reason: "빈 문자열은 허용되지 않습니다",
+    };
+  }
   if (!matchesDataType(value, dataType)) {
     return {
       property: propertyName,
@@ -131,13 +141,16 @@ export function judgeEventStructural(
   const violations: StructuralViolation[] = [];
   for (const prop of properties) {
     const observed = matchedEvents.map((event) => event.raw_properties[prop.technical_name]);
-    const missingCount = observed.filter((value) => value === undefined || value === null).length;
+    const missingCount = observed.filter(
+      (value) => value === undefined || value === null || isBlankString(value),
+    ).length;
     if (prop.is_required && missingCount > 0) {
       const emptyCount = matchedEvents.filter(
         (event) =>
           prop.technical_name in event.raw_properties &&
           (event.raw_properties[prop.technical_name] === undefined ||
-            event.raw_properties[prop.technical_name] === null),
+            event.raw_properties[prop.technical_name] === null ||
+            isBlankString(event.raw_properties[prop.technical_name])),
       ).length;
       violations.push({
         property: prop.technical_name,
@@ -149,7 +162,10 @@ export function judgeEventStructural(
             : `전체 ${matchedEvents.length}건 중 ${missingCount}건에서 필수 프로퍼티가 없거나 비어 있습니다`,
       });
     }
-    const values = observed.filter((value) => value !== undefined && value !== null);
+    const values = observed.filter(
+      (value) =>
+        value !== undefined && value !== null && !(prop.is_required && isBlankString(value)),
+    );
     for (const value of values) {
       const violation = checkValue(value, prop.technical_name, prop.data_type, prop.allowed_values);
       if (violation) violations.push(violation);

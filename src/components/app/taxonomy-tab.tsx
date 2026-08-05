@@ -55,6 +55,7 @@ import {
 import { DATA_TYPES, errorMessage } from "@/lib/domain";
 import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
+import { parseAllowedValues } from "@/lib/taxonomy-import";
 import { useQaChannelExclusions, useQaChannels, type QaChannel } from "@/lib/qa-rounds-queries";
 
 type AnyAttribute =
@@ -991,10 +992,7 @@ function AttributeDialog({
   async function submit() {
     if (!technicalName.trim()) return toast.error("기술 이름은 필수예요");
     setSaving(true);
-    const allowedValues = allowed
-      .split(",")
-      .map((v) => v.trim())
-      .filter(Boolean);
+    const allowedValues = parseAllowedValues(allowed);
     const basePayload = {
       technical_name: technicalName.trim(),
       display_name: displayName.trim() || null,
@@ -1281,10 +1279,7 @@ function CustomAttributePropertyDialog({
   async function submit() {
     if (!technicalName.trim()) return toast.error("기술 이름은 필수예요");
     setSaving(true);
-    const allowedValues = allowed
-      .split(",")
-      .map((v) => v.trim())
-      .filter(Boolean);
+    const allowedValues = parseAllowedValues(allowed);
     const payload = {
       technical_name: technicalName.trim(),
       display_name: displayName.trim() || null,

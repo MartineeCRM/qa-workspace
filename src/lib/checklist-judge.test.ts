@@ -54,6 +54,39 @@ describe("matchLatestSnapshotValue", () => {
 });
 
 describe("judgeEventStructural", () => {
+  it("treats a blank required string as missing and a blank optional string as invalid", () => {
+    const blankEvent = {
+      ...runEvents[0],
+      raw_properties: { required_name: "  ", optional_name: "" },
+    };
+    expect(
+      judgeEventStructural(
+        [blankEvent],
+        [
+          {
+            id: "required",
+            event_id: "evt-1",
+            technical_name: "required_name",
+            data_type: "string",
+            is_required: true,
+            allowed_values: null,
+          },
+          {
+            id: "optional",
+            event_id: "evt-1",
+            technical_name: "optional_name",
+            data_type: "string",
+            is_required: false,
+            allowed_values: null,
+          },
+        ],
+      ),
+    ).toEqual([
+      { property: "required_name", reason: "필수 프로퍼티 값이 비어 있습니다" },
+      { property: "optional_name", reason: "빈 문자열은 허용되지 않습니다" },
+    ]);
+  });
+
   it("flags a value outside allowed_values", () => {
     const violations = judgeEventStructural(runEvents, [
       {

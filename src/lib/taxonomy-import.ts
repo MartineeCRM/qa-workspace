@@ -34,17 +34,26 @@ function toBool(value: unknown, defaultValue: boolean): boolean {
   return v === "true" || v === "y" || v === "yes" || v === "1" || v === "required" || v === "필수";
 }
 
+function unwrapQuotedValue(value: string): string {
+  const trimmed = value.trim();
+  const quote = trimmed[0];
+  return trimmed.length >= 2 && (quote === '"' || quote === "'") && trimmed.at(-1) === quote
+    ? trimmed.slice(1, -1).trim()
+    : trimmed;
+}
+
+export function parseAllowedValues(value: string): string[] {
+  return value.split(/[|,]/).map(unwrapQuotedValue).filter(Boolean);
+}
+
 function toList(value: unknown): string[] | null {
   if (Array.isArray(value)) {
-    const list = value.map((v) => str(v)).filter(Boolean);
+    const list = value.map((v) => unwrapQuotedValue(str(v))).filter(Boolean);
     return list.length ? list : null;
   }
   const raw = str(value);
   if (!raw) return null;
-  const list = raw
-    .split(/[|,]/)
-    .map((v) => v.trim())
-    .filter(Boolean);
+  const list = parseAllowedValues(raw);
   return list.length ? list : null;
 }
 

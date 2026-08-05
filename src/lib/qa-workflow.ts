@@ -1,4 +1,4 @@
-import { matchesDataType } from "@/lib/checklist-judge";
+import { isBlankString, matchesDataType } from "@/lib/checklist-judge";
 import type {
   ChecklistDisposition,
   QaAttributeSnapshot,
@@ -643,23 +643,28 @@ export function buildEventSpecDiffRows(input: {
       .map((raw) => raw[prop.technical_name])
       .filter((v) => v !== undefined && v !== null);
     const mismatchingValue = values.find((v) => !matchesDataType(v, prop.data_type));
+    const blankValue = values.find(isBlankString);
     const invalidAllowedValue = values.find(
       (v) =>
         matchesDataType(v, prop.data_type) &&
         prop.allowed_values !== null &&
         !prop.allowed_values.includes(String(v)),
     );
-    const observedValue = mismatchingValue ?? invalidAllowedValue ?? values[0];
+    const observedValue = mismatchingValue ?? blankValue ?? invalidAllowedValue ?? values[0];
     const structuralVerdict: SpecDiffVerdict =
       values.length === 0
         ? prop.is_required
           ? "missing_required"
           : "pass"
-        : mismatchingValue !== undefined
-          ? "type_mismatch"
-          : invalidAllowedValue !== undefined
-            ? "value_mismatch"
-            : "pass";
+        : blankValue !== undefined
+          ? prop.is_required
+            ? "missing_required"
+            : "value_mismatch"
+          : mismatchingValue !== undefined
+            ? "type_mismatch"
+            : invalidAllowedValue !== undefined
+              ? "value_mismatch"
+              : "pass";
     const verdict: SpecDiffVerdict =
       structuralVerdict !== "pass"
         ? structuralVerdict

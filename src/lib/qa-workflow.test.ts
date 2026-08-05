@@ -955,6 +955,15 @@ describe("buildEventSpecDiffRows", () => {
     });
   });
 
+  it("does not pass blank strings", () => {
+    const rows = buildEventSpecDiffRows({
+      properties,
+      rawPropertiesList: [{ item_final_price_krw: "", platform: " " }],
+    });
+    expect(rows.find((row) => row.propertyId === "p1")?.verdict).toBe("value_mismatch");
+    expect(rows.find((row) => row.propertyId === "p2")?.verdict).toBe("missing_required");
+  });
+
   it("flags a mismatch if ANY matched occurrence is wrong, even when others are fine", () => {
     const rows = buildEventSpecDiffRows({
       properties,
