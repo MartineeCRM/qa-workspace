@@ -19,7 +19,7 @@ import {
   useUpdateQaIssue,
   type ProjectQaIssue,
 } from "@/lib/qa-rounds-queries";
-import { useEnvironments, useTaxonomyEvents } from "@/lib/queries";
+import { useEnvironments, useMembers, useTaxonomyEvents } from "@/lib/queries";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/w/$wsId/p/$projectId/issues")({
@@ -45,6 +45,7 @@ function QaIssuesPage() {
   const { data: events = [] } = useTaxonomyEvents(projectId);
   const { data: environments = [] } = useEnvironments(projectId);
   const { data: channels = [] } = useQaChannels(projectId);
+  const { data: members = [] } = useMembers(wsId);
   const updateIssue = useUpdateQaIssue(projectId);
   const submitIssues = useSubmitQaIssues(projectId);
   const deleteIssue = useDeleteQaIssue(projectId);
@@ -58,6 +59,12 @@ function QaIssuesPage() {
   const eventById = new Map(events.map((event) => [event.id, event]));
   const environmentById = new Map(environments.map((environment) => [environment.id, environment]));
   const channelById = new Map(channels.map((channel) => [channel.id, channel]));
+  const reporterById = new Map(
+    members.map((member) => [
+      member.user_id,
+      member.profiles?.display_name || member.profiles?.email || "알 수 없는 사용자",
+    ]),
+  );
   const activeIssues = issues.filter(
     (issue): issue is ProjectQaIssue & { workflow_status: IssueStatus } =>
       issue.workflow_status !== "dismissed" && issue.workflow_status !== "verified",
@@ -246,6 +253,7 @@ function QaIssuesPage() {
                           channel?.name ?? "채널 미지정",
                           issue.session_name,
                           `${issue.round_number}차`,
+                          `리포팅한 사람 ${reporterById.get(issue.created_by) ?? "알 수 없는 사용자"}`,
                         ]
                           .filter(Boolean)
                           .join(" · ")}
