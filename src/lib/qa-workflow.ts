@@ -8,7 +8,6 @@ import type {
 import type { CoverageItem, EnvironmentCoverage } from "@/lib/queries";
 
 const EXECUTION_WORKFLOW_LAUNCHED_AT = Date.parse("2026-08-05T11:35:27+09:00");
-const EXECUTION_RESULT_FILTER_LAUNCHED_AT = Date.parse("2026-08-05T16:25:00+09:00");
 
 export function normalizeChecklistExecution<
   T extends { created_at: string; executed_at: string | null },
@@ -26,10 +25,7 @@ export function hasCurrentChecklistResult(item: {
 }): boolean {
   const result = item.qa_checklist_item_results[0];
   return Boolean(
-    item.executed_at &&
-    result &&
-    Date.parse(result.updated_at) >= Date.parse(item.executed_at) &&
-    Date.parse(result.updated_at) >= EXECUTION_RESULT_FILTER_LAUNCHED_AT,
+    item.executed_at && result && Date.parse(result.updated_at) >= Date.parse(item.executed_at),
   );
 }
 

@@ -101,13 +101,13 @@ describe("hasCurrentChecklistResult", () => {
     ).toBe(true);
   });
 
-  it("does not show results from the pre-execution checklist workflow", () => {
+  it("shows a current result regardless of a later global rollout time", () => {
     expect(
       hasCurrentChecklistResult({
         executed_at: "2026-08-05T12:00:00+09:00",
         qa_checklist_item_results: [{ updated_at: "2026-08-05T16:00:00+09:00" }],
       }),
-    ).toBe(false);
+    ).toBe(true);
   });
 });
 
