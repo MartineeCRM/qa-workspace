@@ -4,7 +4,7 @@ import { Panel } from "@/components/app/layout-parts";
 import { cn } from "@/lib/utils";
 import { useQaChecklistItems, type QaSession } from "@/lib/qa-rounds-queries";
 import { useTaxonomyCustomAttributes, useTaxonomyEvents } from "@/lib/queries";
-import { compactVerdictReason } from "@/lib/qa-workflow";
+import { compactVerdictReason, hasCurrentChecklistResult } from "@/lib/qa-workflow";
 
 type ResultFilter = "all" | "failed" | "not_collected" | "passed";
 
@@ -37,7 +37,7 @@ export function QaSessionResultsPanel({
   const { data: checklistItems = [] } = useQaChecklistItems(session.id);
   const [filter, setFilter] = useState<ResultFilter>("all");
 
-  const rows = checklistItems.map((item) => ({
+  const rows = checklistItems.filter(hasCurrentChecklistResult).map((item) => ({
     item,
     result: item.qa_checklist_item_results[0],
     finalStatus: item.qa_checklist_item_results[0]?.final_status ?? "not_collected",

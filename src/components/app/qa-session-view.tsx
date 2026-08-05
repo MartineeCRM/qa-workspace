@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Check } from "lucide-react";
 import { toast } from "sonner";
-import { deriveSessionStep } from "@/lib/qa-workflow";
+import { deriveSessionStep, hasCurrentChecklistResult } from "@/lib/qa-workflow";
 import { errorMessage } from "@/lib/domain";
 import {
   useAnalyzeChecklist,
@@ -66,7 +66,8 @@ export function QaSessionView({
   const { data: customAttributes = [] } = useTaxonomyCustomAttributes(projectId);
   const { data: rules = [] } = useRules(projectId);
   const analyze = useAnalyzeChecklist(session.id);
-  const hasResults = checklistItems.some((i) => i.qa_checklist_item_results.length > 0);
+  const executedChecklistItems = checklistItems.filter((item) => item.executed_at);
+  const hasResults = executedChecklistItems.some(hasCurrentChecklistResult);
   const currentStep = deriveSessionStep({
     checklistItemCount: checklistItems.length,
     hasRunEvents: runEvents.length > 0,
@@ -96,7 +97,7 @@ export function QaSessionView({
   async function runAnalysis() {
     try {
       await analyze.mutateAsync({
-        checklistItems,
+        checklistItems: executedChecklistItems,
         events: applicableEvents,
         eventProperties: applicableEventProperties,
         customAttributes,

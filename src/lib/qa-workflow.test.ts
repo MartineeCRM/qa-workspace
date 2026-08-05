@@ -19,6 +19,7 @@ import {
   compactVerdictReason,
   groupVerdictReason,
   normalizeChecklistExecution,
+  hasCurrentChecklistResult,
   resolveEvidenceHighlightTone,
   buildEventSpecDiffRows,
   type ChecklistCoverageRow,
@@ -81,6 +82,32 @@ describe("normalizeChecklistExecution", () => {
         executed_at: "2026-08-05T14:00:00+09:00",
       }).executed_at,
     ).toBe("2026-08-05T14:00:00+09:00");
+  });
+});
+
+describe("hasCurrentChecklistResult", () => {
+  it("only accepts a result created after the item was actually executed", () => {
+    expect(
+      hasCurrentChecklistResult({
+        executed_at: "2026-08-05T14:00:00+09:00",
+        qa_checklist_item_results: [{ updated_at: "2026-08-05T11:00:00+09:00" }],
+      }),
+    ).toBe(false);
+    expect(
+      hasCurrentChecklistResult({
+        executed_at: "2026-08-05T14:00:00+09:00",
+        qa_checklist_item_results: [{ updated_at: "2026-08-05T16:26:00+09:00" }],
+      }),
+    ).toBe(true);
+  });
+
+  it("does not show results from the pre-execution checklist workflow", () => {
+    expect(
+      hasCurrentChecklistResult({
+        executed_at: "2026-08-05T12:00:00+09:00",
+        qa_checklist_item_results: [{ updated_at: "2026-08-05T16:00:00+09:00" }],
+      }),
+    ).toBe(false);
   });
 });
 
