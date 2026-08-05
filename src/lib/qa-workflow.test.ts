@@ -32,27 +32,27 @@ describe("deriveSessionStep", () => {
     ).toBe(1);
   });
 
-  it("returns 2 when items exist but nothing has been collected yet", () => {
+  it("stays on execution when items exist but nothing has been collected yet", () => {
     expect(
       deriveSessionStep({ checklistItemCount: 3, hasRunEvents: false, hasResults: false }),
+    ).toBe(1);
+  });
+
+  it("returns 2 once run events are collected but analysis hasn't produced results yet", () => {
+    expect(
+      deriveSessionStep({ checklistItemCount: 3, hasRunEvents: true, hasResults: false }),
     ).toBe(2);
   });
 
-  it("returns 3 once run events are collected but analysis hasn't produced results yet", () => {
-    expect(
-      deriveSessionStep({ checklistItemCount: 3, hasRunEvents: true, hasResults: false }),
-    ).toBe(3);
-  });
-
-  it("returns 4 once results exist, regardless of whether more run events keep arriving", () => {
+  it("returns 3 once results exist, regardless of whether more run events keep arriving", () => {
     expect(deriveSessionStep({ checklistItemCount: 3, hasRunEvents: true, hasResults: true })).toBe(
-      4,
+      3,
     );
   });
 
-  it("returns 1 when the checklist is empty even if results somehow exist", () => {
+  it("shows results when they exist even if the checklist query is momentarily empty", () => {
     expect(deriveSessionStep({ checklistItemCount: 0, hasRunEvents: true, hasResults: true })).toBe(
-      1,
+      3,
     );
   });
 });
@@ -64,27 +64,27 @@ describe("deriveSessionStepFromRow", () => {
     ).toBe(1);
   });
 
-  it("returns 2 once items are checklisted but nothing's been collected", () => {
+  it("stays on execution once items are checked but nothing's been collected", () => {
     expect(
       deriveSessionStepFromRow({
         id: "s1",
         qa_round_checklist_items: [{ qa_checklist_item_results: [] }],
         qa_run_events: [],
       }),
-    ).toBe(2);
+    ).toBe(1);
   });
 
-  it("returns 3 once run events exist but no item has a result yet", () => {
+  it("returns 2 once run events exist but no item has a result yet", () => {
     expect(
       deriveSessionStepFromRow({
         id: "s1",
         qa_round_checklist_items: [{ qa_checklist_item_results: [] }],
         qa_run_events: [{ id: "re1" }],
       }),
-    ).toBe(3);
+    ).toBe(2);
   });
 
-  it("returns 4 once any item has a judged result", () => {
+  it("returns 3 once any item has a judged result", () => {
     expect(
       deriveSessionStepFromRow({
         id: "s1",
@@ -94,7 +94,7 @@ describe("deriveSessionStepFromRow", () => {
         ],
         qa_run_events: [{ id: "re1" }],
       }),
-    ).toBe(4);
+    ).toBe(3);
   });
 });
 

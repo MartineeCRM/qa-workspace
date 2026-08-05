@@ -11,11 +11,10 @@ export function deriveSessionStep(input: {
   checklistItemCount: number;
   hasRunEvents: boolean;
   hasResults: boolean;
-}): 1 | 2 | 3 | 4 {
-  if (input.checklistItemCount === 0) return 1;
-  if (input.hasResults) return 4;
-  if (input.hasRunEvents) return 3;
-  return 2;
+}): 1 | 2 | 3 {
+  if (input.hasResults) return 3;
+  if (input.hasRunEvents) return 2;
+  return 1;
 }
 
 // Same derivation as deriveSessionStep, but sourced straight from the nested
@@ -28,7 +27,7 @@ export type RawSessionForStep = {
   qa_run_events: unknown[] | null;
 };
 
-export function deriveSessionStepFromRow(row: RawSessionForStep): 1 | 2 | 3 | 4 {
+export function deriveSessionStepFromRow(row: RawSessionForStep): 1 | 2 | 3 {
   const items = row.qa_round_checklist_items ?? [];
   return deriveSessionStep({
     checklistItemCount: items.length,

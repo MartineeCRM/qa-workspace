@@ -29,6 +29,8 @@ const item: QaChecklistItem = {
   qa_session_id: "session-1",
   target_type: "custom_attribute",
   target_id: "attr-1",
+  created_at: "2026-08-05T00:00:00Z",
+  executed_at: "2026-08-05T00:00:00Z",
 };
 
 function ctxWithSnapshots(snapshots: AttributeSnapshot[]) {

@@ -18,18 +18,15 @@ import {
   useTaxonomyEventProperties,
   useTaxonomyEvents,
 } from "@/lib/queries";
-import { Button } from "@/components/ui/button";
 import { QaBreadcrumb } from "@/components/app/qa-breadcrumb";
 import { QaSessionChecklistPanel } from "@/components/app/qa-session-checklist-panel";
-import { QaSessionCollectionPanel } from "@/components/app/qa-session-collection-panel";
 import { QaSessionAnalysisPanel } from "@/components/app/qa-session-analysis-panel";
 import { QaSessionResultsPanel } from "@/components/app/qa-session-results-panel";
 
 const STEPS = [
-  { n: 1, label: "체크리스트", sub: "무엇을 검증할지 확정" },
-  { n: 2, label: "수집", sub: "스냅샷 + 이벤트 CSV" },
-  { n: 3, label: "분석", sub: "시간순 병합 · AI 검증" },
-  { n: 4, label: "결과", sub: "판단 · 논의 · 처리" },
+  { n: 1, label: "검증 실행", sub: "택소노미 체크 · 스냅샷" },
+  { n: 2, label: "분석", sub: "CSV 대조 · AI 검증" },
+  { n: 3, label: "결과", sub: "판정 · 논의 · 처리" },
 ] as const;
 
 export function QaSessionView({
@@ -96,11 +93,6 @@ export function QaSessionView({
     lastSyncRef.current = { sessionId: session.id, currentStep };
   }, [session.id, currentStep, viewingStep]);
 
-  // Belt-and-suspenders: never render a step further than the session has actually
-  // reached, even if viewingStep is momentarily stale for any reason the effect above
-  // doesn't catch.
-  const effectiveStep = Math.min(viewingStep, currentStep) as 1 | 2 | 3 | 4;
-
   async function runAnalysis() {
     try {
       await analyze.mutateAsync({
@@ -114,6 +106,7 @@ export function QaSessionView({
         onProgress: (completed, total) => setAnalysisProgress({ completed, total }),
       });
       toast.success("판정을 완료했어요");
+      setViewingStep(3);
     } catch (error) {
       toast.error(errorMessage(error, "판정에 실패했어요. 다시 시도해주세요."));
     } finally {
@@ -142,49 +135,19 @@ export function QaSessionView({
         <div>
           <h2 className="text-[21px] font-bold">{session.name}</h2>
           <p className="mt-1 text-[12.5px] text-[#8b97a8]">
-            체크리스트 {checklistItems.length} · 이벤트 {runEvents.length}행
+            실행 기록 {checklistItems.filter((item) => item.executed_at).length} · 이벤트 로그{" "}
+            {runEvents.length}행
           </p>
         </div>
-        {checklistItems.length > 0 && runEvents.length > 0 ? (
-          <Button onClick={runAnalysis} disabled={analyze.isPending}>
-            {analysisProgress
-              ? `분석 중 ${analysisProgress.completed}/${analysisProgress.total}`
-              : hasResults
-                ? "다시 분석 돌리기"
-                : "분석 돌리기"}
-          </Button>
-        ) : null}
       </div>
-
-      {analysisProgress ? (
-        <div className="rounded-xl border border-[#d9dcf3] bg-[#f6f7fd] px-4 py-3">
-          <div className="mb-2 flex justify-between text-xs font-semibold text-[#4b4f8a]">
-            <span>AI 분석 진행 중</span>
-            <span>
-              {analysisProgress.completed}/{analysisProgress.total}
-            </span>
-          </div>
-          <div
-            role="progressbar"
-            aria-valuemin={0}
-            aria-valuemax={analysisProgress.total}
-            aria-valuenow={analysisProgress.completed}
-            className="h-2 overflow-hidden rounded-full bg-[#e2e5f4]"
-          >
-            <div
-              className="h-full rounded-full bg-[#5b5fc7] transition-[width] duration-300"
-              style={{
-                width: `${(analysisProgress.completed / analysisProgress.total) * 100}%`,
-              }}
-            />
-          </div>
-        </div>
-      ) : null}
 
       <div className="my-[18px] grid grid-cols-[repeat(auto-fit,minmax(170px,1fr))] gap-2">
         {STEPS.map((step) => {
-          const reachable = step.n <= currentStep;
-          const isActive = step.n === effectiveStep;
+          const reachable =
+            step.n === 1 ||
+            (step.n === 2 && checklistItems.some((item) => item.executed_at)) ||
+            (step.n === 3 && hasResults);
+          const isActive = step.n === viewingStep;
           return (
             <button
               key={step.n}
@@ -218,20 +181,24 @@ export function QaSessionView({
         })}
       </div>
 
-      {effectiveStep === 1 ? (
+      {viewingStep === 1 ? (
         <QaSessionChecklistPanel
           projectId={projectId}
           environmentId={environmentId}
           session={session}
+          onContinue={() => setViewingStep(2)}
         />
       ) : null}
-      {effectiveStep === 2 ? (
-        <QaSessionCollectionPanel projectId={projectId} session={session} />
+      {viewingStep === 2 ? (
+        <QaSessionAnalysisPanel
+          projectId={projectId}
+          session={session}
+          analyzing={analyze.isPending}
+          analysisProgress={analysisProgress}
+          onAnalyze={runAnalysis}
+        />
       ) : null}
-      {effectiveStep === 3 ? <QaSessionAnalysisPanel session={session} /> : null}
-      {effectiveStep === 4 ? (
-        <QaSessionResultsPanel projectId={projectId} session={session} />
-      ) : null}
+      {viewingStep === 3 ? <QaSessionResultsPanel projectId={projectId} session={session} /> : null}
     </div>
   );
 }

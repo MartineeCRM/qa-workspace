@@ -563,6 +563,7 @@ export type Database = {
           disposed_at: string | null;
           disposed_by: string | null;
           disposition: string;
+          executed_at: string | null;
           id: string;
           qa_session_id: string;
           target_id: string;
@@ -575,6 +576,7 @@ export type Database = {
           disposed_at?: string | null;
           disposed_by?: string | null;
           disposition?: string;
+          executed_at?: string | null;
           id?: string;
           qa_session_id: string;
           target_id: string;
@@ -587,6 +589,7 @@ export type Database = {
           disposed_at?: string | null;
           disposed_by?: string | null;
           disposition?: string;
+          executed_at?: string | null;
           id?: string;
           qa_session_id?: string;
           target_id?: string;

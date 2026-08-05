@@ -111,6 +111,8 @@ export type QaChecklistItem = {
   qa_session_id: string;
   target_type: "event" | "custom_attribute";
   target_id: string;
+  created_at: string;
+  executed_at: string | null;
 };
 
 export type QaChecklistItemResult = {
@@ -172,7 +174,7 @@ export function useQaSessionSteps(roundId: string) {
         .select("id, qa_round_checklist_items(qa_checklist_item_results(id)), qa_run_events(id)")
         .eq("qa_round_id", roundId);
       if (error) throw error;
-      const steps = new Map<string, 1 | 2 | 3 | 4>();
+      const steps = new Map<string, 1 | 2 | 3>();
       for (const row of data ?? []) {
         steps.set(row.id, deriveSessionStepFromRow(row));
       }
@@ -284,11 +286,13 @@ export function useAddChecklistItems(sessionId: string) {
           qa_session_id: sessionId,
           target_type: "event",
           target_id: id,
+          executed_at: new Date().toISOString(),
         })),
         ...customAttributeIds.map((id) => ({
           qa_session_id: sessionId,
           target_type: "custom_attribute",
           target_id: id,
+          executed_at: new Date().toISOString(),
         })),
       ];
       if (items.length === 0) return;
@@ -301,6 +305,20 @@ export function useAddChecklistItems(sessionId: string) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["qa-checklist-items", sessionId] });
     },
+  });
+}
+
+export function useMarkChecklistItemExecuted(sessionId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (itemId: string) => {
+      const { error } = await db
+        .from("qa_round_checklist_items")
+        .update({ executed_at: new Date().toISOString() })
+        .eq("id", itemId);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["qa-checklist-items", sessionId] }),
   });
 }
 

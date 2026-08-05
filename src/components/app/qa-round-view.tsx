@@ -52,12 +52,12 @@ import {
   type QaSession,
 } from "@/lib/qa-rounds-queries";
 
-const SESSION_STEP_LABELS = ["체크리스트", "수집", "분석", "결과"] as const;
+const SESSION_STEP_LABELS = ["검증 실행", "분석", "결과"] as const;
 
 function SessionProgressBar({ step }: { step: number }) {
   return (
     <div className="mt-3.5 flex gap-[5px]">
-      {[1, 2, 3, 4].map((n) => (
+      {[1, 2, 3].map((n) => (
         <div
           key={n}
           className="h-1 flex-1 rounded-full"
@@ -219,7 +219,7 @@ export function QaRoundView({
             {round.name?.trim() ? round.name : `${round.round_number}차`} 라운드
           </h2>
           <p className="text-[13px] text-[#8b97a8]">
-            검증 실행 하나가 채널별 체크리스트 → 수집 → 분석 → 결과의 한 사이클이에요.
+            검증 실행 하나가 채널별 실행 기록 → 분석 → 결과의 한 사이클이에요.
           </p>
         </div>
         <Button
@@ -357,7 +357,7 @@ export function QaRoundView({
               ” 라운드를 삭제할까요?
             </AlertDialogTitle>
             <AlertDialogDescription>
-              이 라운드에 속한 세션·체크리스트·검증 결과·스냅샷이 모두 함께 사라져요. 되돌릴 수
+              이 라운드에 속한 세션·실행 기록·검증 결과·스냅샷이 모두 함께 사라져요. 되돌릴 수
               없어요.
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -376,7 +376,7 @@ export function QaRoundView({
           <AlertDialogHeader>
             <AlertDialogTitle>“{deletingSession?.name}” 검증 실행을 삭제할까요?</AlertDialogTitle>
             <AlertDialogDescription>
-              이 실행의 체크리스트·수집한 스냅샷/CSV·판정 결과·논의가 모두 함께 사라져요. 되돌릴 수
+              이 실행의 실행 기록·수집한 스냅샷/CSV·판정 결과·논의가 모두 함께 사라져요. 되돌릴 수
               없어요.
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -441,7 +441,7 @@ export function QaRoundView({
                 </div>
                 <SessionProgressBar step={step} />
                 <p className="mt-2 text-[11.5px] text-[#8b97a8]">
-                  {step}/4 · {SESSION_STEP_LABELS[step - 1]} 단계
+                  {step}/3 · {SESSION_STEP_LABELS[step - 1]} 단계
                 </p>
               </Link>
               <div className="border-t border-[#eef1f5] px-4 py-2">
