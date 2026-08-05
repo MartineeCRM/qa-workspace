@@ -440,7 +440,7 @@ export function QaItemView({
                     { label: "미정의", value: ruleCounts.undefined, color: "#b45309" },
                     { label: "타입", value: ruleCounts.type, color: "#dc2626" },
                     { label: "값 형식", value: ruleCounts.format, color: "#dc2626" },
-                    { label: "AI 확인 필요", value: ruleCounts.aiPending, color: "#a4550a" },
+                    { label: "AI 확인 필요", value: ruleCounts.aiPending, color: "#2b6a9c" },
                     { label: "통과", value: ruleCounts.passed, color: "#16a34a" },
                   ].map((stat) => (
                     <div key={stat.label}>

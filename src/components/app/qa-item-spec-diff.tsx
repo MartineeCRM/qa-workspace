@@ -50,7 +50,7 @@ function verdictBadge(verdict: SpecDiffVerdict) {
     return { label: "형식·의미", className: "bg-[#fdecec] text-[#dc2626]" };
   }
   if (verdict === "ai_pending") {
-    return { label: "AI 확인 필요", className: "bg-[#fff7e6] text-[#a4550a]" };
+    return { label: "AI 확인 필요", className: "bg-[#e8f1f8] text-[#2b6a9c]" };
   }
   if (verdict === "undefined_property") {
     return { label: "미정의", className: "bg-[#fdf3e3] text-[#b45309]" };
