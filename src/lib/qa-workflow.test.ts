@@ -73,6 +73,15 @@ describe("normalizeChecklistExecution", () => {
       }).executed_at,
     ).toBe("2026-08-05T12:00:00+09:00");
   });
+
+  it("keeps a newly recorded execution on a legacy checklist item", () => {
+    expect(
+      normalizeChecklistExecution({
+        created_at: "2026-08-05T11:00:00+09:00",
+        executed_at: "2026-08-05T14:00:00+09:00",
+      }).executed_at,
+    ).toBe("2026-08-05T14:00:00+09:00");
+  });
 });
 
 describe("deriveSessionStepFromRow", () => {
