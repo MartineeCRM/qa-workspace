@@ -28,9 +28,12 @@ import { useAuth } from "@/lib/auth";
 export const Route = createFileRoute("/_authenticated/workspaces")({
   head: () => ({
     meta: [
-      { title: "워크스페이스 — Trackspec" },
-      { name: "description", content: "트래킹 스펙을 관리할 워크스페이스를 고르거나 새로 만들어요." },
-      { property: "og:title", content: "워크스페이스 — Trackspec" },
+      { title: "워크스페이스 — QA Workspace" },
+      {
+        name: "description",
+        content: "트래킹 스펙을 관리할 워크스페이스를 고르거나 새로 만들어요.",
+      },
+      { property: "og:title", content: "워크스페이스 — QA Workspace" },
       { property: "og:description", content: "내 트래킹 스펙 워크스페이스 목록이에요." },
     ],
   }),

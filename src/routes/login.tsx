@@ -14,7 +14,7 @@ export const Route = createFileRoute("/login")({
   ssr: false,
   head: () => ({
     meta: [
-      { title: "로그인 — Trackspec" },
+      { title: "로그인 — QA Workspace" },
       { name: "description", content: "회사 이메일로 로그인해요." },
     ],
   }),

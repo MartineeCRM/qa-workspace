@@ -74,13 +74,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Trackspec — Tracking data QA specifications" },
+      { title: "QA Workspace — Tracking data QA" },
       {
         name: "description",
         content:
           "Manage tracking taxonomies, validation rules and live QA stage coverage for analytics data quality.",
       },
-      { property: "og:title", content: "Trackspec — Tracking data QA specifications" },
+      { property: "og:title", content: "QA Workspace — Tracking data QA" },
       {
         property: "og:description",
         content: "Taxonomy-driven tracking coverage management.",

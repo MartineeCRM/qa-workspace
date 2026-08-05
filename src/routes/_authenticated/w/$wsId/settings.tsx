@@ -61,9 +61,9 @@ import { useAuth } from "@/lib/auth";
 export const Route = createFileRoute("/_authenticated/w/$wsId/settings")({
   head: () => ({
     meta: [
-      { title: "워크스페이스 설정 — Trackspec" },
+      { title: "워크스페이스 설정 — QA Workspace" },
       { name: "description", content: "워크스페이스 이름과 설명, 멤버와 권한을 관리해요." },
-      { property: "og:title", content: "워크스페이스 설정 — Trackspec" },
+      { property: "og:title", content: "워크스페이스 설정 — QA Workspace" },
       { property: "og:description", content: "워크스페이스 멤버와 권한을 관리해요." },
     ],
   }),

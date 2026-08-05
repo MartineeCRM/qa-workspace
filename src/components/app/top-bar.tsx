@@ -25,7 +25,7 @@ export function TopBar({ children }: { children?: React.ReactNode }) {
       <div className="flex min-w-0 items-center gap-4">
         <Link to="/workspaces" className="flex items-center gap-2 text-sm font-semibold">
           <ShieldCheck className="size-4 text-primary" />
-          Trackspec
+          QA Workspace
         </Link>
         <div className="min-w-0">{children}</div>
       </div>

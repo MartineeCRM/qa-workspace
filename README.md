@@ -1,4 +1,4 @@
-# Trackspec
+# QA Workspace
 
 Tracking taxonomy, validation rule, and QA workflow management application.
 

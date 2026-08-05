@@ -52,13 +52,16 @@ import { useAuth } from "@/lib/auth";
 export const Route = createFileRoute("/_authenticated/w/$wsId/")({
   head: () => ({
     meta: [
-      { title: "프로젝트 — Trackspec" },
+      { title: "프로젝트 — QA Workspace" },
       {
         name: "description",
         content: "이 워크스페이스의 모든 고객 프로젝트와 실시간 택소노미 규모예요.",
       },
-      { property: "og:title", content: "프로젝트 — Trackspec" },
-      { property: "og:description", content: "Trackspec 워크스페이스의 프로젝트 목록이에요." },
+      { property: "og:title", content: "프로젝트 — QA Workspace" },
+      {
+        property: "og:description",
+        content: "QA Workspace의 프로젝트 목록이에요.",
+      },
     ],
   }),
   component: ProjectsPage,

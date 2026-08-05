@@ -14,10 +14,10 @@ import { errorMessage } from "@/lib/domain";
 export const Route = createFileRoute("/_authenticated/account")({
   head: () => ({
     meta: [
-      { title: "내 프로필 — Trackspec" },
+      { title: "내 프로필 — QA Workspace" },
       { name: "description", content: "표시 이름과 프로필 이미지를 수정해요." },
-      { property: "og:title", content: "내 프로필 — Trackspec" },
-      { property: "og:description", content: "Trackspec 계정 프로필을 관리해요." },
+      { property: "og:title", content: "내 프로필 — QA Workspace" },
+      { property: "og:description", content: "QA Workspace 계정 프로필을 관리해요." },
     ],
   }),
   component: AccountPage,
