@@ -93,6 +93,7 @@ export function QaSessionChecklistPanel({
     [items],
   );
   const executedEvents = items.filter((item) => item.target_type === "event" && item.executed_at);
+  const boardItems = items.filter((item) => item.executed_at || item.carried_from_item_id);
 
   const ruleSuggestions = useMemo(() => {
     const suggestions: SuggestedAttribute[] = [];
@@ -369,13 +370,13 @@ export function QaSessionChecklistPanel({
           </header>
 
           <div className="space-y-3 p-5">
-            {items.length === 0 ? (
+            {boardItems.length === 0 ? (
               <EmptyState
                 title="아직 실행 기록이 없어요"
                 description="왼쪽 택소노미에서 앱으로 실행한 이벤트를 체크하세요."
               />
             ) : (
-              items.map((item) => {
+              boardItems.map((item) => {
                 const event = events.find((candidate) => candidate.id === item.target_id);
                 const attribute = attributes.find((candidate) => candidate.id === item.target_id);
                 const label =

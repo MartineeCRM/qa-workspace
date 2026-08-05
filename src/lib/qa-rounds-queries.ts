@@ -12,6 +12,7 @@ import type {
 import {
   deriveSessionStepFromRow,
   flattenChecklistCoverageRounds,
+  normalizeChecklistExecution,
   summarizeRoundValidationItems,
   type ChecklistCoverageRow,
 } from "@/lib/qa-workflow";
@@ -264,9 +265,10 @@ export function useQaChecklistItems(sessionId: string) {
         .select("*, qa_checklist_item_results(*)")
         .eq("qa_session_id", sessionId);
       if (error) throw error;
-      return data as (QaChecklistItemWithDisposition & {
+      const rows = data as (QaChecklistItemWithDisposition & {
         qa_checklist_item_results: QaChecklistItemResult[];
       })[];
+      return rows.map(normalizeChecklistExecution);
     },
   });
 }

@@ -18,6 +18,7 @@ import {
   compressRoundHistory,
   compactVerdictReason,
   groupVerdictReason,
+  normalizeChecklistExecution,
   resolveEvidenceHighlightTone,
   buildEventSpecDiffRows,
   type ChecklistCoverageRow,
@@ -54,6 +55,23 @@ describe("deriveSessionStep", () => {
     expect(deriveSessionStep({ checklistItemCount: 0, hasRunEvents: true, hasResults: true })).toBe(
       3,
     );
+  });
+});
+
+describe("normalizeChecklistExecution", () => {
+  it("does not reinterpret legacy target selection as an execution", () => {
+    expect(
+      normalizeChecklistExecution({
+        created_at: "2026-08-05T11:00:00+09:00",
+        executed_at: "2026-08-05T11:00:00+09:00",
+      }).executed_at,
+    ).toBeNull();
+    expect(
+      normalizeChecklistExecution({
+        created_at: "2026-08-05T12:00:00+09:00",
+        executed_at: "2026-08-05T12:00:00+09:00",
+      }).executed_at,
+    ).toBe("2026-08-05T12:00:00+09:00");
   });
 });
 

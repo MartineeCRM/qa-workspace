@@ -145,7 +145,10 @@ export function QaSessionView({
         {STEPS.map((step) => {
           const reachable =
             step.n === 1 ||
-            (step.n === 2 && checklistItems.some((item) => item.executed_at)) ||
+            (step.n === 2 &&
+              (checklistItems.some((item) => item.executed_at) ||
+                runEvents.length > 0 ||
+                hasResults)) ||
             (step.n === 3 && hasResults);
           const isActive = step.n === viewingStep;
           return (

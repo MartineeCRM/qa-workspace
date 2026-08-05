@@ -7,6 +7,16 @@ import type {
 } from "@/lib/qa-rounds-queries";
 import type { CoverageItem, EnvironmentCoverage } from "@/lib/queries";
 
+const EXECUTION_WORKFLOW_LAUNCHED_AT = Date.parse("2026-08-05T11:35:27+09:00");
+
+export function normalizeChecklistExecution<
+  T extends { created_at: string; executed_at: string | null },
+>(item: T): T {
+  return Date.parse(item.created_at) < EXECUTION_WORKFLOW_LAUNCHED_AT
+    ? { ...item, executed_at: null }
+    : item;
+}
+
 export function deriveSessionStep(input: {
   checklistItemCount: number;
   hasRunEvents: boolean;
