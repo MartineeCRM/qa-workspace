@@ -694,6 +694,7 @@ export type Database = {
           qa_session_id: string;
           raw_event_name: string;
           raw_properties: Json;
+          source_event_id: string | null;
         };
         Insert: {
           created_at?: string;
@@ -704,6 +705,7 @@ export type Database = {
           qa_session_id: string;
           raw_event_name: string;
           raw_properties?: Json;
+          source_event_id?: string | null;
         };
         Update: {
           created_at?: string;
@@ -714,6 +716,7 @@ export type Database = {
           qa_session_id?: string;
           raw_event_name?: string;
           raw_properties?: Json;
+          source_event_id?: string | null;
         };
         Relationships: [
           {

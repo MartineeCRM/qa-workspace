@@ -9,6 +9,7 @@ import type {
   TaxonomyEventProperty,
   ValidationRule,
 } from "@/lib/queries";
+import { dedupeRunEvents } from "@/lib/run-events-csv";
 import {
   deriveSessionStepFromRow,
   flattenChecklistCoverageRounds,
@@ -494,6 +495,7 @@ export function useDeleteQaRound(environmentId: string) {
 export type QaRunEvent = {
   id: string;
   qa_session_id: string;
+  source_event_id?: string | null;
   event_id: string | null;
   raw_event_name: string;
   occurred_at: string;
@@ -513,7 +515,7 @@ export function useQaRunEvents(sessionId: string) {
         .eq("qa_session_id", sessionId)
         .order("occurred_at", { ascending: true });
       if (error) throw error;
-      return data as QaRunEvent[];
+      return dedupeRunEvents(data as QaRunEvent[]);
     },
   });
 }
@@ -523,6 +525,7 @@ export function useUploadRunEventsLog(sessionId: string) {
   return useMutation({
     mutationFn: async (
       rows: Array<{
+        source_event_id: string;
         event_id: string | null;
         raw_event_name: string;
         occurred_at: string;
@@ -531,9 +534,13 @@ export function useUploadRunEventsLog(sessionId: string) {
       }>,
     ) => {
       if (rows.length === 0) return;
-      const { error } = await db
-        .from("qa_run_events")
-        .insert(rows.map((r) => ({ ...r, qa_session_id: sessionId })));
+      const { error } = await db.from("qa_run_events").upsert(
+        rows.map((r) => ({ ...r, qa_session_id: sessionId })),
+        {
+          onConflict: "qa_session_id,source_event_id",
+          ignoreDuplicates: true,
+        },
+      );
       if (error) throw error;
     },
     onSuccess: () => {

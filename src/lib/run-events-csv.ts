@@ -1,9 +1,30 @@
 export type ParsedRunEventRow = {
+  source_event_id: string;
   raw_event_name: string;
   occurred_at: string;
   external_user_id: string;
   raw_properties: Record<string, unknown>;
 };
+
+export function dedupeRunEvents<
+  T extends {
+    source_event_id?: string | null;
+    raw_event_name: string;
+    occurred_at: string;
+    external_user_id: string;
+    raw_properties: Record<string, unknown>;
+  },
+>(rows: T[]): T[] {
+  const seen = new Set<string>();
+  return rows.filter((row) => {
+    const key = row.source_event_id
+      ? `id:${row.source_event_id}`
+      : `legacy:${row.raw_event_name}:${row.occurred_at}:${row.external_user_id}:${JSON.stringify(row.raw_properties)}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
 
 function splitCsvLine(line: string): string[] {
   const out: string[] = [];
@@ -30,17 +51,20 @@ export function parseRunEventsCsv(text: string): ParsedRunEventRow[] {
   if (lines.length === 0) return [];
 
   const headers = splitCsvLine(lines[0]).map((h) => h.toUpperCase());
+  const eventIdIdx = headers.indexOf("EVENT_ID");
   const nameIdx = headers.indexOf("NAME");
   const timeIdx = headers.indexOf("TIME");
   const userIdIdx = headers.indexOf("USER_ID");
   const propsIdx = headers.indexOf("PROPERTIES");
 
-  if (nameIdx === -1 || timeIdx === -1 || userIdIdx === -1) {
-    throw new Error("CSV에 NAME, TIME, USER_ID 컬럼이 필요해요");
+  if (eventIdIdx === -1 || nameIdx === -1 || timeIdx === -1 || userIdIdx === -1) {
+    throw new Error("CSV에 EVENT_ID, NAME, TIME, USER_ID 컬럼이 필요해요");
   }
 
-  return lines.slice(1).map((line) => {
+  return lines.slice(1).map((line, index) => {
     const cells = splitCsvLine(line);
+    const sourceEventId = cells[eventIdIdx]?.trim();
+    if (!sourceEventId) throw new Error(`CSV ${index + 2}행의 EVENT_ID가 비어 있어요`);
     let raw_properties: Record<string, unknown> = {};
     const rawProps = propsIdx === -1 ? "" : (cells[propsIdx] ?? "");
     if (rawProps) {
@@ -54,6 +78,7 @@ export function parseRunEventsCsv(text: string): ParsedRunEventRow[] {
       }
     }
     return {
+      source_event_id: sourceEventId,
       raw_event_name: cells[nameIdx] ?? "",
       occurred_at: cells[timeIdx] ?? "",
       external_user_id: cells[userIdIdx] ?? "",

@@ -126,7 +126,7 @@ Event User Log에서 내려받은 CSV를 업로드합니다. CSV에는 다음 �
 예시:
 
 ```csv
-NAME,TIME,USER_ID,PROPERTIES
+EVENT_ID,NAME,TIME,USER_ID,PROPERTIES
 login_completed,2026-08-06T10:30:00+09:00,user-123,"{""platform"":""ios_app""}"
 ```
 
