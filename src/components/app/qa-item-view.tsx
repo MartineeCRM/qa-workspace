@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { Copy, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { Panel } from "@/components/app/layout-parts";
@@ -128,6 +128,7 @@ export function QaItemView({
   item: QaChecklistItemWithDisposition;
   result: QaChecklistItemResult | undefined;
 }) {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const { data: events = [] } = useTaxonomyEvents(projectId);
   const { data: customAttributes = [] } = useTaxonomyCustomAttributes(projectId);
@@ -312,7 +313,17 @@ export function QaItemView({
     new Map(eventProperties.map((property) => [property.id, property.technical_name])),
   );
 
-  const orderedIds = checklistItems.filter(hasCurrentChecklistResult).map((i) => i.id);
+  const resultItems = checklistItems.filter(hasCurrentChecklistResult);
+  const orderedIds = resultItems.map((i) => i.id);
+
+  function checklistItemLabel(checklistItem: (typeof resultItems)[number]): string {
+    return (
+      (checklistItem.target_type === "event"
+        ? events.find((event) => event.id === checklistItem.target_id)?.technical_name
+        : customAttributes.find((attribute) => attribute.id === checklistItem.target_id)
+            ?.technical_name) ?? checklistItem.target_id
+    );
+  }
 
   function copyEvidenceLog() {
     const text = evidenceRows
@@ -416,7 +427,25 @@ export function QaItemView({
             {result ? formatDateTime(result.updated_at) : "없음"}
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            aria-label="판정 결과 항목 선택"
+            value={item.id}
+            onChange={(event) =>
+              navigate({
+                to: "/w/$wsId/p/$projectId/qa/$stageSlug/$roundId/$sessionId/$itemId",
+                params: (prev) => ({ ...prev, itemId: event.target.value }),
+              })
+            }
+            className="h-9 max-w-[280px] rounded-md border border-[#dfe5ec] bg-white px-3 text-sm outline-none focus:border-[#2b6a9c] focus:ring-2 focus:ring-[#2b6a9c]/15"
+          >
+            {resultItems.map((resultItem) => (
+              <option key={resultItem.id} value={resultItem.id}>
+                {checklistItemLabel(resultItem)} ·{" "}
+                {resultItem.target_type === "event" ? "이벤트" : "어트리뷰트"}
+              </option>
+            ))}
+          </select>
           <Link
             from="/w/$wsId/p/$projectId/qa/$stageSlug/$roundId/$sessionId/$itemId"
             to="/w/$wsId/p/$projectId/qa/$stageSlug/$roundId/$sessionId/$itemId"

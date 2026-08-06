@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { Link } from "@tanstack/react-router";
+import { Search } from "lucide-react";
 import { Panel } from "@/components/app/layout-parts";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { useQaChecklistItems, type QaSession } from "@/lib/qa-rounds-queries";
 import { useTaxonomyCustomAttributes, useTaxonomyEvents } from "@/lib/queries";
@@ -36,6 +38,15 @@ export function QaSessionResultsPanel({
   const { data: customAttributes = [] } = useTaxonomyCustomAttributes(projectId);
   const { data: checklistItems = [] } = useQaChecklistItems(session.id);
   const [filter, setFilter] = useState<ResultFilter>("all");
+  const [search, setSearch] = useState("");
+
+  function itemLabel(targetType: "event" | "custom_attribute", targetId: string): string {
+    const label =
+      targetType === "event"
+        ? events.find((e) => e.id === targetId)?.technical_name
+        : customAttributes.find((a) => a.id === targetId)?.technical_name;
+    return label ?? targetId;
+  }
 
   const rows = checklistItems.filter(hasCurrentChecklistResult).map((item) => ({
     item,
@@ -60,38 +71,46 @@ export function QaSessionResultsPanel({
       count: rows.filter((row) => row.finalStatus === "passed").length,
     },
   ];
-  const shownRows = filter === "all" ? rows : rows.filter((row) => row.finalStatus === filter);
-
-  function itemLabel(targetType: "event" | "custom_attribute", targetId: string): string {
-    const label =
-      targetType === "event"
-        ? events.find((e) => e.id === targetId)?.technical_name
-        : customAttributes.find((a) => a.id === targetId)?.technical_name;
-    return label ?? targetId;
-  }
+  const query = search.trim().toLowerCase();
+  const shownRows = rows.filter(
+    (row) =>
+      (filter === "all" || row.finalStatus === filter) &&
+      (!query || itemLabel(row.item.target_type, row.item.target_id).toLowerCase().includes(query)),
+  );
 
   return (
     <Panel
       title="판정 결과"
       description="항목을 눌러 검증 근거를 확인하고 필요한 대상을 이슈로 등록하세요. 상태 변경과 다음 차수 검증은 이슈 모아보기에서 관리합니다."
       actions={
-        <div className="flex flex-wrap gap-1 rounded-lg bg-[#f1f4f8] p-[3px]">
-          {filters.map((option) => (
-            <button
-              key={option.key}
-              type="button"
-              aria-pressed={filter === option.key}
-              onClick={() => setFilter(option.key)}
-              className={cn(
-                "rounded-md px-2.5 py-1 text-xs",
-                filter === option.key
-                  ? "bg-white font-semibold text-[#1c2431] shadow-sm"
-                  : "text-[#8b97a8]",
-              )}
-            >
-              {option.label} {option.count}
-            </button>
-          ))}
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="flex h-8 w-56 items-center gap-2 rounded-lg border border-[#dfe5ec] bg-white px-2.5">
+            <Search className="size-3.5 text-[#94a3b8]" />
+            <Input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="이벤트·어트리뷰트 검색"
+              className="h-auto border-0 bg-transparent p-0 text-xs shadow-none focus-visible:ring-0"
+            />
+          </label>
+          <div className="flex flex-wrap gap-1 rounded-lg bg-[#f1f4f8] p-[3px]">
+            {filters.map((option) => (
+              <button
+                key={option.key}
+                type="button"
+                aria-pressed={filter === option.key}
+                onClick={() => setFilter(option.key)}
+                className={cn(
+                  "rounded-md px-2.5 py-1 text-xs",
+                  filter === option.key
+                    ? "bg-white font-semibold text-[#1c2431] shadow-sm"
+                    : "text-[#8b97a8]",
+                )}
+              >
+                {option.label} {option.count}
+              </button>
+            ))}
+          </div>
         </div>
       }
     >
