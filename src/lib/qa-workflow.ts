@@ -117,6 +117,38 @@ export function relatedRuleEvidenceTargets(input: {
   );
 }
 
+export function unexpectedSnapshotAttributeIds(input: {
+  snapshots: Array<{
+    status: string;
+    payload: Record<string, unknown> | null;
+  }>;
+  attributes: Array<{ id: string; technical_name: string; is_active: boolean }>;
+  checklistItems: Array<{
+    target_type: "event" | "custom_attribute";
+    target_id: string;
+    executed_at: string | null;
+  }>;
+}): string[] {
+  const snapshotKeys = new Set(
+    input.snapshots
+      .filter((snapshot) => snapshot.status === "captured")
+      .flatMap((snapshot) => Object.keys(snapshot.payload ?? {})),
+  );
+  const executedIds = new Set(
+    input.checklistItems
+      .filter((item) => item.target_type === "custom_attribute" && item.executed_at)
+      .map((item) => item.target_id),
+  );
+  return input.attributes
+    .filter(
+      (attribute) =>
+        attribute.is_active &&
+        snapshotKeys.has(attribute.technical_name) &&
+        !executedIds.has(attribute.id),
+    )
+    .map((attribute) => attribute.id);
+}
+
 export type VerdictReasonGroup = {
   reason: string;
   label: string;

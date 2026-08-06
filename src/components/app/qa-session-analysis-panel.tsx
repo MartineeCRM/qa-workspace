@@ -4,8 +4,10 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { errorMessage, formatMergedTimelineTime } from "@/lib/domain";
 import { parseRunEventsCsv } from "@/lib/run-events-csv";
-import { buildMergedTimeline } from "@/lib/qa-workflow";
+import { buildMergedTimeline, unexpectedSnapshotAttributeIds } from "@/lib/qa-workflow";
 import {
+  useAddChecklistItems,
+  useMarkChecklistItemExecuted,
   useQaAttributeSnapshots,
   useQaChecklistItems,
   useQaRunEvents,
@@ -29,12 +31,15 @@ export function QaSessionAnalysisPanel({
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
+  const [dismissedAttributes, setDismissedAttributes] = useState<Set<string>>(new Set());
   const { data: events = [] } = useTaxonomyEvents(projectId);
   const { data: attributes = [] } = useTaxonomyCustomAttributes(projectId);
   const { data: runEvents = [] } = useQaRunEvents(session.id);
   const { data: snapshots = [] } = useQaAttributeSnapshots(session.id);
   const { data: items = [] } = useQaChecklistItems(session.id);
   const uploadLog = useUploadRunEventsLog(session.id);
+  const addItems = useAddChecklistItems(session.id);
+  const markExecuted = useMarkChecklistItemExecuted(session.id);
   const eventByName = useMemo(
     () => new Map(events.map((event) => [event.technical_name, event])),
     [events],
@@ -60,6 +65,16 @@ export function QaSessionAnalysisPanel({
         .map((event) => event.raw_event_name),
     ),
   );
+  const unexpectedAttributes = unexpectedSnapshotAttributeIds({
+    snapshots,
+    attributes,
+    checklistItems: items,
+  })
+    .filter((attributeId) => !dismissedAttributes.has(attributeId))
+    .flatMap((attributeId) => {
+      const attribute = attributes.find((candidate) => candidate.id === attributeId);
+      return attribute ? [attribute] : [];
+    });
   const rows = buildMergedTimeline(runEvents, snapshots);
 
   function eventName(eventId: string) {
@@ -82,6 +97,19 @@ export function QaSessionAnalysisPanel({
     } finally {
       setUploading(false);
       if (fileRef.current) fileRef.current.value = "";
+    }
+  }
+
+  async function addUnexpectedAttribute(attributeId: string) {
+    try {
+      const existing = items.find(
+        (item) => item.target_type === "custom_attribute" && item.target_id === attributeId,
+      );
+      if (existing) await markExecuted.mutateAsync(existing.id);
+      else await addItems.mutateAsync({ eventIds: [], customAttributeIds: [attributeId] });
+      toast.success("어트리뷰트를 이번 검증에 추가했어요");
+    } catch (error) {
+      toast.error(errorMessage(error, "어트리뷰트 추가에 실패했어요"));
     }
   }
 
@@ -117,7 +145,11 @@ export function QaSessionAnalysisPanel({
         <div className="grid gap-3 p-5 md:grid-cols-3">
           <StatusCard tone="success" label="수집 확인" value={collectedItems.length} />
           <StatusCard tone="warning" label="미수집 후보" value={missingItems.length} />
-          <StatusCard tone="neutral" label="추가 수집" value={unexpectedEvents.length} />
+          <StatusCard
+            tone="neutral"
+            label="추가 수집"
+            value={unexpectedEvents.length + unexpectedAttributes.length}
+          />
         </div>
 
         {missingItems.length > 0 ? (
@@ -154,6 +186,43 @@ export function QaSessionAnalysisPanel({
               이번 실행의 판정 대상에는 자동으로 포함하지 않습니다.
             </p>
             <p className="mono-token mt-2 text-xs text-[#475569]">{unexpectedEvents.join(" · ")}</p>
+          </div>
+        ) : null}
+
+        {unexpectedAttributes.length > 0 ? (
+          <div className="mx-5 mb-5 rounded-xl border border-[#d9dcf3] bg-[#f7f7fd] p-4">
+            <p className="text-[13px] font-semibold">체크하지 않았지만 스냅샷에서 발견됐어요</p>
+            <p className="mt-1 text-xs text-[#7b8798]">
+              이번 검증에 추가하면 현재 스냅샷을 근거로 함께 분석합니다.
+            </p>
+            <div className="mt-3 space-y-2">
+              {unexpectedAttributes.map((attribute) => (
+                <div
+                  key={attribute.id}
+                  className="flex flex-wrap items-center gap-2 rounded-lg border border-[#dfe2f1] bg-white px-3 py-2"
+                >
+                  <span className="mono-token min-w-0 flex-1 truncate text-xs font-semibold">
+                    {attribute.technical_name}
+                  </span>
+                  <Button
+                    size="sm"
+                    onClick={() => void addUnexpectedAttribute(attribute.id)}
+                    disabled={addItems.isPending || markExecuted.isPending}
+                  >
+                    이번 검증에 추가
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() =>
+                      setDismissedAttributes((current) => new Set(current).add(attribute.id))
+                    }
+                  >
+                    제외
+                  </Button>
+                </div>
+              ))}
+            </div>
           </div>
         ) : null}
       </section>

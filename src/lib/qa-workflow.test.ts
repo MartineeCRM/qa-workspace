@@ -22,6 +22,7 @@ import {
   hasCurrentChecklistResult,
   resolveEvidenceHighlightTone,
   relatedRuleEvidenceTargets,
+  unexpectedSnapshotAttributeIds,
   buildEventSpecDiffRows,
   type ChecklistCoverageRow,
 } from "@/lib/qa-workflow";
@@ -77,6 +78,33 @@ describe("relatedRuleEvidenceTargets", () => {
         ],
       }),
     ).toEqual([{ targetType: "event", targetId: "cart-list" }]);
+  });
+});
+
+describe("unexpectedSnapshotAttributeIds", () => {
+  it("finds active snapshot attributes that were not executed in the checklist", () => {
+    expect(
+      unexpectedSnapshotAttributeIds({
+        snapshots: [
+          {
+            status: "captured",
+            payload: { cart_list: [], search_history: ["shoes"], unknown_key: true },
+          },
+        ],
+        attributes: [
+          { id: "cart", technical_name: "cart_list", is_active: true },
+          { id: "search", technical_name: "search_history", is_active: true },
+          { id: "inactive", technical_name: "unknown_key", is_active: false },
+        ],
+        checklistItems: [
+          {
+            target_type: "custom_attribute",
+            target_id: "cart",
+            executed_at: "2026-08-06T00:00:00Z",
+          },
+        ],
+      }),
+    ).toEqual(["search"]);
   });
 });
 
