@@ -38,7 +38,7 @@ SUPABASE_SERVICE_ROLE_KEY=
 
 # AI 분석을 사용할 때 필요
 OPENAI_API_KEY=
-OPENAI_MODEL=gpt-5.6-sol
+OPENAI_MODEL=gpt-5.6-luna
 ```
 
 클라이언트 번들에는 `VITE_SUPABASE_*` 값만 사용합니다. `SUPABASE_SERVICE_ROLE_KEY`와 `OPENAI_API_KEY`는 반드시 서버 환경에만 둡니다.

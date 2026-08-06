@@ -33,7 +33,7 @@ export const JUDGE_RESPONSE_FORMAT = {
           required: ["rule_id", "verdict", "reasoning", "evidence"],
           properties: {
             rule_id: { type: "string" },
-            verdict: { type: "string", enum: ["passed", "failed"] },
+            verdict: { type: "string", enum: ["failed"] },
             reasoning: { type: "string" },
             evidence: {
               type: "object",
@@ -105,16 +105,13 @@ export function parseJudgeResponse(text: string, rules: JudgePromptInput["rules"
   if (!Array.isArray(parsed.results)) {
     return { ok: false, error: "AI 응답에 규칙별 results가 없어요." };
   }
-  const byRuleId = new Map(parsed.results.map((result) => [result.rule_id, result]));
-  const results = rules.map((rule) => byRuleId.get(rule.id));
-  if (
-    results.some(
-      (result) => !result || (result.verdict !== "passed" && result.verdict !== "failed"),
-    )
-  ) {
-    return { ok: false, error: "AI가 일부 규칙의 판정 결과를 올바르게 반환하지 않았어요." };
+  const ruleIds = new Set(rules.map((rule) => rule.id));
+  const failed = parsed.results.filter(
+    (result) => result.verdict === "failed" && ruleIds.has(result.rule_id ?? ""),
+  );
+  if (failed.length !== parsed.results.length) {
+    return { ok: false, error: "AI가 요청하지 않은 규칙의 결과를 반환했어요." };
   }
-  const failed = results.filter((result) => result?.verdict === "failed");
   return {
     ok: true,
     verdict: failed.length > 0 ? "failed" : "passed",
@@ -136,15 +133,6 @@ export function buildJudgePrompt(input: JudgePromptInput): string {
   return [
     "당신은 이벤트 트래킹 QA 판정 엔진입니다. 각 검증 규칙을 근거 로그와 독립적으로 대조하세요.",
     "",
-    "검증 규칙:",
-    ...input.rules.map(
-      (rule) =>
-        `- ID=${JSON.stringify(rule.id)}, 이름=${JSON.stringify(rule.name)}, 조건=${JSON.stringify(rule.description)}`,
-    ),
-    "",
-    "근거:",
-    ...evidenceLines,
-    "",
     "판정 원칙:",
     "- 데이터 타입이 같다는 이유만으로 통과시키지 마세요.",
     "- 먼저 프로퍼티명, 설명, 허용값, 예시값을 종합해 기대 계약을 데이터 타입, 구조, 표현 체계, 의미 영역, 정규화 규칙으로 분해하세요.",
@@ -164,7 +152,7 @@ export function buildJudgePrompt(input: JudgePromptInput): string {
     "- 'A가 발생하면 B가 발생해야 한다' 같은 조건부 규칙은 A가 없으면 통과, A가 있는데 B가 없으면 실패입니다.",
     "- 로그가 없는 대상도 빈 배열 자체가 근거입니다. 추측으로 존재한다고 간주하지 마세요.",
     '- `__kind: "array_summary"`는 긴 배열의 길이와 대표값만 줄여 보낸 것입니다. 객체로 오해하지 마세요.',
-    "- 각 규칙 ID마다 반드시 결과 하나를 반환하세요.",
+    "- 모든 규칙을 판정하되 실패한 규칙만 results에 넣으세요. 모두 통과하면 빈 배열을 반환하세요.",
     "",
     "사용자에게 보여줄 reasoning 작성법:",
     "- 쉬운 한국어로 핵심만 1~2문장으로 쓰세요.",
@@ -172,12 +160,20 @@ export function buildJudgePrompt(input: JudgePromptInput): string {
     "- 같은 결론을 반복하거나 판정 과정을 길게 설명하지 마세요. 자세한 분석은 evidence에만 넣으세요.",
     "- '입증', '혼재', '임의 해석', '표현 체계', '의미 영역', '정규화 규칙' 같은 딱딱한 말은 reasoning에서 쓰지 마세요.",
     '- 예: "`referral_source`가 없습니다. 대신 철자가 다른 `refferal_source`가 들어왔습니다."',
-    "- 통과한 규칙의 reasoning은 빈 문자열로 반환하세요.",
     "- evidence에는 원본 로그나 배열을 다시 복사하지 마세요. 짧은 observed_summary와 근거 대상·필드만 refs에 적으세요.",
+    "",
+    "검증 규칙:",
+    ...input.rules.map(
+      (rule) =>
+        `- ID=${JSON.stringify(rule.id)}, 이름=${JSON.stringify(rule.name)}, 조건=${JSON.stringify(rule.description)}`,
+    ),
+    "",
+    "근거:",
+    ...evidenceLines,
     "",
     "다른 설명 없이 다음 JSON 형식으로만 응답하세요:",
     "마크다운 코드 블록(```json 등) 없이 순수 JSON 텍스트만 출력하세요.",
-    '{"results":[{"rule_id":"규칙 ID","verdict":"failed","reasoning":"쉽고 짧은 실패 이유 1~2문장","evidence":{"mismatch_dimensions":["불일치 차원"],"observed_summary":"실제 근거의 짧은 요약","refs":[{"target":"대상 기술명","field":"근거 필드명"}]}}]}',
-    '각 verdict는 반드시 "passed" 또는 "failed" 중 하나여야 합니다.',
+    '{"results":[{"rule_id":"실패한 규칙 ID","verdict":"failed","reasoning":"쉽고 짧은 실패 이유 1~2문장","evidence":{"mismatch_dimensions":["불일치 차원"],"observed_summary":"실제 근거의 짧은 요약","refs":[{"target":"대상 기술명","field":"근거 필드명"}]}}]}',
+    'results에는 실패한 규칙만 넣고 각 verdict는 반드시 "failed"여야 합니다. 모두 통과하면 {"results":[]}를 반환하세요.',
   ].join("\n");
 }

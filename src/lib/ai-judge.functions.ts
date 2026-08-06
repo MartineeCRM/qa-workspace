@@ -24,7 +24,7 @@ export function extractOpenAIResponseText(body: OpenAIResponse): string {
 }
 
 export function judgeOutputTokenBudget(ruleCount: number): number {
-  return Math.min(8_192, Math.max(2_048, 1_024 + ruleCount * 384));
+  return Math.min(4_096, Math.max(1_024, 512 + ruleCount * 128));
 }
 
 export type JudgeAiResult =
@@ -55,7 +55,7 @@ export const judgeChecklistItemWithAI = createServerFn({ method: "POST" })
           Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
-          model: process.env.OPENAI_MODEL ?? "gpt-5.6-sol",
+          model: process.env.OPENAI_MODEL ?? "gpt-5.6-luna",
           input: buildJudgePrompt(data),
           reasoning: { effort: "low" },
           text: { format: JUDGE_RESPONSE_FORMAT },

@@ -27,8 +27,8 @@ describe("extractOpenAIResponseText", () => {
 
 describe("judgeOutputTokenBudget", () => {
   it("grows with rule count and stays bounded", () => {
-    expect(judgeOutputTokenBudget(1)).toBe(2_048);
-    expect(judgeOutputTokenBudget(10)).toBe(4_864);
-    expect(judgeOutputTokenBudget(100)).toBe(8_192);
+    expect(judgeOutputTokenBudget(1)).toBe(1_024);
+    expect(judgeOutputTokenBudget(10)).toBe(1_792);
+    expect(judgeOutputTokenBudget(100)).toBe(4_096);
   });
 });

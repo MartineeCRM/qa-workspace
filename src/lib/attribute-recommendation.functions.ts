@@ -21,7 +21,7 @@ export const recommendAttributesForEvent = createServerFn({ method: "POST" })
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
         body: JSON.stringify({
-          model: process.env.OPENAI_MODEL ?? "gpt-5.6-sol",
+          model: process.env.OPENAI_MODEL ?? "gpt-5.6-luna",
           input: buildAttributeRecommendationPrompt(data),
           reasoning: { effort: "low" },
           text: { format: ATTRIBUTE_RECOMMENDATION_FORMAT },

@@ -70,7 +70,7 @@ describe("buildJudgePrompt", () => {
     expect(prompt).toContain("쉬운 한국어로 핵심만 1~2문장");
     expect(prompt).toContain("자세한 분석은 evidence에만 넣으세요");
     expect(prompt).toContain("`referral_source`가 없습니다");
-    expect(prompt).toContain("통과한 규칙의 reasoning은 빈 문자열");
+    expect(prompt).toContain("실패한 규칙만 results에 넣으세요");
     expect(prompt).toContain("원본 로그나 배열을 다시 복사하지 마세요");
   });
 
@@ -108,11 +108,10 @@ describe("parseJudgeResponse", () => {
     { id: "sequence", name: "후속 이벤트", description: "A 이후 B" },
   ];
 
-  it("fails the item when any rule fails and keeps every rule's evidence", () => {
+  it("fails the item when a failed rule is returned", () => {
     const result = parseJudgeResponse(
       JSON.stringify({
         results: [
-          { rule_id: "format", verdict: "passed", reasoning: "", evidence: {} },
           {
             rule_id: "sequence",
             verdict: "failed",
@@ -131,28 +130,29 @@ describe("parseJudgeResponse", () => {
     });
   });
 
-  it("rejects a response that omits one of the requested rules", () => {
+  it("treats an empty failure list as passed", () => {
+    const result = parseJudgeResponse(JSON.stringify({ results: [] }), rules);
+
+    expect(result).toMatchObject({ ok: true, verdict: "passed" });
+  });
+
+  it("rejects a failure for an unknown rule", () => {
     const result = parseJudgeResponse(
       JSON.stringify({
-        results: [{ rule_id: "format", verdict: "passed", reasoning: "", evidence: {} }],
+        results: [{ rule_id: "unknown", verdict: "failed", reasoning: "오류", evidence: {} }],
       }),
       rules,
     );
 
     expect(result).toEqual({
       ok: false,
-      error: "AI가 일부 규칙의 판정 결과를 올바르게 반환하지 않았어요.",
+      error: "AI가 요청하지 않은 규칙의 결과를 반환했어요.",
     });
   });
 
   it("accepts JSON wrapped in a markdown code fence", () => {
     const response = {
-      results: rules.map((rule) => ({
-        rule_id: rule.id,
-        verdict: "passed",
-        reasoning: "",
-        evidence: {},
-      })),
+      results: [],
     };
 
     expect(
