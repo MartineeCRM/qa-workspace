@@ -211,7 +211,7 @@ export function QaItemView({
       .filter((row) => row.source === "snapshot" && relevantAttributeNames.has(row.name))
       .map((row) => row.key),
   ]);
-  const evidenceRows = timeline.filter((row) => relevantKeys.has(row.key));
+  const evidenceRows = timeline.filter((row) => relevantKeys.has(row.key)).reverse();
   const aiFailedPropertyIds = aiFailedTaxonomyPropertyIds(result?.ai_evidence);
   const aiAnalysisIncomplete = Boolean(
     result?.ai_evidence &&
