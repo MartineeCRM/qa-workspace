@@ -70,6 +70,53 @@ export type MergedTimelineRow = {
   raw?: Record<string, unknown>;
 };
 
+type RuleEvidenceTarget = {
+  targetType: "event" | "custom_attribute";
+  targetId: string;
+};
+
+export function relatedRuleEvidenceTargets(input: {
+  itemTargetType: RuleEvidenceTarget["targetType"];
+  itemTargetId: string;
+  eventProperties: Array<{ id: string; event_id: string }>;
+  rules: Array<{
+    is_enabled: boolean;
+    validation_rule_targets: Array<{
+      target_type: "event" | "property" | "custom_attribute";
+      target_id: string;
+    }>;
+  }>;
+}): RuleEvidenceTarget[] {
+  const parentEventId = (propertyId: string) =>
+    input.eventProperties.find((property) => property.id === propertyId)?.event_id;
+  const appliesToItem = (target: {
+    target_type: "event" | "property" | "custom_attribute";
+    target_id: string;
+  }) =>
+    (target.target_type === input.itemTargetType && target.target_id === input.itemTargetId) ||
+    (input.itemTargetType === "event" &&
+      target.target_type === "property" &&
+      parentEventId(target.target_id) === input.itemTargetId);
+
+  const targets: RuleEvidenceTarget[] = [
+    { targetType: input.itemTargetType, targetId: input.itemTargetId },
+  ];
+  for (const rule of input.rules) {
+    if (!rule.is_enabled || !rule.validation_rule_targets.some(appliesToItem)) continue;
+    for (const target of rule.validation_rule_targets) {
+      if (target.target_type === "property") {
+        const eventId = parentEventId(target.target_id);
+        if (eventId) targets.push({ targetType: "event", targetId: eventId });
+      } else {
+        targets.push({ targetType: target.target_type, targetId: target.target_id });
+      }
+    }
+  }
+  return Array.from(
+    new Map(targets.map((target) => [`${target.targetType}:${target.targetId}`, target])).values(),
+  );
+}
+
 export type VerdictReasonGroup = {
   reason: string;
   label: string;

@@ -327,7 +327,9 @@ async function judgeQualitative(
       checklist_item_id: checklistItemId,
       ai_verdict: "not_collected",
       ai_reasoning: result.error,
-      ai_evidence: null,
+      ai_evidence: result.rawResponse
+        ? { qualitative_error: result.error, raw_response: result.rawResponse }
+        : null,
       failed_layer: null,
       final_status: "not_collected",
       judged_by: "ai",

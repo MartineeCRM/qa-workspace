@@ -34,7 +34,7 @@ export type JudgeAiResult =
       reasoning: string;
       evidence: Json;
     }
-  | { ok: false; error: string };
+  | { ok: false; error: string; rawResponse?: string };
 
 export const judgeChecklistItemWithAI = createServerFn({ method: "POST" })
   .validator((data: JudgePromptInput) => data)
@@ -89,6 +89,7 @@ export const judgeChecklistItemWithAI = createServerFn({ method: "POST" })
     if (body.status === "incomplete") {
       return {
         ok: false,
+        rawResponse: text.slice(0, 20_000) || undefined,
         error:
           body.incomplete_details?.reason === "max_output_tokens"
             ? "AI 판정이 출력 한도에서 잘렸어요. 규칙을 줄이거나 다시 분석해주세요."
@@ -98,5 +99,7 @@ export const judgeChecklistItemWithAI = createServerFn({ method: "POST" })
     if (!text) return { ok: false, error: "AI가 판정 본문을 반환하지 않았어요." };
 
     const parsed = parseJudgeResponse(text, data.rules);
-    return parsed.ok ? { ...parsed, evidence: parsed.evidence as Json } : parsed;
+    return parsed.ok
+      ? { ...parsed, evidence: parsed.evidence as Json }
+      : { ...parsed, rawResponse: text.slice(0, 20_000) };
   });

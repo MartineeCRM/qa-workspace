@@ -19,6 +19,7 @@ import {
   hasCurrentChecklistResult,
   nextChecklistItemId,
   previousChecklistItemId,
+  relatedRuleEvidenceTargets,
   resolveEvidenceHighlightTone,
   type MergedTimelineRow,
 } from "@/lib/qa-workflow";
@@ -85,6 +86,13 @@ function extractAiSummary(evidence: unknown): string | null {
     .map((entry) => entry.reasoning.trim())
     .filter(Boolean);
   return lines.length > 0 ? lines.join(" ") : null;
+}
+
+function extractAiRawResponse(evidence: unknown): string | null {
+  if (!evidence || typeof evidence !== "object" || Array.isArray(evidence)) return null;
+  const record = evidence as { raw_response?: unknown; qualitative?: unknown };
+  if (typeof record.raw_response === "string") return record.raw_response;
+  return extractAiRawResponse(record.qualitative);
 }
 
 function AiSummaryText({ text }: { text: string }) {
@@ -175,16 +183,34 @@ export function QaItemView({
 
   const normalizedSnapshots = normalizeFlatAttributeArrays(snapshots, customAttributes);
   const timeline = buildMergedTimeline(runEvents, normalizedSnapshots);
-  // Scope the evidence log to this item's own target — never fall back to showing
-  // the whole session's CSV/snapshot history for items with no ai_evidence (e.g.
-  // passed verdicts), which is what a size-0-relevantKeys fallback used to do.
-  const relevantKeys = new Set(
-    item.target_type === "event"
-      ? runEvents.filter((e) => e.event_id === item.target_id).map((e) => `event:${e.id}`)
-      : timeline
-          .filter((row) => row.source === "snapshot" && row.name === label)
-          .map((row) => row.key),
+  const evidenceTargets = relatedRuleEvidenceTargets({
+    itemTargetType: item.target_type,
+    itemTargetId: item.target_id,
+    eventProperties,
+    rules,
+  });
+  const relevantEventIds = new Set(
+    evidenceTargets
+      .filter((target) => target.targetType === "event")
+      .map((target) => target.targetId),
   );
+  const relevantAttributeNames = new Set(
+    evidenceTargets
+      .filter((target) => target.targetType === "custom_attribute")
+      .map(
+        (target) =>
+          customAttributes.find((attribute) => attribute.id === target.targetId)?.technical_name,
+      )
+      .filter((name): name is string => Boolean(name)),
+  );
+  const relevantKeys = new Set([
+    ...runEvents
+      .filter((event) => event.event_id && relevantEventIds.has(event.event_id))
+      .map((event) => `event:${event.id}`),
+    ...timeline
+      .filter((row) => row.source === "snapshot" && relevantAttributeNames.has(row.name))
+      .map((row) => row.key),
+  ]);
   const evidenceRows = timeline.filter((row) => relevantKeys.has(row.key));
   const aiFailedPropertyIds = aiFailedTaxonomyPropertyIds(result?.ai_evidence);
   const aiAnalysisIncomplete = Boolean(
@@ -280,6 +306,7 @@ export function QaItemView({
   const aiSummary =
     extractAiSummary(result?.ai_evidence) ??
     (result?.judged_by === "ai" && result.ai_evidence == null ? result.ai_reasoning : null);
+  const aiRawResponse = extractAiRawResponse(result?.ai_evidence);
   const compressedHistory = compressRoundHistory(
     history,
     new Map(eventProperties.map((property) => [property.id, property.technical_name])),
@@ -461,7 +488,19 @@ export function QaItemView({
                   <h4 className="text-[12.5px] font-bold">AI 분석</h4>
                 </div>
                 {aiSummary ? (
-                  <AiSummaryText text={aiSummary} />
+                  <>
+                    <AiSummaryText text={aiSummary} />
+                    {aiRawResponse ? (
+                      <details className="mt-3 rounded-lg border border-[#dbe2ea] bg-[#f8fafc]">
+                        <summary className="cursor-pointer px-3 py-2 text-xs font-semibold text-[#64748b]">
+                          AI 원문 보기
+                        </summary>
+                        <pre className="max-h-72 overflow-auto whitespace-pre-wrap break-all border-t border-[#dbe2ea] p-3 text-[11.5px] leading-5 text-[#475569]">
+                          {aiRawResponse}
+                        </pre>
+                      </details>
+                    ) : null}
+                  </>
                 ) : (
                   <p className="mt-3 text-[13px] leading-[1.7] text-[#a3adbb]">추가 분석 없음</p>
                 )}
@@ -471,7 +510,7 @@ export function QaItemView({
 
           <Panel
             title="근거 로그"
-            description="이 항목과 관련된 병합 타임라인 구간"
+            description="이 항목과 연결된 검증 규칙의 이벤트·어트리뷰트 로그"
             actions={
               <button
                 type="button"

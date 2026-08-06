@@ -21,11 +21,64 @@ import {
   normalizeChecklistExecution,
   hasCurrentChecklistResult,
   resolveEvidenceHighlightTone,
+  relatedRuleEvidenceTargets,
   buildEventSpecDiffRows,
   type ChecklistCoverageRow,
 } from "@/lib/qa-workflow";
 import type { QaAttributeSnapshot, QaRunEvent, RoundHistoryEntry } from "@/lib/qa-rounds-queries";
 import type { CoverageItem } from "@/lib/queries";
+
+describe("relatedRuleEvidenceTargets", () => {
+  it("includes every target from a rule connected to the current event", () => {
+    expect(
+      relatedRuleEvidenceTargets({
+        itemTargetType: "event",
+        itemTargetId: "cart-list",
+        eventProperties: [{ id: "cart-id", event_id: "cart-list" }],
+        rules: [
+          {
+            is_enabled: true,
+            validation_rule_targets: [
+              { target_type: "property", target_id: "cart-id" },
+              { target_type: "event", target_id: "cart-updated" },
+              { target_type: "custom_attribute", target_id: "cart-history" },
+            ],
+          },
+        ],
+      }),
+    ).toEqual([
+      { targetType: "event", targetId: "cart-list" },
+      { targetType: "event", targetId: "cart-updated" },
+      { targetType: "custom_attribute", targetId: "cart-history" },
+    ]);
+  });
+
+  it("does not include unrelated or disabled rule targets", () => {
+    expect(
+      relatedRuleEvidenceTargets({
+        itemTargetType: "event",
+        itemTargetId: "cart-list",
+        eventProperties: [],
+        rules: [
+          {
+            is_enabled: false,
+            validation_rule_targets: [
+              { target_type: "event", target_id: "cart-list" },
+              { target_type: "event", target_id: "disabled-related" },
+            ],
+          },
+          {
+            is_enabled: true,
+            validation_rule_targets: [
+              { target_type: "event", target_id: "other" },
+              { target_type: "event", target_id: "unrelated" },
+            ],
+          },
+        ],
+      }),
+    ).toEqual([{ targetType: "event", targetId: "cart-list" }]);
+  });
+});
 
 describe("deriveSessionStep", () => {
   it("returns 1 when the session has no checklist items", () => {

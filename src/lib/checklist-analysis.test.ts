@@ -216,7 +216,11 @@ describe("judgeChecklistItem — taxonomy example format", () => {
   });
 
   it("does not hide an AI failure behind a structural error", async () => {
-    judgeWithAI.mockResolvedValue({ ok: false, error: "OpenAI 판정 시간이 30초를 초과했어요." });
+    judgeWithAI.mockResolvedValue({
+      ok: false,
+      error: "AI 응답을 JSON으로 해석하지 못했어요.",
+      rawResponse: "not valid json",
+    });
     const event = {
       id: "event-1",
       technical_name: "signup_completed",
@@ -257,7 +261,8 @@ describe("judgeChecklistItem — taxonomy example format", () => {
 
     expect(result.ai_reasoning).toContain("AI 분석 미완료");
     expect(result.ai_evidence).toMatchObject({
-      qualitative_error: expect.stringContaining("30초"),
+      qualitative_error: expect.stringContaining("JSON"),
+      qualitative: { raw_response: "not valid json" },
     });
   });
 });
