@@ -93,7 +93,12 @@ export function parseJudgeResponse(text: string, rules: JudgePromptInput["rules"
     }>;
   };
   try {
-    parsed = JSON.parse(text);
+    parsed = JSON.parse(
+      text
+        .trim()
+        .replace(/^```(?:json)?\s*/i, "")
+        .replace(/\s*```$/, ""),
+    );
   } catch {
     return { ok: false, error: "AI 응답을 JSON으로 해석하지 못했어요." };
   }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { extractOpenAIResponseText } from "./ai-judge.functions";
+import { extractOpenAIResponseText, judgeOutputTokenBudget } from "./ai-judge.functions";
 
 describe("extractOpenAIResponseText", () => {
   it("extracts the Responses API output text", () => {
@@ -11,5 +11,24 @@ describe("extractOpenAIResponseText", () => {
         ],
       }),
     ).toBe('{"results":[]}');
+  });
+
+  it("joins every output text block", () => {
+    expect(
+      extractOpenAIResponseText({
+        output: [
+          { content: [{ type: "output_text", text: '{"results":' }] },
+          { content: [{ type: "output_text", text: "[]}" }] },
+        ],
+      }),
+    ).toBe('{"results":[]}');
+  });
+});
+
+describe("judgeOutputTokenBudget", () => {
+  it("grows with rule count and stays bounded", () => {
+    expect(judgeOutputTokenBudget(1)).toBe(2_048);
+    expect(judgeOutputTokenBudget(10)).toBe(4_864);
+    expect(judgeOutputTokenBudget(100)).toBe(8_192);
   });
 });

@@ -144,4 +144,22 @@ describe("parseJudgeResponse", () => {
       error: "AI가 일부 규칙의 판정 결과를 올바르게 반환하지 않았어요.",
     });
   });
+
+  it("accepts JSON wrapped in a markdown code fence", () => {
+    const response = {
+      results: rules.map((rule) => ({
+        rule_id: rule.id,
+        verdict: "passed",
+        reasoning: "",
+        evidence: {},
+      })),
+    };
+
+    expect(
+      parseJudgeResponse(`\`\`\`json\n${JSON.stringify(response)}\n\`\`\``, rules),
+    ).toMatchObject({
+      ok: true,
+      verdict: "passed",
+    });
+  });
 });
