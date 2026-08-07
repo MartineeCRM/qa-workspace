@@ -51,6 +51,22 @@ describe("buildJudgePrompt", () => {
     expect(prompt).toContain('"verdict"');
   });
 
+  it("marks the current target and keeps related logs as evidence only", () => {
+    const request = buildJudgeRequest({
+      scope: {
+        kind: "event",
+        technicalName: "cart_add_completed",
+        allowedFields: ["item_id"],
+      },
+      rules: [{ id: "cart-rule", name: "장바구니", description: "장바구니 상태 비교" }],
+      targets: [],
+    });
+
+    expect(request).toContain('현재 판정 대상: event "cart_add_completed"');
+    expect(request).toContain('허용된 판정 필드: ["item_id"]');
+    expect(request).toContain("연관 로그는 비교 근거로만 사용하세요");
+  });
+
   it("does not throw and still includes the rule description and JSON format instructions when targets is empty", () => {
     const prompt = buildJudgePrompt({
       rules: [{ id: "rule-1", name: "전체 규칙", description: "연결된 대상이 없는 규칙" }],
@@ -182,6 +198,61 @@ describe("parseJudgeResponse", () => {
     ).toMatchObject({
       ok: true,
       verdict: "passed",
+    });
+  });
+
+  it("drops failures that belong only to a related log", () => {
+    const result = parseJudgeResponse(
+      JSON.stringify({
+        results: [
+          {
+            rule_id: "sequence",
+            verdict: "failed",
+            reasoning: "cart_remove_completed 로그가 잘못됐습니다",
+            evidence: {
+              refs: [{ target: "cart_remove_completed", field: "item_id" }],
+            },
+          },
+        ],
+      }),
+      rules,
+      { kind: "event", technicalName: "cart_add_completed", allowedFields: ["item_id"] },
+    );
+
+    expect(result).toMatchObject({ ok: true, verdict: "passed", evidence: [] });
+  });
+
+  it("keeps only current-target failures for structurally eligible fields", () => {
+    const result = parseJudgeResponse(
+      JSON.stringify({
+        results: [
+          {
+            rule_id: "format",
+            verdict: "failed",
+            reasoning: "현재 item_id 형식이 잘못됐습니다",
+            evidence: {
+              refs: [{ target: "cart_add_completed", field: "item_id" }],
+            },
+          },
+          {
+            rule_id: "sequence",
+            verdict: "failed",
+            reasoning: "누락 필드를 다시 검사했습니다",
+            evidence: {
+              refs: [{ target: "cart_add_completed", field: "missing_property" }],
+            },
+          },
+        ],
+      }),
+      rules,
+      { kind: "event", technicalName: "cart_add_completed", allowedFields: ["item_id"] },
+    );
+
+    expect(result).toMatchObject({
+      ok: true,
+      verdict: "failed",
+      reasoning: "현재 item_id 형식이 잘못됐습니다",
+      evidence: [expect.objectContaining({ rule_id: "format" })],
     });
   });
 });

@@ -387,6 +387,21 @@ async function judgeQualitative(
   try {
     result = await judgeChecklistItemWithAI({
       data: {
+        scope: {
+          kind: targetType,
+          technicalName:
+            targetType === "event"
+              ? (ctx.events.find((event) => event.id === targetId)?.technical_name ?? targetId)
+              : (ctx.customAttributes.find((attribute) => attribute.id === targetId)
+                  ?.technical_name ?? targetId),
+          allowedFields:
+            targetType === "event"
+              ? [...(aiEligiblePropertyNames ?? [])]
+              : [
+                  ctx.customAttributes.find((attribute) => attribute.id === targetId)
+                    ?.technical_name ?? targetId,
+                ],
+        },
         rules: promptRules.map((rule) => ({
           id: rule.id,
           name: rule.name,

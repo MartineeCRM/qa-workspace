@@ -93,17 +93,45 @@ function extractAiSummary(evidence: unknown): string | null {
       ? (evidence as { qualitative?: unknown }).qualitative
       : evidence;
   if (!Array.isArray(nested)) return warningLines.length > 0 ? warningLines.join(" ") : null;
-  const lines = nested
-    .filter(
-      (entry): entry is { verdict: string; reasoning: string } =>
-        Boolean(entry) &&
-        typeof entry === "object" &&
-        (entry as { verdict?: unknown }).verdict === "failed" &&
-        typeof (entry as { reasoning?: unknown }).reasoning === "string",
+  const repeated = new Map<string, string[]>();
+  for (const entry of nested) {
+    if (!entry || typeof entry !== "object") continue;
+    const evidence = (entry as { evidence?: unknown }).evidence;
+    if (!evidence || typeof evidence !== "object" || Array.isArray(evidence)) continue;
+    const summary = (evidence as { observed_summary?: unknown }).observed_summary;
+    const refs = (evidence as { refs?: unknown }).refs;
+    if (typeof summary !== "string" || !Array.isArray(refs)) continue;
+    const fields = refs.flatMap((ref) =>
+      ref && typeof ref === "object" && typeof (ref as { field?: unknown }).field === "string"
+        ? [(ref as { field: string }).field]
+        : [],
+    );
+    if (fields.length > 0) repeated.set(summary, [...(repeated.get(summary) ?? []), ...fields]);
+  }
+  const groupedReasoning = Array.from(repeated.entries()).filter(
+    ([, fields]) => new Set(fields).size >= 3,
+  );
+  const groupedSummaries = new Set(groupedReasoning.map(([summary]) => summary));
+  const ungroupedLines = nested
+    .filter((entry) => {
+      if (!entry || typeof entry !== "object") return true;
+      const summary = (entry as { evidence?: { observed_summary?: unknown } }).evidence
+        ?.observed_summary;
+      return typeof summary !== "string" || !groupedSummaries.has(summary);
+    })
+    .flatMap((entry) =>
+      entry &&
+      typeof entry === "object" &&
+      typeof (entry as { reasoning?: unknown }).reasoning === "string"
+        ? [(entry as { reasoning: string }).reasoning.trim()]
+        : [],
     )
-    .map((entry) => entry.reasoning.trim())
     .filter(Boolean);
-  const summaries = [...lines, ...warningLines];
+  const groupedLines = groupedReasoning.map(([summary, fields]) => {
+    const uniqueFields = [...new Set(fields)];
+    return `${uniqueFields[0]} 외 ${uniqueFields.length - 1}개 프로퍼티에 같은 형식의 값이 들어왔습니다. 실제 값: ${summary}`;
+  });
+  const summaries = [...ungroupedLines, ...groupedLines, ...warningLines];
   return summaries.length > 0 ? summaries.join(" ") : null;
 }
 

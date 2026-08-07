@@ -5,6 +5,11 @@ export type JudgePromptTarget =
 export type JudgePromptInput = {
   rules: Array<{ id: string; name: string; description: string }>;
   targets: JudgePromptTarget[];
+  scope?: {
+    kind: "event" | "custom_attribute";
+    technicalName: string;
+    allowedFields: string[];
+  };
 };
 
 export type JudgeResponse =
@@ -83,7 +88,11 @@ function compactPromptEvidence(value: unknown): unknown {
   return value;
 }
 
-export function parseJudgeResponse(text: string, rules: JudgePromptInput["rules"]): JudgeResponse {
+export function parseJudgeResponse(
+  text: string,
+  rules: JudgePromptInput["rules"],
+  scope?: JudgePromptInput["scope"],
+): JudgeResponse {
   let parsed: {
     results?: Array<{
       rule_id?: string;
@@ -112,14 +121,41 @@ export function parseJudgeResponse(text: string, rules: JudgePromptInput["rules"
   if (failed.length !== parsed.results.length) {
     return { ok: false, error: "AI가 요청하지 않은 규칙의 결과를 반환했어요." };
   }
+  const scoped = scope
+    ? failed.filter((result) => {
+        const evidence = result.evidence as { refs?: unknown } | undefined;
+        if (!Array.isArray(evidence?.refs)) return false;
+        const currentRefs = evidence.refs.filter((ref) => {
+          if (!ref || typeof ref !== "object") return false;
+          const target = (ref as { target?: unknown }).target;
+          return (
+            typeof target === "string" &&
+            (target === scope.technicalName || target.startsWith(`${scope.technicalName}.`))
+          );
+        });
+        return (
+          currentRefs.length > 0 &&
+          currentRefs.every((ref) => {
+            const field = (ref as { field?: unknown }).field;
+            return (
+              typeof field === "string" &&
+              (scope.allowedFields.includes(field) || field === "event" || field === "occurred_at")
+            );
+          })
+        );
+      })
+    : failed;
+  const deduped = Array.from(
+    new Map(scoped.map((result) => [result.reasoning?.trim(), result])).values(),
+  );
   return {
     ok: true,
-    verdict: failed.length > 0 ? "failed" : "passed",
-    reasoning: failed
+    verdict: deduped.length > 0 ? "failed" : "passed",
+    reasoning: deduped
       .map((result) => result?.reasoning?.trim())
       .filter(Boolean)
       .join("\n"),
-    evidence: parsed.results,
+    evidence: deduped,
   };
 }
 
@@ -129,6 +165,9 @@ export const JUDGE_SYSTEM_PROMPT = [
   "판정 원칙:",
   "- 데이터 타입이 같다는 이유만으로 통과시키지 마세요.",
   "- 이 단계에 전달된 값은 앞선 Rule-based 데이터 타입 및 enum 검사를 통과했습니다. 특히 택소노미 타입이 array이면 실제 배열을 문자열이어야 한다고 판단하지 마세요.",
+  "- '현재 판정 대상'만 판정하세요. 함께 제공된 연관 로그는 현재 대상의 규칙을 확인하기 위한 근거일 뿐, 연관 로그 자체의 독립적인 오류를 이 결과에 넣지 마세요.",
+  "- 결과의 refs에는 반드시 현재 판정 대상과 허용된 판정 필드 중 하나를 포함하세요. 누락·타입·enum 검사에서 제외된 필드는 언급하지 마세요.",
+  "- 같은 원인과 실제값이 여러 필드에서 반복되면 프로퍼티명을 묶어 한 번만 설명하세요.",
   "- 먼저 프로퍼티명, 설명, 허용값, 예시값을 종합해 기대 계약을 데이터 타입, 구조, 표현 체계, 의미 영역, 정규화 규칙으로 분해하세요.",
   "- 실제값도 같은 차원으로 독립적으로 분류한 뒤 기대 계약과 하나씩 비교하세요.",
   "- 구조는 단일 값·목록·객체·날짜/시간·URL·식별자 등을 구분하세요.",
@@ -170,6 +209,14 @@ export function buildJudgeRequest(input: JudgePromptInput): string {
   );
 
   return [
+    ...(input.scope
+      ? [
+          `현재 판정 대상: ${input.scope.kind} ${JSON.stringify(input.scope.technicalName)}`,
+          `허용된 판정 필드: ${JSON.stringify(input.scope.allowedFields)}`,
+          "연관 로그는 비교 근거로만 사용하세요.",
+          "",
+        ]
+      : []),
     "검증 규칙:",
     ...input.rules.map(
       (rule) =>

@@ -103,7 +103,7 @@ export const judgeChecklistItemWithAI = createServerFn({ method: "POST" })
     }
     if (!text) return { ok: false, error: "AI가 판정 본문을 반환하지 않았어요." };
 
-    const parsed = parseJudgeResponse(text, data.rules);
+    const parsed = parseJudgeResponse(text, data.rules, data.scope);
     return parsed.ok
       ? { ...parsed, evidence: parsed.evidence as Json }
       : { ...parsed, rawResponse: text.slice(0, 20_000) };
