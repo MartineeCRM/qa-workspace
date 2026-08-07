@@ -208,6 +208,10 @@ describe("judgeChecklistItem — taxonomy example format", () => {
         targets: [expect.objectContaining({ technicalName: "signup_completed" })],
       }),
     });
+    const aiTarget = judgeWithAI.mock.calls[0][0].data.targets[0];
+    expect(aiTarget.runEvents[0].raw_properties).toEqual({
+      birth_date: "31년 05월 31일",
+    });
     expect(result).toMatchObject({
       final_status: "failed",
       failed_layer: "structural",
@@ -263,6 +267,153 @@ describe("judgeChecklistItem — taxonomy example format", () => {
     expect(result.ai_evidence).toMatchObject({
       qualitative_error: expect.stringContaining("JSON"),
       qualitative: { raw_response: "not valid json" },
+    });
+  });
+
+  it("only sends properties that passed type and enum checks to AI", async () => {
+    judgeWithAI.mockResolvedValue({ ok: true, verdict: "passed", reasoning: "", evidence: [] });
+    const event = {
+      id: "event-1",
+      technical_name: "search_completed",
+    } as TaxonomyEvent;
+    const properties = [
+      {
+        id: "property-valid",
+        event_id: event.id,
+        technical_name: "referral_source",
+        data_type: "string",
+        is_required: true,
+        description: "사람이 읽는 유입 경로 이름",
+        example_value: "혜택",
+        allowed_values: null,
+      },
+      {
+        id: "property-enum",
+        event_id: event.id,
+        technical_name: "platform",
+        data_type: "string",
+        is_required: true,
+        description: "플랫폼 코드",
+        example_value: "ios_app",
+        allowed_values: ["ios_app", "android_app"],
+      },
+      {
+        id: "property-type",
+        event_id: event.id,
+        technical_name: "is_login",
+        data_type: "boolean",
+        is_required: true,
+        description: "로그인 여부",
+        example_value: true,
+        allowed_values: null,
+      },
+    ] as TaxonomyEventProperty[];
+
+    const result = await judgeChecklistItem(
+      { ...item, target_type: "event", target_id: event.id },
+      {
+        events: [event],
+        eventProperties: properties,
+        customAttributes: [],
+        rules: [],
+        runEvents: [
+          {
+            event_id: event.id,
+            raw_event_name: event.technical_name,
+            occurred_at: "2026-08-03T00:00:00Z",
+            external_user_id: "u1",
+            raw_properties: {
+              referral_source: "https://example.com/main",
+              platform: "pc_web",
+              is_login: "true",
+            },
+          },
+        ],
+        snapshots: [],
+      },
+    );
+
+    expect(judgeWithAI).toHaveBeenCalledOnce();
+    expect(judgeWithAI.mock.calls[0][0].data.rules).toEqual([
+      expect.objectContaining({ id: "taxonomy-property:property-valid" }),
+    ]);
+    expect(judgeWithAI.mock.calls[0][0].data.targets[0].runEvents[0].raw_properties).toEqual({
+      referral_source: "https://example.com/main",
+    });
+    expect(result).toMatchObject({ final_status: "failed", failed_layer: "structural" });
+  });
+
+  it("does not call AI when every property fails structural checks", async () => {
+    const event = {
+      id: "event-1",
+      technical_name: "search_completed",
+    } as TaxonomyEvent;
+    const property = {
+      id: "property-enum",
+      event_id: event.id,
+      technical_name: "platform",
+      data_type: "string",
+      is_required: true,
+      description: "플랫폼 코드",
+      example_value: "ios_app",
+      allowed_values: ["ios_app", "android_app"],
+    } as TaxonomyEventProperty;
+
+    const result = await judgeChecklistItem(
+      { ...item, target_type: "event", target_id: event.id },
+      {
+        events: [event],
+        eventProperties: [property],
+        customAttributes: [],
+        rules: [],
+        runEvents: [
+          {
+            event_id: event.id,
+            raw_event_name: event.technical_name,
+            occurred_at: "2026-08-03T00:00:00Z",
+            external_user_id: "u1",
+            raw_properties: { platform: "pc_web" },
+          },
+        ],
+        snapshots: [],
+      },
+    );
+
+    expect(judgeWithAI).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      final_status: "failed",
+      failed_layer: "structural",
+      judged_by: "rule",
+    });
+  });
+
+  it("does not call AI for an attribute that fails its type check", async () => {
+    const booleanAttribute = {
+      ...baseAttribute,
+      data_type: "boolean",
+      description: "로그인 여부",
+      example_value: true,
+    } as TaxonomyCustomAttribute;
+    const snapshots: AttributeSnapshot[] = [
+      {
+        external_user_id: "u1",
+        snapshot_name: "현재 상태",
+        status: "captured",
+        payload: { item_viewed_history: "true" },
+        captured_at: "2026-08-03T06:06:34Z",
+      },
+    ];
+
+    const result = await judgeChecklistItem(item, {
+      ...ctxWithSnapshots(snapshots),
+      customAttributes: [booleanAttribute],
+    });
+
+    expect(judgeWithAI).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      final_status: "failed",
+      failed_layer: "structural",
+      judged_by: "rule",
     });
   });
 });

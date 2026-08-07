@@ -72,7 +72,30 @@ export async function judgeChecklistItem(
         allowed_values: Array.isArray(p.allowed_values) ? (p.allowed_values as string[]) : null,
       }));
     const violations = judgeEventStructural(matched, properties);
-    const qualitative = await judgeQualitative(base.checklist_item_id, event.id, "event", ctx);
+    const blockedPropertyNames = new Set(violations.map((violation) => violation.property));
+    const aiEligiblePropertyNames = new Set(
+      properties
+        .filter(
+          (property) =>
+            !blockedPropertyNames.has(property.technical_name) &&
+            matched.some((log) => {
+              const value = log.raw_properties[property.technical_name];
+              return (
+                value !== undefined &&
+                value !== null &&
+                !(typeof value === "string" && !value.trim())
+              );
+            }),
+        )
+        .map((property) => property.technical_name),
+    );
+    const qualitative = await judgeQualitative(
+      base.checklist_item_id,
+      event.id,
+      "event",
+      ctx,
+      aiEligiblePropertyNames,
+    );
     if (violations.length > 0) {
       const structuralReason = violations.map((v) => `${v.property}: ${v.reason}`).join("\n");
       const qualitativeError =
@@ -130,39 +153,29 @@ export async function judgeChecklistItem(
       : null,
   };
   const violations = judgeAttributeStructural(value, attributeLite);
+  if (violations.length > 0) {
+    return {
+      ...base,
+      ai_verdict: "failed",
+      ai_reasoning: violations.map((v) => v.reason).join("\n"),
+      ai_evidence: {
+        value,
+        structural: violations,
+        qualitative: null,
+        qualitative_error: null,
+      },
+      failed_layer: "structural",
+      final_status: "failed",
+      judged_by: "rule",
+    };
+  }
+
   const qualitative = await judgeQualitative(
     base.checklist_item_id,
     attribute.id,
     "custom_attribute",
     ctx,
   );
-  if (violations.length > 0) {
-    const qualitativeError =
-      qualitative.final_status === "not_collected" && qualitative.ai_reasoning
-        ? `AI 분석 미완료: ${qualitative.ai_reasoning}`
-        : null;
-    return {
-      ...base,
-      ai_verdict: "failed",
-      ai_reasoning: [
-        violations.map((v) => v.reason).join("\n"),
-        qualitative.final_status === "failed" ? qualitative.ai_reasoning : null,
-        qualitativeError,
-      ]
-        .filter(Boolean)
-        .join("\n"),
-      ai_evidence: {
-        value,
-        structural: violations,
-        qualitative: qualitative.ai_evidence,
-        qualitative_error: qualitativeError,
-      },
-      failed_layer: "structural",
-      final_status: "failed",
-      judged_by: qualitative.judged_by === "ai" && qualitative.ai_evidence !== null ? "ai" : "rule",
-    };
-  }
-
   return qualitative;
 }
 
@@ -178,19 +191,31 @@ async function judgeQualitative(
     runEvents: RunEvent[];
     snapshots: AttributeSnapshot[];
   },
+  aiEligiblePropertyNames?: Set<string>,
 ): Promise<ChecklistItemVerdict> {
-  const rules = ctx.rules.filter((rule) => {
-    if (!rule.is_enabled) return false;
-    if (rule.validation_rule_targets.length === 0) return true;
-    return rule.validation_rule_targets.some((t) => {
-      if (t.target_type === targetType && t.target_id === targetId) return true;
-      if (targetType === "event" && t.target_type === "property") {
-        const property = ctx.eventProperties.find((p) => p.id === t.target_id);
-        return property?.event_id === targetId;
-      }
-      return false;
+  const rules = ctx.rules
+    .filter((rule) => {
+      if (!rule.is_enabled) return false;
+      if (rule.validation_rule_targets.length === 0) return true;
+      return rule.validation_rule_targets.some((t) => {
+        if (t.target_type === targetType && t.target_id === targetId) return true;
+        if (targetType === "event" && t.target_type === "property") {
+          const property = ctx.eventProperties.find((p) => p.id === t.target_id);
+          return property?.event_id === targetId;
+        }
+        return false;
+      });
+    })
+    .filter((rule) => {
+      if (targetType !== "event" || !aiEligiblePropertyNames) return true;
+      return rule.validation_rule_targets.every((target) => {
+        if (target.target_type !== "property") return true;
+        const property = ctx.eventProperties.find((candidate) => candidate.id === target.target_id);
+        return (
+          property?.event_id !== targetId || aiEligiblePropertyNames.has(property.technical_name)
+        );
+      });
     });
-  });
 
   const taxonomyRules =
     targetType === "event"
@@ -198,6 +223,7 @@ async function judgeQualitative(
           .filter(
             (property) =>
               property.event_id === targetId &&
+              (!aiEligiblePropertyNames || aiEligiblePropertyNames.has(property.technical_name)) &&
               (Boolean(property.description?.trim()) || property.example_value != null),
           )
           .map((property) => ({
@@ -293,9 +319,23 @@ async function judgeQualitative(
 
   const dedupedTargets = Array.from(new Map(targets.map((t) => [`${t.kind}:${t.id}`, t])).values());
 
+  const qualitativeRunEvents = aiEligiblePropertyNames
+    ? ctx.runEvents.map((event) =>
+        event.event_id === targetId
+          ? {
+              ...event,
+              raw_properties: Object.fromEntries(
+                Object.entries(event.raw_properties).filter(([name]) =>
+                  aiEligiblePropertyNames.has(name),
+                ),
+              ),
+            }
+          : event,
+      )
+    : ctx.runEvents;
   const bundle = collectRuleEvidence(
     { description: "", targets: dedupedTargets },
-    { runEvents: ctx.runEvents, snapshots: ctx.snapshots },
+    { runEvents: qualitativeRunEvents, snapshots: ctx.snapshots },
   );
 
   let result: Awaited<ReturnType<typeof judgeChecklistItemWithAI>>;
