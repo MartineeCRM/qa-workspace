@@ -284,8 +284,26 @@ function SharedIssuesPage() {
                 </div>
                 <div className="mt-3 space-y-2">
                   {selected.comments.map((comment: any) => (
-                    <div key={comment.id} className="rounded-lg bg-[#f5f7fa] px-3 py-2.5">
-                      <p className="text-[11px] font-semibold text-[#64748b]">
+                    <div
+                      key={comment.id}
+                      className={cn(
+                        "rounded-lg border px-3 py-2.5",
+                        comment.external
+                          ? "border-[#9dcfc4] bg-[#edf9f6]"
+                          : "border-[#dbe2ea] bg-[#f5f7fa]",
+                      )}
+                    >
+                      <p
+                        className={cn(
+                          "text-[11px] font-semibold",
+                          comment.external ? "text-[#167565]" : "text-[#64748b]",
+                        )}
+                      >
+                        {comment.external ? (
+                          <span className="mr-1.5 rounded bg-[#ccece5] px-1.5 py-0.5 text-[10px] font-bold">
+                            고객사
+                          </span>
+                        ) : null}
                         {comment.author} · {formatDateTime(comment.createdAt)}
                       </p>
                       <p className="mt-1 whitespace-pre-wrap text-[13px] leading-5">

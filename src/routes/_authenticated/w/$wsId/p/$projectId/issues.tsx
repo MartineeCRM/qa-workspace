@@ -238,8 +238,7 @@ function QaIssuesPage() {
               const comments = [...issue.qa_discussion_comments].sort((a, b) =>
                 a.created_at.localeCompare(b.created_at),
               );
-              const latestComment = comments.at(-1);
-              const previousComments = comments.slice(0, -1);
+              const visibleComments = (noteOpen ? comments : comments.slice(-2)).reverse();
               return (
                 <li
                   key={issue.id}
@@ -287,82 +286,103 @@ function QaIssuesPage() {
                           .join(" · ")}
                       </p>
 
-                      {latestComment ? (
-                        <div className="mt-3 rounded-[10px] border border-[#cbd5e1] bg-[#f8fafc] px-3 py-2.5">
-                          <div className="flex items-center justify-between gap-2">
-                            <p className="text-[11.5px] font-medium text-[#64748b]">
-                              {latestComment.external_author_name ??
-                                (latestComment.author_id
-                                  ? authorById.get(latestComment.author_id)
-                                  : null) ??
-                                "알 수 없는 사용자"}{" "}
-                              · {formatDateTime(latestComment.created_at)}
-                            </p>
-                            {latestComment.author_id === user?.id &&
-                            editingComment?.id !== latestComment.id ? (
-                              <button
-                                type="button"
-                                aria-label="댓글 수정"
-                                onClick={() =>
-                                  setEditingComment({
-                                    id: latestComment.id,
-                                    body: latestComment.body,
-                                  })
-                                }
-                                className="text-[#64748b] hover:text-[#2b6a9c]"
+                      {visibleComments.length ? (
+                        <div className="mt-3 space-y-2">
+                          {visibleComments.map((comment) => {
+                            const external = Boolean(comment.external_author_name);
+                            return (
+                              <div
+                                key={comment.id}
+                                className={cn(
+                                  "rounded-[10px] border px-3 py-2.5",
+                                  external
+                                    ? "border-[#9dcfc4] bg-[#edf9f6]"
+                                    : "border-[#cbd5e1] bg-[#f8fafc]",
+                                )}
                               >
-                                <Pencil className="size-3" />
-                              </button>
-                            ) : null}
-                          </div>
-                          {editingComment?.id === latestComment.id ? (
-                            <div className="mt-1 space-y-1.5">
-                              <Textarea
-                                value={editingComment.body}
-                                onChange={(event) =>
-                                  setEditingComment({
-                                    id: latestComment.id,
-                                    body: event.target.value,
-                                  })
-                                }
-                                className="min-h-16 bg-white"
-                              />
-                              <div className="flex justify-end gap-1.5">
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={() => setEditingComment(null)}
-                                >
-                                  취소
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  disabled={!editingComment.body.trim() || updateComment.isPending}
-                                  onClick={() =>
-                                    updateComment.mutate(
-                                      {
-                                        commentId: latestComment.id,
-                                        body: editingComment.body,
-                                      },
-                                      {
-                                        onSuccess: () => {
-                                          setEditingComment(null);
-                                          toast.success("댓글을 수정했어요");
-                                        },
-                                        onError: (error) => toast.error(errorMessage(error)),
-                                      },
-                                    )
-                                  }
-                                >
-                                  저장
-                                </Button>
+                                <div className="flex items-center justify-between gap-2">
+                                  <p
+                                    className={cn(
+                                      "text-[11.5px] font-medium",
+                                      external ? "text-[#167565]" : "text-[#64748b]",
+                                    )}
+                                  >
+                                    {external ? (
+                                      <span className="mr-1.5 rounded bg-[#ccece5] px-1.5 py-0.5 text-[10px] font-bold">
+                                        고객사
+                                      </span>
+                                    ) : null}
+                                    {comment.external_author_name ??
+                                      (comment.author_id
+                                        ? authorById.get(comment.author_id)
+                                        : null) ??
+                                      "알 수 없는 사용자"}{" "}
+                                    · {formatDateTime(comment.created_at)}
+                                  </p>
+                                  {comment.author_id === user?.id &&
+                                  editingComment?.id !== comment.id ? (
+                                    <button
+                                      type="button"
+                                      aria-label="댓글 수정"
+                                      onClick={() =>
+                                        setEditingComment({ id: comment.id, body: comment.body })
+                                      }
+                                      className="text-[#64748b] hover:text-[#2b6a9c]"
+                                    >
+                                      <Pencil className="size-3" />
+                                    </button>
+                                  ) : null}
+                                </div>
+                                {editingComment?.id === comment.id ? (
+                                  <div className="mt-1 space-y-1.5">
+                                    <Textarea
+                                      value={editingComment.body}
+                                      onChange={(event) =>
+                                        setEditingComment({
+                                          id: comment.id,
+                                          body: event.target.value,
+                                        })
+                                      }
+                                      className="min-h-16 bg-white"
+                                    />
+                                    <div className="flex justify-end gap-1.5">
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        onClick={() => setEditingComment(null)}
+                                      >
+                                        취소
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        disabled={
+                                          !editingComment.body.trim() || updateComment.isPending
+                                        }
+                                        onClick={() =>
+                                          updateComment.mutate(
+                                            { commentId: comment.id, body: editingComment.body },
+                                            {
+                                              onSuccess: () => {
+                                                setEditingComment(null);
+                                                toast.success("댓글을 수정했어요");
+                                              },
+                                              onError: (error) => toast.error(errorMessage(error)),
+                                            },
+                                          )
+                                        }
+                                      >
+                                        저장
+                                      </Button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <p className="mt-1 text-[13px] leading-[1.6] text-[#3c4757]">
+                                    {comment.body}
+                                  </p>
+                                )}
                               </div>
-                            </div>
-                          ) : (
-                            <p className="mt-0.5 text-[13px] leading-[1.6] text-[#3c4757]">
-                              {latestComment.body}
-                            </p>
-                          )}
+                            );
+                          })}
                         </div>
                       ) : null}
 
@@ -383,7 +403,7 @@ function QaIssuesPage() {
                       </div>
 
                       <div className="mt-2 flex flex-wrap items-center gap-2">
-                        {previousComments.length > 0 ? (
+                        {comments.length > 2 ? (
                           <Button
                             size="sm"
                             variant="outline"
@@ -400,7 +420,7 @@ function QaIssuesPage() {
                               noteOpen && "border-[#2b6a9c] text-[#2b6a9c]",
                             )}
                           >
-                            {noteOpen ? "기존 메모 닫기" : "기존 메모 보기"}
+                            {noteOpen ? "접기" : `전체 보기 (${comments.length})`}
                           </Button>
                         ) : null}
                         <Button asChild size="sm" variant="outline" className="h-8 text-xs">
@@ -438,90 +458,6 @@ function QaIssuesPage() {
                           }
                         />
                       </div>
-
-                      {noteOpen ? (
-                        <div className="mt-2.5">
-                          {comments.length > 0 ? (
-                            <div className="max-h-52 divide-y divide-[#dbe2ea] overflow-y-auto rounded-[10px] border border-[#dbe2ea] bg-[#f8fafc] px-3">
-                              {previousComments.map((comment) => (
-                                <div key={comment.id} className="py-2.5">
-                                  <div className="flex items-center justify-between gap-2">
-                                    <p className="text-[11px] font-medium text-[#64748b]">
-                                      {comment.external_author_name ??
-                                        (comment.author_id
-                                          ? authorById.get(comment.author_id)
-                                          : null) ??
-                                        "알 수 없는 사용자"}{" "}
-                                      · {formatDateTime(comment.created_at)}
-                                    </p>
-                                    {comment.author_id === user?.id &&
-                                    editingComment?.id !== comment.id ? (
-                                      <button
-                                        type="button"
-                                        aria-label="댓글 수정"
-                                        onClick={() =>
-                                          setEditingComment({ id: comment.id, body: comment.body })
-                                        }
-                                        className="text-[#64748b] hover:text-[#2b6a9c]"
-                                      >
-                                        <Pencil className="size-3" />
-                                      </button>
-                                    ) : null}
-                                  </div>
-                                  {editingComment?.id === comment.id ? (
-                                    <div className="mt-1 space-y-1.5">
-                                      <Textarea
-                                        value={editingComment.body}
-                                        onChange={(event) =>
-                                          setEditingComment({
-                                            id: comment.id,
-                                            body: event.target.value,
-                                          })
-                                        }
-                                        className="min-h-16 bg-white"
-                                      />
-                                      <div className="flex justify-end gap-1.5">
-                                        <Button
-                                          size="sm"
-                                          variant="ghost"
-                                          onClick={() => setEditingComment(null)}
-                                        >
-                                          취소
-                                        </Button>
-                                        <Button
-                                          size="sm"
-                                          disabled={
-                                            !editingComment.body.trim() || updateComment.isPending
-                                          }
-                                          onClick={() =>
-                                            updateComment.mutate(
-                                              { commentId: comment.id, body: editingComment.body },
-                                              {
-                                                onSuccess: () => {
-                                                  setEditingComment(null);
-                                                  toast.success("댓글을 수정했어요");
-                                                },
-                                                onError: (error) =>
-                                                  toast.error(errorMessage(error)),
-                                              },
-                                            )
-                                          }
-                                        >
-                                          저장
-                                        </Button>
-                                      </div>
-                                    </div>
-                                  ) : (
-                                    <p className="text-[12.5px] leading-relaxed text-[#4a5666]">
-                                      {comment.body}
-                                    </p>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-                          ) : null}
-                        </div>
-                      ) : null}
                     </div>
 
                     <div className="border-l border-[#e2e8f0] pl-5 max-md:col-start-2 max-md:border-l-0 max-md:pl-0">

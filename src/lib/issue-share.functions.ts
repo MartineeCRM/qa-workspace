@@ -243,6 +243,7 @@ export const getSharedIssuePortal = createServerFn({ method: "GET" })
             id: comment.id,
             author:
               comment.external_author_name ?? authorById.get(comment.author_id) ?? "내부 담당자",
+            external: Boolean(comment.external_author_name),
             body: comment.body,
             createdAt: comment.created_at,
           }))
