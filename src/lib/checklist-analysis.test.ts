@@ -154,6 +154,12 @@ describe("judgeChecklistItem — taxonomy example format", () => {
       '["PUSH","SMS","DM"]',
     );
     expect(formatTaxonomyExampleForAI("PUSH, SMS, DM", "array")).toBe('["PUSH","SMS","DM"]');
+    expect(
+      formatTaxonomyExampleForAI(
+        '[\n"date_1|itemNm_상품1|itemNo_1|qty_1"\n"date_2|itemNm_상품2|itemNo_2|qty_1"\n]',
+        "array",
+      ),
+    ).toBe('["date_1|itemNm_상품1|itemNo_1|qty_1","date_2|itemNm_상품2|itemNo_2|qty_1"]');
   });
 
   it("sends property examples and observed values to AI as an implicit format rule", async () => {

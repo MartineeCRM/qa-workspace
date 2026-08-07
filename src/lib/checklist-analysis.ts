@@ -36,12 +36,24 @@ export function formatTaxonomyExampleForAI(example: unknown, dataType: string): 
       if (Array.isArray(parsed)) return JSON.stringify(parsed);
     } catch {
       if (dataType === "array") {
+        const lineItems = example
+          .replace(/^\s*\[|\]\s*$/g, "")
+          .split(/\r?\n/)
+          .map((value) =>
+            value
+              .trim()
+              .replace(/,$/, "")
+              .replace(/^["']|["']$/g, ""),
+          )
+          .filter(Boolean);
         return JSON.stringify(
-          example
-            .replace(/^\s*\[|\]\s*$/g, "")
-            .split(",")
-            .map((value) => value.trim().replace(/^["']|["']$/g, ""))
-            .filter(Boolean),
+          lineItems.length > 1
+            ? lineItems
+            : example
+                .replace(/^\s*\[|\]\s*$/g, "")
+                .split(",")
+                .map((value) => value.trim().replace(/^["']|["']$/g, ""))
+                .filter(Boolean),
         );
       }
     }

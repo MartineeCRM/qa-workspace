@@ -139,7 +139,13 @@ export function parseJudgeResponse(
             const field = (ref as { field?: unknown }).field;
             return (
               typeof field === "string" &&
-              (scope.allowedFields.includes(field) || field === "event" || field === "occurred_at")
+              (scope.allowedFields.includes(field) ||
+                (scope.kind === "custom_attribute" &&
+                  (field === "value" ||
+                    field === "payload" ||
+                    scope.allowedFields.some((allowed) => field === `payload.${allowed}`))) ||
+                field === "event" ||
+                field === "occurred_at")
             );
           })
         );
@@ -168,6 +174,8 @@ export const JUDGE_SYSTEM_PROMPT = [
   "- '현재 판정 대상'만 판정하세요. 함께 제공된 연관 로그는 현재 대상의 규칙을 확인하기 위한 근거일 뿐, 연관 로그 자체의 독립적인 오류를 이 결과에 넣지 마세요.",
   "- 결과의 refs에는 반드시 현재 판정 대상과 허용된 판정 필드 중 하나를 포함하세요. 누락·타입·enum 검사에서 제외된 필드는 언급하지 마세요.",
   "- 같은 원인과 실제값이 여러 필드에서 반복되면 프로퍼티명을 묶어 한 번만 설명하세요.",
+  "- 배열 타입은 배열 여부만 확인하고 끝내지 마세요. 배열 원소가 문자열이면 각 문자열의 내부 구조, 구분자, 필드명, 필드별 값 형식까지 검증하세요.",
+  "- 배열의 문자열 예시가 `|` 등으로 구분된 `키_값` 구조라면 예시에 반복해서 나타나는 키 집합을 원소의 구조 계약으로 봅니다. 설명에서 선택 항목이라고 밝히지 않은 키가 실제 원소에 빠지면 실패입니다.",
   "- 먼저 프로퍼티명, 설명, 허용값, 예시값을 종합해 기대 계약을 데이터 타입, 구조, 표현 체계, 의미 영역, 정규화 규칙으로 분해하세요.",
   "- 실제값도 같은 차원으로 독립적으로 분류한 뒤 기대 계약과 하나씩 비교하세요.",
   "- 구조는 단일 값·목록·객체·날짜/시간·URL·식별자 등을 구분하세요.",

@@ -94,6 +94,9 @@ describe("buildJudgePrompt", () => {
     expect(prompt).toContain(
       "택소노미 타입이 array이면 실제 배열을 문자열이어야 한다고 판단하지 마세요",
     );
+    expect(prompt).toContain(
+      "각 문자열의 내부 구조, 구분자, 필드명, 필드별 값 형식까지 검증하세요",
+    );
     expect(prompt).toContain("사람이 읽는 명칭과 URL");
     expect(prompt).toContain("임의로 기대값에 맞춰 해석하지 마세요");
     expect(prompt).toContain("mismatch_dimensions");
@@ -253,6 +256,29 @@ describe("parseJudgeResponse", () => {
       verdict: "failed",
       reasoning: "현재 item_id 형식이 잘못됐습니다",
       evidence: [expect.objectContaining({ rule_id: "format" })],
+    });
+  });
+
+  it("keeps a custom-attribute failure referenced through its value", () => {
+    const result = parseJudgeResponse(
+      JSON.stringify({
+        results: [
+          {
+            rule_id: "format",
+            verdict: "failed",
+            reasoning: "배열 원소에 필수 내부 필드가 없습니다",
+            evidence: { refs: [{ target: "cart_list", field: "value" }] },
+          },
+        ],
+      }),
+      rules,
+      { kind: "custom_attribute", technicalName: "cart_list", allowedFields: ["cart_list"] },
+    );
+
+    expect(result).toMatchObject({
+      ok: true,
+      verdict: "failed",
+      reasoning: "배열 원소에 필수 내부 필드가 없습니다",
     });
   });
 });
