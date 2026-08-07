@@ -55,16 +55,17 @@ export function QaSessionAnalysisPanel({
   const missingItems = hasEventCsv
     ? executedEventItems.filter((item) => !collectedEventIds.has(item.target_id))
     : [];
-  const unexpectedEvents = Array.from(
+  const unexpectedEventIds = Array.from(
     new Set(
       runEvents
         .filter(
           (event) =>
             event.event_id && !executedEventItems.some((item) => item.target_id === event.event_id),
         )
-        .map((event) => event.raw_event_name),
+        .flatMap((event) => (event.event_id ? [event.event_id] : [])),
     ),
   );
+  const unexpectedEvents = unexpectedEventIds.map((eventId) => eventName(eventId));
   const unexpectedAttributes = unexpectedSnapshotAttributeIds({
     snapshots,
     attributes,
@@ -113,6 +114,20 @@ export function QaSessionAnalysisPanel({
     }
   }
 
+  async function addAllUnexpectedItems() {
+    try {
+      await addItems.mutateAsync({
+        eventIds: unexpectedEventIds,
+        customAttributeIds: unexpectedAttributes.map((attribute) => attribute.id),
+      });
+      toast.success(
+        `이벤트 ${unexpectedEventIds.length}개와 어트리뷰트 ${unexpectedAttributes.length}개를 이번 검증에 추가했어요`,
+      );
+    } catch (error) {
+      toast.error(errorMessage(error, "발견된 항목을 추가하지 못했어요"));
+    }
+  }
+
   return (
     <div className="space-y-4">
       <section className="rounded-xl border border-[#dfe5ec] bg-white">
@@ -151,6 +166,27 @@ export function QaSessionAnalysisPanel({
             value={unexpectedEvents.length + unexpectedAttributes.length}
           />
         </div>
+
+        {unexpectedEvents.length + unexpectedAttributes.length > 0 ? (
+          <div className="mx-5 mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#cfd9e6] bg-[#f5f8fb] px-4 py-3">
+            <div>
+              <p className="text-[13px] font-semibold text-[#263547]">
+                체크하지 않은 항목 {unexpectedEvents.length + unexpectedAttributes.length}개를
+                발견했어요
+              </p>
+              <p className="mt-0.5 text-xs text-[#6f7f91]">
+                이벤트 {unexpectedEvents.length}개 · 어트리뷰트 {unexpectedAttributes.length}개
+              </p>
+            </div>
+            <Button
+              size="sm"
+              onClick={() => void addAllUnexpectedItems()}
+              disabled={addItems.isPending}
+            >
+              모두 이번 검증에 추가
+            </Button>
+          </div>
+        ) : null}
 
         {missingItems.length > 0 ? (
           <div className="mx-5 mb-5 rounded-xl border border-[#f0d8a8] bg-[#fffaf0] p-4">

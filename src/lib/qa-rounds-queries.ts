@@ -301,7 +301,6 @@ export function useAddChecklistItems(sessionId: string) {
       if (items.length === 0) return;
       const { error } = await db.from("qa_round_checklist_items").upsert(items, {
         onConflict: "qa_session_id,target_type,target_id",
-        ignoreDuplicates: true,
       });
       if (error) throw error;
     },
