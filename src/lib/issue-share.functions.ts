@@ -18,9 +18,40 @@ async function readPortal(token: string) {
   return data ?? null;
 }
 
-async function readPortalIssue(token: string, discussionId: string) {
+async function canAccessSharedProject(projectId: string, userId: string) {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const db = supabaseAdmin as any;
+  const { data: project } = await db
+    .from("projects")
+    .select("workspace_id")
+    .eq("id", projectId)
+    .maybeSingle();
+  if (!project) return false;
+  const [{ data: projectMember }, { data: workspaceMember }] = await Promise.all([
+    db
+      .from("project_members")
+      .select("id")
+      .eq("project_id", projectId)
+      .eq("user_id", userId)
+      .maybeSingle(),
+    db
+      .from("workspace_members")
+      .select("id")
+      .eq("workspace_id", project.workspace_id)
+      .eq("user_id", userId)
+      .maybeSingle(),
+  ]);
+  return Boolean(projectMember || workspaceMember);
+}
+
+async function readPortalIssue(token: string, discussionId: string, userId: string) {
   const portal = await readPortal(token);
-  if (!portal || !UUID.test(discussionId)) return null;
+  if (
+    !portal ||
+    !UUID.test(discussionId) ||
+    !(await canAccessSharedProject(portal.project_id, userId))
+  )
+    return null;
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const db = supabaseAdmin as any;
   const { data: issue } = await db
@@ -101,9 +132,9 @@ export const createProjectIssueShare = createServerFn({ method: "POST" })
 export const getSharedIssuePortal = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .validator((data: { token: string }) => data)
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
     const portal = await readPortal(data.token);
-    if (!portal) return null;
+    if (!portal || !(await canAccessSharedProject(portal.project_id, context.userId))) return null;
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const db = supabaseAdmin as any;
     const { data: project } = await db
@@ -276,7 +307,7 @@ export const updateSharedIssue = createServerFn({ method: "POST" })
   .validator((data: { token: string; discussionId: string; status: string }) => data)
   .handler(async ({ data, context }) => {
     if (!STATUSES.has(data.status)) throw new Error("올바르지 않은 상태예요.");
-    if (!(await readPortalIssue(data.token, data.discussionId)))
+    if (!(await readPortalIssue(data.token, data.discussionId, context.userId)))
       throw new Error("이 이슈를 변경할 수 없어요.");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: profile } = await (supabaseAdmin as any)
@@ -304,7 +335,7 @@ export const commentOnSharedIssue = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const body = data.body.trim();
     if (!body || body.length > 5000) throw new Error("댓글 내용을 확인해주세요.");
-    if (!(await readPortalIssue(data.token, data.discussionId)))
+    if (!(await readPortalIssue(data.token, data.discussionId, context.userId)))
       throw new Error("이 이슈에 댓글을 남길 수 없어요.");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: profile } = await (supabaseAdmin as any)

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { createFileRoute, Link, Outlet, useParams } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Pencil, SlidersHorizontal } from "lucide-react";
+import { Pencil, SlidersHorizontal, Users } from "lucide-react";
 
 import { db, useEnvironments, useProject, type QaEnvironment } from "@/lib/queries";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -22,6 +22,7 @@ import { Pill } from "@/components/app/badges";
 import { StagesManager } from "@/components/app/stages-manager";
 import { AttributeApiSettings } from "@/components/app/attribute-api-settings";
 import { QaChannelsManager } from "@/components/app/qa-channels-manager";
+import { ProjectAccessManager } from "@/components/app/project-access-manager";
 import { useQaChannels } from "@/lib/qa-rounds-queries";
 import { useWorkspaceContext } from "@/lib/workspace-context";
 import { canEdit, errorMessage } from "@/lib/domain";
@@ -42,6 +43,7 @@ function ProjectShell() {
   const [renameOpen, setRenameOpen] = useState(false);
   const [apiSettingsOpen, setApiSettingsOpen] = useState(false);
   const [channelsOpen, setChannelsOpen] = useState(false);
+  const [accessOpen, setAccessOpen] = useState(false);
 
   if (isLoading)
     return (
@@ -91,6 +93,9 @@ function ProjectShell() {
               </Button>
               <Button size="sm" variant="outline" onClick={() => setStagesOpen(true)}>
                 <SlidersHorizontal className="size-4" /> QA 환경 관리
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => setAccessOpen(true)}>
+                <Users className="size-4" /> 구성원·고객사
               </Button>
               <Button size="sm" variant="outline" onClick={() => setApiSettingsOpen(true)}>
                 Attribute API 설정
@@ -142,6 +147,7 @@ function ProjectShell() {
         open={channelsOpen}
         onOpenChange={setChannelsOpen}
       />
+      <ProjectAccessManager projectId={projectId} open={accessOpen} onOpenChange={setAccessOpen} />
       {renameOpen ? (
         <RenameProjectDialog
           projectId={projectId}
