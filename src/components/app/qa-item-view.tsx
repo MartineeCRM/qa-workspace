@@ -726,7 +726,7 @@ export function QaItemView({
                 <div className="border-b border-[#dbe2ea] bg-white">
                   <SpecHierarchyLabel>상위 검증 대상 · 어트리뷰트</SpecHierarchyLabel>
                   <div className="grid min-w-[760px] grid-cols-[minmax(140px,1fr)_minmax(150px,1fr)_minmax(160px,1.1fr)_minmax(68px,0.5fr)_minmax(125px,0.65fr)] items-start gap-4 border-l-[3px] border-l-[#6f9aba] bg-[#f7fafc] py-3 pr-4 pl-[13px]">
-                    <div>
+                    <div className="self-center">
                       <code className="mono-token break-all text-[13px] font-bold text-[#334155]">
                         {currentAttribute.technical_name}
                       </code>
@@ -775,7 +775,7 @@ export function QaItemView({
                           : "예시값 없음"}
                       </p>
                     </div>
-                    <div className="flex justify-center">
+                    <div className="flex self-center justify-center">
                       <span
                         className={cn(
                           "inline-block whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold",

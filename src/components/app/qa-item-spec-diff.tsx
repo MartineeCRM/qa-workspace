@@ -337,7 +337,7 @@ export function QaItemSpecDiffTable({
       <div className="border-b border-[#dbe2ea] bg-white">
         <SpecHierarchyLabel>상위 검증 대상 · 이벤트</SpecHierarchyLabel>
         <div className="grid min-w-[760px] grid-cols-[minmax(140px,1fr)_minmax(150px,1fr)_minmax(160px,1.1fr)_minmax(68px,0.5fr)_minmax(125px,0.65fr)] items-start gap-4 border-l-[3px] border-l-[#6f9aba] bg-[#f7fafc] py-3 pr-4 pl-[13px]">
-          <div>
+          <div className="self-center">
             <code className="mono-token break-all text-[13px] font-bold text-[#334155]">
               {eventName}
             </code>
@@ -349,7 +349,7 @@ export function QaItemSpecDiffTable({
           <p className="text-[12.5px] leading-[1.5] text-[#64748b]">
             {eventDescription || "이벤트 설명이 없습니다."}
           </p>
-          <div className="flex justify-center">
+          <div className="flex self-center justify-center">
             <span
               className={cn(
                 "whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold",
@@ -411,7 +411,7 @@ export function QaItemSpecDiffTable({
                   className={cn("border-b border-[#f4f6f9]", chosen ? "bg-[#fbfdfb]" : "bg-white")}
                 >
                   <div className="grid grid-cols-[minmax(140px,1fr)_minmax(150px,1fr)_minmax(160px,1.1fr)_minmax(68px,0.5fr)_minmax(125px,0.65fr)] items-start gap-4 px-4 py-3">
-                    <div className="min-w-0">
+                    <div className="min-w-0 self-center">
                       <code className="mono-token break-all text-[12.5px]">{row.name}</code>
                       {row.typoCandidate ? (
                         <p className="mt-0.5 text-[11px] font-semibold text-[#4b4f8a]">
@@ -456,7 +456,7 @@ export function QaItemSpecDiffTable({
                             : "예시값 없음 · 택소노미에 추가해주세요"}
                       </p>
                     </div>
-                    <div className="flex justify-center">
+                    <div className="flex self-center justify-center">
                       <span
                         className={cn(
                           "inline-block whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold",
