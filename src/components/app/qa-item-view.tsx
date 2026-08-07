@@ -1043,9 +1043,29 @@ export function QaItemView({
                       {selectedIssue.qa_discussion_comments.length > 0 ? (
                         <div className="max-h-52 space-y-2 overflow-y-auto rounded-lg bg-[#f8fafc] p-3">
                           {selectedIssue.qa_discussion_comments.map((comment) => (
-                            <div key={comment.id}>
+                            <div
+                              key={comment.id}
+                              className={cn(
+                                "rounded-lg border px-3 py-2.5",
+                                comment.external_author_name
+                                  ? "border-[#9dcfc4] bg-[#edf9f6]"
+                                  : "border-[#dbe2ea] bg-white",
+                              )}
+                            >
                               <div className="flex items-center justify-between gap-2">
-                                <p className="text-[11px] text-[#8b97a8]">
+                                <p
+                                  className={cn(
+                                    "text-[11px] font-medium",
+                                    comment.external_author_name
+                                      ? "text-[#167565]"
+                                      : "text-[#8b97a8]",
+                                  )}
+                                >
+                                  {comment.external_author_name ? (
+                                    <span className="mr-1.5 rounded bg-[#ccece5] px-1.5 py-0.5 text-[10px] font-bold">
+                                      고객사
+                                    </span>
+                                  ) : null}
                                   {comment.external_author_name ??
                                     (comment.author_id === user?.id ? "나" : "내부 담당자")}{" "}
                                   · {formatDateTime(comment.created_at)}
