@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from "react";
-import { AlertTriangle, Check, FileUp, SearchCheck } from "lucide-react";
+import { Check, FileUp, SearchCheck } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { errorMessage, formatMergedTimelineTime } from "@/lib/domain";
@@ -47,11 +47,27 @@ export function QaSessionAnalysisPanel({
   const executedEventItems = items.filter(
     (item) => item.target_type === "event" && item.executed_at,
   );
+  const executedAttributeItems = items.filter(
+    (item) => item.target_type === "custom_attribute" && item.executed_at,
+  );
   const hasEventCsv = runEvents.length > 0;
   const collectedItems = executedEventItems.filter((item) => collectedEventIds.has(item.target_id));
-  const missingItems = hasEventCsv
+  const missingEventItems = hasEventCsv
     ? executedEventItems.filter((item) => !collectedEventIds.has(item.target_id))
     : [];
+  const capturedAttributeNames = new Set(
+    snapshots
+      .filter((snapshot) => snapshot.status === "captured")
+      .flatMap((snapshot) => Object.keys(snapshot.payload ?? {})),
+  );
+  const missingAttributeItems =
+    snapshots.length > 0
+      ? executedAttributeItems.filter((item) => {
+          const attribute = attributes.find((candidate) => candidate.id === item.target_id);
+          return !attribute || !capturedAttributeNames.has(attribute.technical_name);
+        })
+      : [];
+  const missingItemCount = missingEventItems.length + missingAttributeItems.length;
   const unexpectedEventIds = Array.from(
     new Set(
       runEvents
@@ -141,7 +157,7 @@ export function QaSessionAnalysisPanel({
 
         <div className="grid gap-3 p-5 md:grid-cols-3">
           <StatusCard tone="success" label="수집 확인" value={collectedItems.length} />
-          <StatusCard tone="warning" label="미수집 후보" value={missingItems.length} />
+          <StatusCard tone="warning" label="미수집 후보" value={missingItemCount} />
           <StatusCard
             tone="neutral"
             label="추가 수집"
@@ -179,29 +195,35 @@ export function QaSessionAnalysisPanel({
           </div>
         ) : null}
 
-        {missingItems.length > 0 ? (
-          <div className="mx-5 mb-5 rounded-xl border border-[#f0d8a8] bg-[#fffaf0] p-4">
-            <div className="flex gap-3">
-              <AlertTriangle className="mt-0.5 size-4 shrink-0 text-[#b45309]" />
+        {missingItemCount > 0 ? (
+          <div className="mx-5 mb-5 rounded-xl border border-[#cfd9e6] bg-[#f5f8fb] p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <p className="text-[13px] font-semibold text-[#7c3f0c]">
-                  실행했지만 CSV에서 찾지 못한 이벤트가 있어요
+                <p className="text-[13px] font-semibold text-[#263547]">
+                  체크했지만 CSV와 스냅샷에서 찾지 못한 항목이 있어요
                 </p>
-                <p className="mt-1 text-xs leading-5 text-[#8a5a24]">
+                <p className="mt-0.5 text-xs text-[#6f7f91]">
+                  이벤트 {missingEventItems.length}개 · 어트리뷰트 {missingAttributeItems.length}개
+                </p>
+                <p className="mt-1 text-xs leading-5 text-[#6f7f91]">
                   CSV에 아직 반영되지 않았을 수 있어요. Event User Log에서 다시 확인한 뒤 CSV를
                   추가로 업로드해주세요. 그대로 분석하면 미발생으로 판정합니다.
                 </p>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {missingItems.map((item) => (
-                    <span
-                      key={item.id}
-                      className="mono-token rounded-md border border-[#ecd6aa] bg-white px-2 py-1 text-[11.5px] text-[#7c3f0c]"
-                    >
-                      {eventName(item.target_id)}
-                    </span>
-                  ))}
-                </div>
               </div>
+            </div>
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              <DiscoveredItemList
+                title="이벤트"
+                items={missingEventItems.map((item) => eventName(item.target_id))}
+              />
+              <DiscoveredItemList
+                title="어트리뷰트"
+                items={missingAttributeItems.map(
+                  (item) =>
+                    attributes.find((attribute) => attribute.id === item.target_id)
+                      ?.technical_name ?? item.target_id,
+                )}
+              />
             </div>
           </div>
         ) : null}
