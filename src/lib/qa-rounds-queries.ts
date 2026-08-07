@@ -550,6 +550,19 @@ export function useUploadRunEventsLog(sessionId: string) {
   });
 }
 
+export function useResetQaRunEvents(sessionId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const { error } = await db.from("qa_run_events").delete().eq("qa_session_id", sessionId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["qa-run-events", sessionId] });
+    },
+  });
+}
+
 export function useAnalyzeChecklist(sessionId: string) {
   const qc = useQueryClient();
   return useMutation({

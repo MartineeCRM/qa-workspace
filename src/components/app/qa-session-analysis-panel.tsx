@@ -11,6 +11,7 @@ import {
   useQaChecklistItems,
   useQaRunEvents,
   useRemoveChecklistItem,
+  useResetQaRunEvents,
   useUploadRunEventsLog,
   type QaSession,
 } from "@/lib/qa-rounds-queries";
@@ -30,6 +31,7 @@ export function QaSessionAnalysisPanel({
   onAnalyze: () => void;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
+  const uploadModeRef = useRef<"append" | "replace">("append");
   const [uploading, setUploading] = useState(false);
   const [selectedMissingIds, setSelectedMissingIds] = useState<Set<string>>(new Set());
   const { data: events = [] } = useTaxonomyEvents(projectId);
@@ -38,6 +40,7 @@ export function QaSessionAnalysisPanel({
   const { data: snapshots = [] } = useQaAttributeSnapshots(session.id);
   const { data: items = [] } = useQaChecklistItems(session.id);
   const uploadLog = useUploadRunEventsLog(session.id);
+  const resetRunEvents = useResetQaRunEvents(session.id);
   const addItems = useAddChecklistItems(session.id);
   const removeItems = useRemoveChecklistItem(session.id);
   const eventByName = useMemo(
@@ -104,13 +107,18 @@ export function QaSessionAnalysisPanel({
     setUploading(true);
     try {
       const parsedRows = parseRunEventsCsv(await file.text());
+      if (uploadModeRef.current === "replace") await resetRunEvents.mutateAsync();
       await uploadLog.mutateAsync(
         parsedRows.map((row) => ({
           ...row,
           event_id: eventByName.get(row.raw_event_name)?.id ?? null,
         })),
       );
-      toast.success(`${parsedRows.length}행을 업로드하고 실행 기록과 대조했어요`);
+      toast.success(
+        uploadModeRef.current === "replace"
+          ? `기존 CSV를 초기화하고 ${parsedRows.length}행을 업로드했어요`
+          : `${parsedRows.length}행을 업로드하고 실행 기록과 대조했어요`,
+      );
     } catch (error) {
       toast.error(errorMessage(error, "CSV 업로드에 실패했어요"));
     } finally {
@@ -166,10 +174,31 @@ export function QaSessionAnalysisPanel({
               if (file) void handleFile(file);
             }}
           />
-          <Button variant="outline" onClick={() => fileRef.current?.click()} disabled={uploading}>
-            <FileUp className="size-4" />
-            {runEvents.length > 0 ? "CSV 추가 업로드" : "CSV 업로드"}
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            {runEvents.length > 0 ? (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  uploadModeRef.current = "replace";
+                  fileRef.current?.click();
+                }}
+                disabled={uploading}
+              >
+                초기화 후 업로드
+              </Button>
+            ) : null}
+            <Button
+              variant="outline"
+              onClick={() => {
+                uploadModeRef.current = "append";
+                fileRef.current?.click();
+              }}
+              disabled={uploading}
+            >
+              <FileUp className="size-4" />
+              {runEvents.length > 0 ? "CSV 추가 업로드" : "CSV 업로드"}
+            </Button>
+          </div>
         </header>
 
         <div className="grid gap-3 p-5 md:grid-cols-3">
