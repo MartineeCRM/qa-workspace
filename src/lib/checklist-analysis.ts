@@ -71,8 +71,17 @@ export async function judgeChecklistItem(
         is_required: p.is_required,
         allowed_values: Array.isArray(p.allowed_values) ? (p.allowed_values as string[]) : null,
       }));
-    const violations = judgeEventStructural(matched, properties);
+    const sortedMatched = [...matched].sort((a, b) => b.occurred_at.localeCompare(a.occurred_at));
+    const latestMatched = sortedMatched[0];
+    const violations = judgeEventStructural([latestMatched], properties);
     const blockedPropertyNames = new Set(violations.map((violation) => violation.property));
+    const historicalWarnings = Array.from(
+      new Map(
+        judgeEventStructural(sortedMatched.slice(1), properties)
+          .filter((violation) => !blockedPropertyNames.has(violation.property))
+          .map((violation) => [violation.property, violation]),
+      ).values(),
+    );
     const aiEligiblePropertyNames = new Set(
       properties
         .filter(
@@ -95,6 +104,7 @@ export async function judgeChecklistItem(
       "event",
       ctx,
       aiEligiblePropertyNames,
+      latestMatched,
     );
     if (violations.length > 0) {
       const structuralReason = violations.map((v) => `${v.property}: ${v.reason}`).join("\n");
@@ -124,7 +134,17 @@ export async function judgeChecklistItem(
       };
     }
 
-    return qualitative;
+    if (historicalWarnings.length === 0) return qualitative;
+    return {
+      ...qualitative,
+      ai_evidence: {
+        qualitative: qualitative.ai_evidence,
+        historical_warnings: historicalWarnings.map((warning) => ({
+          ...warning,
+          message: `최신 로그의 ${warning.property} 값은 정상입니다. 이전 로그에서는 ${warning.reason} 확인이 필요합니다.`,
+        })),
+      },
+    };
   }
 
   const attribute = ctx.customAttributes.find((a) => a.id === item.target_id);
@@ -192,6 +212,7 @@ async function judgeQualitative(
     snapshots: AttributeSnapshot[];
   },
   aiEligiblePropertyNames?: Set<string>,
+  latestRunEvent?: RunEvent,
 ): Promise<ChecklistItemVerdict> {
   const rules = ctx.rules
     .filter((rule) => {
@@ -320,18 +341,20 @@ async function judgeQualitative(
   const dedupedTargets = Array.from(new Map(targets.map((t) => [`${t.kind}:${t.id}`, t])).values());
 
   const qualitativeRunEvents = aiEligiblePropertyNames
-    ? ctx.runEvents.map((event) =>
-        event.event_id === targetId
-          ? {
-              ...event,
-              raw_properties: Object.fromEntries(
-                Object.entries(event.raw_properties).filter(([name]) =>
-                  aiEligiblePropertyNames.has(name),
+    ? ctx.runEvents
+        .filter((event) => event.event_id !== targetId || event === latestRunEvent)
+        .map((event) =>
+          event.event_id === targetId
+            ? {
+                ...event,
+                raw_properties: Object.fromEntries(
+                  Object.entries(event.raw_properties).filter(([name]) =>
+                    aiEligiblePropertyNames.has(name),
+                  ),
                 ),
-              ),
-            }
-          : event,
-      )
+              }
+            : event,
+        )
     : ctx.runEvents;
   const bundle = collectRuleEvidence(
     { description: "", targets: dedupedTargets },

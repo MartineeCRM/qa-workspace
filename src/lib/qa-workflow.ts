@@ -711,10 +711,10 @@ export function buildEventSpecDiffRows(input: {
   const rows: SpecDiffRow[] = [];
 
   for (const prop of input.properties) {
-    // Check every matched occurrence, not just the first — the same property can
-    // be valid in one log line and wrong in another, and judgeEventStructural
-    // (the actual judging engine) flags a violation if ANY occurrence mismatches.
-    const values = input.rawPropertiesList
+    const latestValue = input.rawPropertiesList[0]?.[prop.technical_name];
+    const values = [latestValue].filter((v) => v !== undefined && v !== null);
+    const historicalValues = input.rawPropertiesList
+      .slice(1)
       .map((raw) => raw[prop.technical_name])
       .filter((v) => v !== undefined && v !== null);
     const mismatchingValue = values.find((v) => !matchesDataType(v, prop.data_type));
@@ -725,6 +725,18 @@ export function buildEventSpecDiffRows(input: {
         prop.allowed_values !== null &&
         !prop.allowed_values.includes(String(v)),
     );
+    const hasHistoricalMismatch =
+      historicalValues.some(
+        (value) =>
+          isBlankString(value) ||
+          !matchesDataType(value, prop.data_type) ||
+          (prop.allowed_values !== null && !prop.allowed_values.includes(String(value))),
+      ) ||
+      (prop.is_required &&
+        input.rawPropertiesList.slice(1).some((raw) => {
+          const value = raw[prop.technical_name];
+          return value === undefined || value === null || isBlankString(value);
+        }));
     const observedValue = mismatchingValue ?? blankValue ?? invalidAllowedValue ?? values[0];
     const structuralVerdict: SpecDiffVerdict =
       values.length === 0
@@ -747,7 +759,9 @@ export function buildEventSpecDiffRows(input: {
           ? "semantic_mismatch"
           : input.aiPendingPropertyIds?.has(prop.id)
             ? "ai_pending"
-            : "pass";
+            : hasHistoricalMismatch
+              ? "ai_pending"
+              : "pass";
     rows.push({
       propertyId: prop.id,
       name: prop.technical_name,
@@ -762,7 +776,7 @@ export function buildEventSpecDiffRows(input: {
   }
 
   const seen = new Set<string>();
-  for (const raw of input.rawPropertiesList) {
+  for (const [rawIndex, raw] of input.rawPropertiesList.entries()) {
     for (const key of Object.keys(raw)) {
       if (knownNames.includes(key) || seen.has(key)) continue;
       seen.add(key);
@@ -774,7 +788,7 @@ export function buildEventSpecDiffRows(input: {
         expectedType: null,
         expectedExample: undefined,
         allowedValues: null,
-        verdict: "undefined_property",
+        verdict: rawIndex === 0 ? "undefined_property" : "ai_pending",
         typoCandidate: findTypoCandidate(key, input.properties),
       });
     }

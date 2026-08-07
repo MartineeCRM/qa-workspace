@@ -387,6 +387,67 @@ describe("judgeChecklistItem — taxonomy example format", () => {
     });
   });
 
+  it("passes the latest valid value and keeps an older mismatch as a non-blocking warning", async () => {
+    judgeWithAI.mockResolvedValue({ ok: true, verdict: "passed", reasoning: "", evidence: [] });
+    const event = {
+      id: "event-1",
+      technical_name: "search_completed",
+    } as TaxonomyEvent;
+    const property = {
+      id: "property-enum",
+      event_id: event.id,
+      technical_name: "platform",
+      data_type: "string",
+      is_required: true,
+      description: "플랫폼 코드",
+      example_value: "ios_app",
+      allowed_values: ["ios_app", "android_app"],
+    } as TaxonomyEventProperty;
+
+    const result = await judgeChecklistItem(
+      { ...item, target_type: "event", target_id: event.id },
+      {
+        events: [event],
+        eventProperties: [property],
+        customAttributes: [],
+        rules: [],
+        runEvents: [
+          {
+            event_id: event.id,
+            raw_event_name: event.technical_name,
+            occurred_at: "2026-08-03T00:00:00Z",
+            external_user_id: "u1",
+            raw_properties: { platform: "pc_web" },
+          },
+          {
+            event_id: event.id,
+            raw_event_name: event.technical_name,
+            occurred_at: "2026-08-03T00:01:00Z",
+            external_user_id: "u1",
+            raw_properties: { platform: "ios_app" },
+          },
+        ],
+        snapshots: [],
+      },
+    );
+
+    expect(judgeWithAI.mock.calls[0][0].data.targets[0].runEvents).toHaveLength(1);
+    expect(judgeWithAI.mock.calls[0][0].data.targets[0].runEvents[0].raw_properties).toEqual({
+      platform: "ios_app",
+    });
+    expect(result).toMatchObject({
+      final_status: "passed",
+      ai_evidence: {
+        historical_warnings: [
+          expect.objectContaining({
+            property: "platform",
+            message: expect.stringContaining("최신 로그의 platform 값은 정상"),
+          }),
+        ],
+      },
+    });
+  });
+
   it("does not call AI for an attribute that fails its type check", async () => {
     const booleanAttribute = {
       ...baseAttribute,

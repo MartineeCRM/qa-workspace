@@ -1045,7 +1045,7 @@ describe("buildEventSpecDiffRows", () => {
     expect(rows.find((row) => row.propertyId === "p2")?.verdict).toBe("missing_required");
   });
 
-  it("flags a mismatch if ANY matched occurrence is wrong, even when others are fine", () => {
+  it("asks for confirmation when the latest value is valid but an older occurrence is wrong", () => {
     const rows = buildEventSpecDiffRows({
       properties,
       rawPropertiesList: [
@@ -1054,8 +1054,9 @@ describe("buildEventSpecDiffRows", () => {
       ],
     });
     expect(rows.find((r) => r.name === "item_final_price_krw")).toMatchObject({
-      verdict: "type_mismatch",
-      observedType: "number",
+      verdict: "ai_pending",
+      observedType: "string",
+      observedSample: "15661",
     });
   });
 
@@ -1079,6 +1080,17 @@ describe("buildEventSpecDiffRows", () => {
       ],
     });
     expect(rows.filter((r) => r.name === "is_login")).toHaveLength(1);
+  });
+
+  it("treats an undefined property found only in an older log as a confirmation item", () => {
+    const rows = buildEventSpecDiffRows({
+      properties,
+      rawPropertiesList: [
+        { platform: "android_app" },
+        { platform: "android_app", legacy_property: "old" },
+      ],
+    });
+    expect(rows.find((row) => row.name === "legacy_property")?.verdict).toBe("ai_pending");
   });
 
   it("carries the taxonomy's example value through for known properties, and leaves it absent for undefined ones", () => {

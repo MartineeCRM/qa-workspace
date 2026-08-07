@@ -75,11 +75,24 @@ function extractAiSummary(evidence: unknown): string | null {
   ) {
     return (evidence as { qualitative_error: string }).qualitative_error;
   }
+  const historicalWarnings =
+    evidence && typeof evidence === "object" && !Array.isArray(evidence)
+      ? (evidence as { historical_warnings?: unknown }).historical_warnings
+      : null;
+  const warningLines = Array.isArray(historicalWarnings)
+    ? historicalWarnings
+        .map((warning) =>
+          warning && typeof warning === "object"
+            ? (warning as { message?: unknown }).message
+            : null,
+        )
+        .filter((message): message is string => typeof message === "string")
+    : [];
   const nested =
     evidence && typeof evidence === "object" && !Array.isArray(evidence)
       ? (evidence as { qualitative?: unknown }).qualitative
       : evidence;
-  if (!Array.isArray(nested)) return null;
+  if (!Array.isArray(nested)) return warningLines.length > 0 ? warningLines.join(" ") : null;
   const lines = nested
     .filter(
       (entry): entry is { verdict: string; reasoning: string } =>
@@ -90,7 +103,8 @@ function extractAiSummary(evidence: unknown): string | null {
     )
     .map((entry) => entry.reasoning.trim())
     .filter(Boolean);
-  return lines.length > 0 ? lines.join(" ") : null;
+  const summaries = [...lines, ...warningLines];
+  return summaries.length > 0 ? summaries.join(" ") : null;
 }
 
 function extractAiRawResponse(evidence: unknown): string | null {
