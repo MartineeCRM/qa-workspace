@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { createFileRoute, Link, useParams } from "@tanstack/react-router";
-import { ArrowUp, Check, CheckCircle2, Pencil } from "lucide-react";
+import { ArrowUp, Check, CheckCircle2, Pencil, Share2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { EmptyState } from "@/components/app/layout-parts";
@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/lib/auth";
 import { errorMessage, formatDateTime } from "@/lib/domain";
+import { createIssueShare } from "@/lib/issue-share.functions";
 import {
   useAddDiscussionComment,
   useDeleteQaIssue,
@@ -387,6 +388,26 @@ function QaIssuesPage() {
                           >
                             검증 근거 보기
                           </Link>
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-8 text-xs"
+                          onClick={async () => {
+                            try {
+                              const share = await createIssueShare({
+                                data: { discussionId: issue.id },
+                              });
+                              const url = `${window.location.origin}/share/${share.token}`;
+                              await navigator.clipboard.writeText(url);
+                              toast.success("고객 공유 링크를 복사했어요 · 30일간 유효해요");
+                            } catch (error) {
+                              toast.error(errorMessage(error));
+                            }
+                          }}
+                        >
+                          <Share2 className="mr-1 size-3" />
+                          고객 공유
                         </Button>
                         <span
                           className="text-[11.5px] font-semibold"

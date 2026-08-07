@@ -15,6 +15,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as AuthenticatedAccountRouteImport } from './routes/_authenticated/account'
 import { Route as AuthenticatedWorkspacesRouteImport } from './routes/_authenticated/workspaces'
+import { Route as ShareTokenRouteImport } from './routes/share/$token'
 import { Route as AuthenticatedWWsIdRouteRouteImport } from './routes/_authenticated/w/$wsId/route'
 import { Route as AuthenticatedWWsIdIndexRouteImport } from './routes/_authenticated/w/$wsId/index'
 import { Route as AuthenticatedWWsIdSettingsRouteImport } from './routes/_authenticated/w/$wsId/settings'
@@ -58,6 +59,11 @@ const AuthenticatedWorkspacesRoute = AuthenticatedWorkspacesRouteImport.update({
   id: '/workspaces',
   path: '/workspaces',
   getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const ShareTokenRoute = ShareTokenRouteImport.update({
+  id: '/share/$token',
+  path: '/share/$token',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedWWsIdRouteRoute = AuthenticatedWWsIdRouteRouteImport.update({
   id: '/w/$wsId',
@@ -158,6 +164,7 @@ export interface FileRoutesByFullPath {
   '/signup': typeof SignupRoute
   '/account': typeof AuthenticatedAccountRoute
   '/workspaces': typeof AuthenticatedWorkspacesRoute
+  '/share/$token': typeof ShareTokenRoute
   '/w/$wsId': typeof AuthenticatedWWsIdRouteRouteWithChildren
   '/w/$wsId/settings': typeof AuthenticatedWWsIdSettingsRoute
   '/w/$wsId/': typeof AuthenticatedWWsIdIndexRoute
@@ -179,6 +186,7 @@ export interface FileRoutesByTo {
   '/signup': typeof SignupRoute
   '/account': typeof AuthenticatedAccountRoute
   '/workspaces': typeof AuthenticatedWorkspacesRoute
+  '/share/$token': typeof ShareTokenRoute
   '/w/$wsId/settings': typeof AuthenticatedWWsIdSettingsRoute
   '/w/$wsId': typeof AuthenticatedWWsIdIndexRoute
   '/w/$wsId/p/$projectId/issues': typeof AuthenticatedWWsIdPProjectIdIssuesRoute
@@ -197,6 +205,7 @@ export interface FileRoutesById {
   '/signup': typeof SignupRoute
   '/_authenticated/account': typeof AuthenticatedAccountRoute
   '/_authenticated/workspaces': typeof AuthenticatedWorkspacesRoute
+  '/share/$token': typeof ShareTokenRoute
   '/_authenticated/w/$wsId': typeof AuthenticatedWWsIdRouteRouteWithChildren
   '/_authenticated/w/$wsId/settings': typeof AuthenticatedWWsIdSettingsRoute
   '/_authenticated/w/$wsId/': typeof AuthenticatedWWsIdIndexRoute
@@ -220,6 +229,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/account'
     | '/workspaces'
+    | '/share/$token'
     | '/w/$wsId'
     | '/w/$wsId/settings'
     | '/w/$wsId/'
@@ -241,6 +251,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/account'
     | '/workspaces'
+    | '/share/$token'
     | '/w/$wsId/settings'
     | '/w/$wsId'
     | '/w/$wsId/p/$projectId/issues'
@@ -258,6 +269,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/_authenticated/account'
     | '/_authenticated/workspaces'
+    | '/share/$token'
     | '/_authenticated/w/$wsId'
     | '/_authenticated/w/$wsId/settings'
     | '/_authenticated/w/$wsId/'
@@ -279,6 +291,7 @@ export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   LoginRoute: typeof LoginRoute
   SignupRoute: typeof SignupRoute
+  ShareTokenRoute: typeof ShareTokenRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -324,6 +337,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/workspaces'
       preLoaderRoute: typeof AuthenticatedWorkspacesRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/share/$token': {
+      id: '/share/$token'
+      path: '/share/$token'
+      fullPath: '/share/$token'
+      preLoaderRoute: typeof ShareTokenRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/_authenticated/w/$wsId': {
       id: '/_authenticated/w/$wsId'
@@ -543,6 +563,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   LoginRoute: LoginRoute,
   SignupRoute: SignupRoute,
+  ShareTokenRoute: ShareTokenRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
