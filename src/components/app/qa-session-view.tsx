@@ -71,6 +71,8 @@ export function QaSessionView({
   });
   const [viewingStep, setViewingStep] = useState(currentStep);
   const [analysisProgress, setAnalysisProgress] = useState<{ completed: number; total: number }>();
+  const [analysisRunning, setAnalysisRunning] = useState(false);
+  const cancelAnalysisRef = useRef(false);
 
   // useState's initializer only runs once, and route params changing doesn't remount this
   // component (same session route, different :sessionId) — so without this effect,
@@ -91,6 +93,8 @@ export function QaSessionView({
   }, [session.id, currentStep, viewingStep]);
 
   async function runAnalysis() {
+    cancelAnalysisRef.current = false;
+    setAnalysisRunning(true);
     try {
       const [
         freshChecklistResult,
@@ -112,6 +116,10 @@ export function QaSessionView({
         refetchExclusions(),
       ]);
       const freshChecklistItems = freshChecklistResult.data ?? checklistItems;
+      if (cancelAnalysisRef.current) {
+        toast.info("분석을 멈췄어요");
+        return;
+      }
       const freshEvents = freshEventsResult.data ?? events;
       const freshProperties = freshPropertiesResult.data ?? eventProperties;
       const freshExclusions = freshExclusionsResult.data ?? exclusions;
@@ -126,7 +134,7 @@ export function QaSessionView({
               !freshExclusions?.properties.has(`${property.id}:${session.qa_channel_id}`),
           )
         : freshProperties;
-      await analyze.mutateAsync({
+      const outcome = await analyze.mutateAsync({
         checklistItems: freshChecklistItems.filter((item) => item.executed_at),
         events: freshApplicableEvents,
         eventProperties: freshApplicableProperties,
@@ -135,13 +143,19 @@ export function QaSessionView({
         runEvents: freshRunEventsResult.data ?? runEvents,
         snapshots: freshSnapshotsResult.data ?? snapshots,
         onProgress: (completed, total) => setAnalysisProgress({ completed, total }),
+        shouldCancel: () => cancelAnalysisRef.current,
       });
-      toast.success("판정을 완료했어요");
-      setViewingStep(3);
+      if (outcome?.cancelled) {
+        toast.info(`${outcome.completed}/${outcome.total}개까지 완료하고 분석을 멈췄어요`);
+      } else {
+        toast.success("판정을 완료했어요");
+        setViewingStep(3);
+      }
     } catch (error) {
       toast.error(errorMessage(error, "판정에 실패했어요. 다시 시도해주세요."));
     } finally {
       setAnalysisProgress(undefined);
+      setAnalysisRunning(false);
     }
   }
 
@@ -227,9 +241,13 @@ export function QaSessionView({
         <QaSessionAnalysisPanel
           projectId={projectId}
           session={session}
-          analyzing={analyze.isPending}
+          analyzing={analysisRunning}
           analysisProgress={analysisProgress}
           onAnalyze={runAnalysis}
+          onCancel={() => {
+            cancelAnalysisRef.current = true;
+            toast.info("진행 중인 묶음이 끝나면 분석을 멈춥니다");
+          }}
         />
       ) : null}
       {viewingStep === 3 ? <QaSessionResultsPanel projectId={projectId} session={session} /> : null}

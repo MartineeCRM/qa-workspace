@@ -581,34 +581,39 @@ export function useAnalyzeChecklist(sessionId: string) {
       runEvents: RunEvent[];
       snapshots: AttributeSnapshot[];
       onProgress?: (completed: number, total: number) => void;
+      shouldCancel?: () => boolean;
     }) => {
       const itemsToJudge = input.checklistItems.filter(
         (item) => !item.qa_checklist_item_results?.[0]?.overridden_by,
       );
-      if (itemsToJudge.length === 0) return;
+      if (itemsToJudge.length === 0) return { cancelled: false, completed: 0, total: 0 };
       let completed = 0;
       input.onProgress?.(completed, itemsToJudge.length);
-      const results = [];
-      const batchSize = 3;
+      const batchSize = 1;
       for (let offset = 0; offset < itemsToJudge.length; offset += batchSize) {
+        if (input.shouldCancel?.()) {
+          return { cancelled: true, completed, total: itemsToJudge.length };
+        }
         const batch = itemsToJudge.slice(offset, offset + batchSize);
-        results.push(
-          ...(await Promise.all(
-            batch.map(async (item) => {
-              try {
-                return await judgeChecklistItem(item, input);
-              } finally {
-                completed += 1;
-                input.onProgress?.(completed, itemsToJudge.length);
-              }
-            }),
-          )),
+        const results = await Promise.all(
+          batch.map(async (item) => {
+            try {
+              return await judgeChecklistItem(item, input);
+            } finally {
+              completed += 1;
+              input.onProgress?.(completed, itemsToJudge.length);
+            }
+          }),
         );
+        const { error } = await db
+          .from("qa_checklist_item_results")
+          .upsert(results, { onConflict: "checklist_item_id" });
+        if (error) throw error;
+        if (input.shouldCancel?.()) {
+          return { cancelled: true, completed, total: itemsToJudge.length };
+        }
       }
-      const { error } = await db
-        .from("qa_checklist_item_results")
-        .upsert(results, { onConflict: "checklist_item_id" });
-      if (error) throw error;
+      return { cancelled: false, completed, total: itemsToJudge.length };
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["qa-checklist-items", sessionId] });

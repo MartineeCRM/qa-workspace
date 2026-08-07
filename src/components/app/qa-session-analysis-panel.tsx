@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from "react";
-import { Check, FileUp, SearchCheck } from "lucide-react";
+import { Check, FileUp, SearchCheck, Square } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { errorMessage, formatMergedTimelineTime } from "@/lib/domain";
@@ -23,12 +23,14 @@ export function QaSessionAnalysisPanel({
   analyzing,
   analysisProgress,
   onAnalyze,
+  onCancel,
 }: {
   projectId: string;
   session: QaSession;
   analyzing: boolean;
   analysisProgress?: { completed: number; total: number };
   onAnalyze: () => void;
+  onCancel: () => void;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const uploadModeRef = useRef<"append" | "replace">("append");
@@ -327,15 +329,20 @@ export function QaSessionAnalysisPanel({
               {items.length}개
             </p>
           </div>
-          <Button
-            onClick={onAnalyze}
-            disabled={
-              analyzing || items.length === 0 || (executedEventItems.length > 0 && !hasEventCsv)
-            }
-          >
-            <SearchCheck className="size-4" />
-            {analyzing ? "분석 중" : "검증 결과 분석"}
-          </Button>
+          {analyzing ? (
+            <Button variant="outline" onClick={onCancel}>
+              <Square className="size-3.5 fill-current" />
+              분석 멈추기
+            </Button>
+          ) : (
+            <Button
+              onClick={onAnalyze}
+              disabled={items.length === 0 || (executedEventItems.length > 0 && !hasEventCsv)}
+            >
+              <SearchCheck className="size-4" />
+              검증 결과 분석
+            </Button>
+          )}
         </header>
 
         {analysisProgress ? (
@@ -349,7 +356,9 @@ export function QaSessionAnalysisPanel({
             <div className="h-2 overflow-hidden rounded-full bg-[#e2e5f4]">
               <div
                 className="h-full rounded-full bg-[#5b5fc7] transition-[width] duration-300"
-                style={{ width: `${(analysisProgress.completed / analysisProgress.total) * 100}%` }}
+                style={{
+                  width: `${analysisProgress.total > 0 ? (analysisProgress.completed / analysisProgress.total) * 100 : 0}%`,
+                }}
               />
             </div>
           </div>
