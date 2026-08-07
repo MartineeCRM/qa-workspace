@@ -176,7 +176,11 @@ function ProjectOverview() {
                             }}
                             className="mono-token truncate text-sm font-medium hover:underline"
                           >
-                            {event?.technical_name ?? issue.event_id}.{issue.target_label}
+                            {issue.target_type === "custom_attribute"
+                              ? issue.target_label
+                              : issue.target_type === "event"
+                                ? (event?.technical_name ?? issue.event_id)
+                                : `${event?.technical_name ?? issue.event_id}.${issue.target_label}`}
                           </Link>
                           {stage ? <Pill>{stage.name}</Pill> : null}
                           <Pill>{channel?.name ?? "채널 미지정"}</Pill>
