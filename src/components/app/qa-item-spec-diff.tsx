@@ -16,7 +16,7 @@ import {
   type TaxonomyEventProperty,
 } from "@/lib/queries";
 
-type FilterKey = "필수 누락" | "미정의" | "타입" | "값·형식" | "AI 확인 필요" | "통과" | "전체";
+type FilterKey = "필수 누락" | "미정의" | "타입" | "형식·의미" | "AI 확인 필요" | "통과" | "전체";
 type FixAction = "type" | "optional" | "allow_value" | "add" | "rename";
 
 export function SpecHierarchyLabel({ children }: { children: ReactNode }) {
@@ -170,7 +170,7 @@ export function QaItemSpecDiffTable({
     { key: "필수 누락", label: `필수 누락 ${missingRows.length}` },
     { key: "미정의", label: `미정의 ${undefinedRows.length}` },
     { key: "타입", label: `타입 ${typeMismatchRows.length}` },
-    { key: "값·형식", label: `값·형식 ${valueRows.length}` },
+    { key: "형식·의미", label: `형식·의미 ${valueRows.length}` },
     { key: "AI 확인 필요", label: `AI 확인 필요 ${aiPendingRows.length}` },
     { key: "통과", label: `통과 ${passedRows.length}` },
     { key: "전체", label: `전체 ${rows.length}` },
@@ -185,7 +185,7 @@ export function QaItemSpecDiffTable({
           ? typeMismatchRows
           : filter === "미정의"
             ? undefinedRows
-            : filter === "값·형식"
+            : filter === "형식·의미"
               ? valueRows
               : filter === "AI 확인 필요"
                 ? aiPendingRows
@@ -202,7 +202,7 @@ export function QaItemSpecDiffTable({
             ? typeMismatchRows
             : nextFilter === "미정의"
               ? undefinedRows
-              : nextFilter === "값·형식"
+              : nextFilter === "형식·의미"
                 ? valueRows
                 : nextFilter === "AI 확인 필요"
                   ? aiPendingRows

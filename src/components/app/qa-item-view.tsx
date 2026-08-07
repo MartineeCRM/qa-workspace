@@ -599,7 +599,7 @@ export function QaItemView({
                     { label: "필수 누락", value: ruleCounts.required, color: "#dc2626" },
                     { label: "미정의", value: ruleCounts.undefined, color: "#b45309" },
                     { label: "타입", value: ruleCounts.type, color: "#dc2626" },
-                    { label: "값 형식", value: ruleCounts.format, color: "#dc2626" },
+                    { label: "형식·의미", value: ruleCounts.format, color: "#dc2626" },
                     { label: "AI 확인 필요", value: ruleCounts.aiPending, color: "#2b6a9c" },
                     { label: "통과", value: ruleCounts.passed, color: "#16a34a" },
                   ].map((stat) => (
@@ -885,7 +885,7 @@ export function QaItemView({
                   { label: "필수 누락", properties: h.missingProperties, tone: "red" },
                   { label: "미정의", properties: h.undefinedProperties, tone: "amber" },
                   { label: "타입", properties: h.typeMismatchProperties, tone: "red" },
-                  { label: "값·형식", properties: h.valueFormatProperties, tone: "red" },
+                  { label: "형식·의미", properties: h.valueFormatProperties, tone: "red" },
                 ] as const;
                 const total = categories.reduce(
                   (count, category) => count + category.properties.length,
