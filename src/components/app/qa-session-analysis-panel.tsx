@@ -10,6 +10,7 @@ import {
   useQaAttributeSnapshots,
   useQaChecklistItems,
   useQaRunEvents,
+  useRemoveChecklistItem,
   useUploadRunEventsLog,
   type QaSession,
 } from "@/lib/qa-rounds-queries";
@@ -30,6 +31,7 @@ export function QaSessionAnalysisPanel({
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
+  const [selectedMissingIds, setSelectedMissingIds] = useState<Set<string>>(new Set());
   const { data: events = [] } = useTaxonomyEvents(projectId);
   const { data: attributes = [] } = useTaxonomyCustomAttributes(projectId);
   const { data: runEvents = [] } = useQaRunEvents(session.id);
@@ -37,6 +39,7 @@ export function QaSessionAnalysisPanel({
   const { data: items = [] } = useQaChecklistItems(session.id);
   const uploadLog = useUploadRunEventsLog(session.id);
   const addItems = useAddChecklistItems(session.id);
+  const removeItems = useRemoveChecklistItem(session.id);
   const eventByName = useMemo(
     () => new Map(events.map((event) => [event.technical_name, event])),
     [events],
@@ -68,6 +71,10 @@ export function QaSessionAnalysisPanel({
         })
       : [];
   const missingItemCount = missingEventItems.length + missingAttributeItems.length;
+  const missingItemIds = [
+    ...missingEventItems.map((item) => item.id),
+    ...missingAttributeItems.map((item) => item.id),
+  ];
   const unexpectedEventIds = Array.from(
     new Set(
       runEvents
@@ -124,6 +131,16 @@ export function QaSessionAnalysisPanel({
     } catch (error) {
       toast.error(errorMessage(error, "발견된 항목을 추가하지 못했어요"));
     }
+  }
+
+  function excludeMissingItems(itemIds: string[]) {
+    removeItems.mutate(itemIds, {
+      onSuccess: () => {
+        setSelectedMissingIds(new Set());
+        toast.success(`${itemIds.length}개를 검증 대상에서 제외했어요`);
+      },
+      onError: (error) => toast.error(errorMessage(error, "검증 대상에서 제외하지 못했어요")),
+    });
   }
 
   return (
@@ -210,19 +227,59 @@ export function QaSessionAnalysisPanel({
                   추가로 업로드해주세요. 그대로 분석하면 미발생으로 판정합니다.
                 </p>
               </div>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={selectedMissingIds.size === 0 || removeItems.isPending}
+                  onClick={() => excludeMissingItems([...selectedMissingIds])}
+                >
+                  선택항목 검증대상에서 제외
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={removeItems.isPending}
+                  onClick={() => excludeMissingItems(missingItemIds)}
+                >
+                  전체항목 검증대상에서 제외
+                </Button>
+              </div>
             </div>
             <div className="mt-4 grid gap-3 md:grid-cols-2">
               <DiscoveredItemList
                 title="이벤트"
-                items={missingEventItems.map((item) => eventName(item.target_id))}
+                items={missingEventItems.map((item) => ({
+                  id: item.id,
+                  label: eventName(item.target_id),
+                }))}
+                selectedIds={selectedMissingIds}
+                onToggle={(itemId) =>
+                  setSelectedMissingIds((previous) => {
+                    const next = new Set(previous);
+                    if (next.has(itemId)) next.delete(itemId);
+                    else next.add(itemId);
+                    return next;
+                  })
+                }
               />
               <DiscoveredItemList
                 title="어트리뷰트"
-                items={missingAttributeItems.map(
-                  (item) =>
+                items={missingAttributeItems.map((item) => ({
+                  id: item.id,
+                  label:
                     attributes.find((attribute) => attribute.id === item.target_id)
                       ?.technical_name ?? item.target_id,
-                )}
+                }))}
+                selectedIds={selectedMissingIds}
+                onToggle={(itemId) =>
+                  setSelectedMissingIds((previous) => {
+                    const next = new Set(previous);
+                    if (next.has(itemId)) next.delete(itemId);
+                    else next.add(itemId);
+                    return next;
+                  })
+                }
               />
             </div>
           </div>
@@ -301,7 +358,17 @@ export function QaSessionAnalysisPanel({
   );
 }
 
-function DiscoveredItemList({ title, items }: { title: string; items: string[] }) {
+function DiscoveredItemList({
+  title,
+  items,
+  selectedIds,
+  onToggle,
+}: {
+  title: string;
+  items: Array<string | { id: string; label: string }>;
+  selectedIds?: Set<string>;
+  onToggle?: (itemId: string) => void;
+}) {
   return (
     <div className="overflow-hidden rounded-lg border border-[#dce4ed] bg-white">
       <p className="border-b border-[#e8edf3] px-3 py-2 text-xs font-semibold text-[#526174]">
@@ -311,15 +378,28 @@ function DiscoveredItemList({ title, items }: { title: string; items: string[] }
         {items.length === 0 ? (
           <li className="px-1 py-2 text-xs text-[#94a3b8]">발견된 항목이 없어요.</li>
         ) : (
-          items.map((item) => (
-            <li
-              key={item}
-              title={item}
-              className="mono-token truncate rounded-md px-2 py-1.5 text-xs text-[#354255] odd:bg-[#f7f9fb]"
-            >
-              {item}
-            </li>
-          ))
+          items.map((item) => {
+            const id = typeof item === "string" ? item : item.id;
+            const label = typeof item === "string" ? item : item.label;
+            return (
+              <li
+                key={id}
+                title={label}
+                className="flex items-center gap-2 rounded-md px-2 py-1.5 text-xs text-[#354255] odd:bg-[#f7f9fb]"
+              >
+                {onToggle ? (
+                  <input
+                    type="checkbox"
+                    checked={selectedIds?.has(id) ?? false}
+                    onChange={() => onToggle(id)}
+                    className="size-3.5 shrink-0 accent-[#1f5f8b]"
+                    aria-label={`${label} 선택`}
+                  />
+                ) : null}
+                <span className="mono-token truncate">{label}</span>
+              </li>
+            );
+          })
         )}
       </ul>
     </div>

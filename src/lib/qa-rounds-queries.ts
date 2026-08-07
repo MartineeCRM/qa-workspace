@@ -327,8 +327,10 @@ export function useMarkChecklistItemExecuted(sessionId: string) {
 export function useRemoveChecklistItem(sessionId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (itemId: string) => {
-      const { error } = await db.from("qa_round_checklist_items").delete().eq("id", itemId);
+    mutationFn: async (itemIds: string | string[]) => {
+      const ids = Array.isArray(itemIds) ? itemIds : [itemIds];
+      if (ids.length === 0) return;
+      const { error } = await db.from("qa_round_checklist_items").delete().in("id", ids);
       if (error) throw error;
     },
     onSuccess: () => {
