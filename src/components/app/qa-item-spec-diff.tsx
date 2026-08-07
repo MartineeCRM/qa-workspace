@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import type { ReactNode } from "react";
 import { toast } from "sonner";
 import { Panel } from "@/components/app/layout-parts";
 import { Button } from "@/components/ui/button";
@@ -17,6 +18,14 @@ import {
 
 type FilterKey = "필수 누락" | "미정의" | "타입" | "값·형식" | "AI 확인 필요" | "통과" | "전체";
 type FixAction = "type" | "optional" | "allow_value" | "add" | "rename";
+
+export function SpecHierarchyLabel({ children }: { children: ReactNode }) {
+  return (
+    <div className="border-b border-[#e8edf2] bg-white px-4 py-2 text-[11px] font-semibold text-[#8b97a8]">
+      {children}
+    </div>
+  );
+}
 
 const OBSERVED_TYPE_TO_TAXONOMY_TYPE: Record<string, string> = {
   string: "string",
@@ -326,9 +335,7 @@ export function QaItemSpecDiffTable({
       }
     >
       <div className="border-b border-[#dbe2ea] bg-white">
-        <div className="border-b border-[#e8edf2] bg-[#fbfcfd] px-4 py-2 text-[11px] font-bold text-[#64748b]">
-          상위 대상 · 이벤트
-        </div>
+        <SpecHierarchyLabel>상위 검증 대상 · 이벤트</SpecHierarchyLabel>
         <div className="grid min-w-[760px] grid-cols-[minmax(140px,1fr)_minmax(150px,1fr)_minmax(160px,1.1fr)_minmax(68px,0.5fr)_minmax(125px,0.65fr)] items-start gap-4 border-l-[3px] border-l-[#6f9aba] bg-[#f7fafc] py-3 pr-4 pl-[13px]">
           <div>
             <code className="mono-token break-all text-[13px] font-bold text-[#334155]">
@@ -376,9 +383,7 @@ export function QaItemSpecDiffTable({
         </div>
       </div>
       <div className="overflow-x-auto">
-        <div className="border-b border-[#e8edf2] bg-white px-4 py-2 text-[11px] font-semibold text-[#8b97a8]">
-          하위 프로퍼티 · {rows.length}개
-        </div>
+        <SpecHierarchyLabel>하위 프로퍼티 · {rows.length}개</SpecHierarchyLabel>
         <div className="grid min-w-[760px] grid-cols-[minmax(140px,1fr)_minmax(150px,1fr)_minmax(160px,1.1fr)_minmax(68px,0.5fr)_minmax(125px,0.65fr)] gap-4 bg-[#fbfcfd] px-4 py-2.5 text-[11.5px] font-semibold tracking-wide text-[#64748b]">
           <div>프로퍼티</div>
           <div>AS-IS · 실제 수신</div>

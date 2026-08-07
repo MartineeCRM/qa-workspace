@@ -3,7 +3,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { Copy, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { Panel } from "@/components/app/layout-parts";
-import { QaItemSpecDiffTable } from "@/components/app/qa-item-spec-diff";
+import { QaItemSpecDiffTable, SpecHierarchyLabel } from "@/components/app/qa-item-spec-diff";
 import { QaIssueDeleteButton } from "@/components/app/qa-issue-delete-button";
 import { TaxonomyAttributeDialog } from "@/components/app/taxonomy-tab";
 import { Button } from "@/components/ui/button";
@@ -724,9 +724,7 @@ export function QaItemView({
             <Panel title="스펙 대조" description="스냅샷 수신 값과 어트리뷰트 정의를 비교해요.">
               <div className="overflow-x-auto">
                 <div className="border-b border-[#dbe2ea] bg-white">
-                  <div className="border-b border-[#e8edf2] bg-[#fbfcfd] px-4 py-2 text-[11px] font-bold text-[#64748b]">
-                    상위 대상 · 어트리뷰트
-                  </div>
+                  <SpecHierarchyLabel>상위 검증 대상 · 어트리뷰트</SpecHierarchyLabel>
                   <div className="grid min-w-[760px] grid-cols-[minmax(140px,1fr)_minmax(150px,1fr)_minmax(160px,1.1fr)_minmax(68px,0.5fr)_minmax(125px,0.65fr)] items-start gap-4 border-l-[3px] border-l-[#6f9aba] bg-[#f7fafc] py-3 pr-4 pl-[13px]">
                     <div>
                       <code className="mono-token break-all text-[13px] font-bold text-[#334155]">
@@ -833,9 +831,7 @@ export function QaItemView({
                   </div>
                 </div>
                 {currentAttribute.data_type === "array of object" ? (
-                  <div className="border-b border-[#e8edf2] bg-white px-4 py-2 text-[11px] font-semibold text-[#8b97a8]">
-                    하위 필드 · Array of Object
-                  </div>
+                  <SpecHierarchyLabel>하위 필드 · Array of Object</SpecHierarchyLabel>
                 ) : null}
               </div>
             </Panel>
