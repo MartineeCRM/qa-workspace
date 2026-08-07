@@ -116,6 +116,19 @@ function AiSummaryText({ text }: { text: string }) {
   );
 }
 
+function formatAttributeExample(value: unknown, dataType: string): string {
+  if (Array.isArray(value)) return JSON.stringify(value, null, 2);
+  const text = typeof value === "string" ? value : JSON.stringify(value);
+  if (!dataType.startsWith("array")) return text;
+  try {
+    const parsed = JSON.parse(text);
+    if (Array.isArray(parsed)) return JSON.stringify(parsed, null, 2);
+  } catch {
+    // Comma-separated taxonomy examples are valid even when they are not JSON.
+  }
+  return text.replace(/,\s*/g, ",\n");
+}
+
 export function QaItemView({
   projectId,
   session,
@@ -707,9 +720,12 @@ export function QaItemView({
                     <code className="rounded-md bg-[#f1f4f8] px-1.5 py-0.5 font-mono text-[12.5px] text-[#64748b]">
                       {currentAttribute.data_type}
                     </code>
-                    <p className="mt-1 break-words text-[12.5px] leading-[1.45] text-[#64748b]">
+                    <p className="mt-1 break-words whitespace-pre-wrap text-[12.5px] leading-[1.45] text-[#64748b]">
                       {currentAttribute.example_value != null
-                        ? `예: ${String(currentAttribute.example_value)}`
+                        ? `예: ${formatAttributeExample(
+                            currentAttribute.example_value,
+                            currentAttribute.data_type,
+                          )}`
                         : "예시값 없음"}
                     </p>
                   </div>

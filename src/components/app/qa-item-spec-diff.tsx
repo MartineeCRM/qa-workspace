@@ -32,8 +32,17 @@ const OBSERVED_TYPE_TO_TAXONOMY_TYPE: Record<string, string> = {
 // spreadsheet — even for boolean/number properties, e.g. is_login's example is
 // the string "true", not the boolean. Stringifying it would just double-quote
 // and escape a value that's already meant to be read as plain text.
-function formatExampleValue(value: unknown): string {
-  return typeof value === "string" ? value : JSON.stringify(value);
+function formatExampleValue(value: unknown, dataType?: string): string {
+  if (Array.isArray(value)) return JSON.stringify(value, null, 2);
+  const text = typeof value === "string" ? value : JSON.stringify(value);
+  if (!dataType?.startsWith("array")) return text;
+  try {
+    const parsed = JSON.parse(text);
+    if (Array.isArray(parsed)) return JSON.stringify(parsed, null, 2);
+  } catch {
+    // Comma-separated taxonomy examples are valid even when they are not JSON.
+  }
+  return text.replace(/,\s*/g, ",\n");
 }
 
 function verdictBadge(verdict: SpecDiffVerdict) {
@@ -370,11 +379,11 @@ export function QaItemSpecDiffTable({
                           정의 없음
                         </code>
                       )}
-                      <p className="mt-1 break-words text-[12.5px] leading-[1.45] text-[#64748b]">
+                      <p className="mt-1 break-words whitespace-pre-wrap text-[12.5px] leading-[1.45] text-[#64748b]">
                         {!row.expectedType
                           ? "스펙에 누락"
                           : row.expectedExample !== null && row.expectedExample !== undefined
-                            ? `예: ${formatExampleValue(row.expectedExample)}`
+                            ? `예: ${formatExampleValue(row.expectedExample, row.expectedType)}`
                             : "예시값 없음 · 택소노미에 추가해주세요"}
                       </p>
                     </div>
