@@ -937,7 +937,6 @@ export function useProjectQaIssues(projectId: string) {
       const { data: items, error: itemsError } = await db
         .from("qa_round_checklist_items")
         .select("id, qa_session_id, target_id")
-        .eq("target_type", "event")
         .in("qa_session_id", [...sessionById.keys()]);
       if (itemsError) throw itemsError;
       const itemById = new Map<string, IssueItemRow>(

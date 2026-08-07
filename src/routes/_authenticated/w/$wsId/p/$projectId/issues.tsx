@@ -203,7 +203,10 @@ function QaIssuesPage() {
               const canSubmit = SUBMITTABLE.has(status);
               const isChecked = checked.has(issue.id);
               const noteOpen = openNotes.has(issue.id);
-              const eventName = eventById.get(issue.event_id)?.technical_name ?? issue.event_id;
+              const eventName =
+                issue.target_type === "custom_attribute"
+                  ? "어트리뷰트"
+                  : (eventById.get(issue.event_id)?.technical_name ?? issue.event_id);
               const environment = environmentById.get(issue.qa_environment_id);
               const channel = issue.qa_channel_id ? channelById.get(issue.qa_channel_id) : null;
               const comments = [...issue.qa_discussion_comments].sort((a, b) =>
