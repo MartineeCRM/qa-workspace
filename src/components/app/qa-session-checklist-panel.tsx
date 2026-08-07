@@ -191,6 +191,12 @@ export function QaSessionChecklistPanel({
       (attribute.display_name ?? "").toLowerCase().includes(q) ||
       (attribute.description ?? "").toLowerCase().includes(q),
   );
+  const uncheckedVisibleCount =
+    taxonomyTab === "events"
+      ? visibleEvents.filter((event) => !itemByKey.get(`event:${event.id}`)?.executed_at).length
+      : visibleAttributes.filter(
+          (attribute) => !itemByKey.get(`custom_attribute:${attribute.id}`)?.executed_at,
+        ).length;
 
   function toggleTarget(targetType: "event" | "custom_attribute", targetId: string) {
     const existing = itemByKey.get(`${targetType}:${targetId}`);
@@ -206,6 +212,29 @@ export function QaSessionChecklistPanel({
       return;
     }
     removeItem.mutate(existing.id);
+  }
+
+  function checkAllVisible() {
+    const eventIds =
+      taxonomyTab === "events"
+        ? visibleEvents
+            .filter((event) => !itemByKey.get(`event:${event.id}`)?.executed_at)
+            .map((event) => event.id)
+        : [];
+    const customAttributeIds =
+      taxonomyTab === "attributes"
+        ? visibleAttributes
+            .filter((attribute) => !itemByKey.get(`custom_attribute:${attribute.id}`)?.executed_at)
+            .map((attribute) => attribute.id)
+        : [];
+    addItems.mutate(
+      { eventIds, customAttributeIds },
+      {
+        onSuccess: () =>
+          toast.success(`${eventIds.length + customAttributeIds.length}개를 체크했어요`),
+        onError: (error) => toast.error(errorMessage(error, "전체 항목을 체크하지 못했어요")),
+      },
+    );
   }
 
   function captureAttribute(attributeId: string) {
@@ -246,7 +275,18 @@ export function QaSessionChecklistPanel({
             <p className="text-[11px] font-bold tracking-[0.12em] text-[#64748b] uppercase">
               택소노미
             </p>
-            <h3 className="mt-1 text-[17px] font-bold">실행한 항목을 체크하세요</h3>
+            <div className="mt-1 flex items-center justify-between gap-3">
+              <h3 className="text-[17px] font-bold">실행한 항목을 체크하세요</h3>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={checkAllVisible}
+                disabled={uncheckedVisibleCount === 0 || addItems.isPending}
+              >
+                <Check className="size-3.5" />
+                {uncheckedVisibleCount === 0 ? "전체 체크됨" : "전체 체크하기"}
+              </Button>
+            </div>
             <p className="mt-1 text-xs leading-5 text-[#7b8798]">
               앱에서 동작한 직후 체크하세요. 프로퍼티는 이벤트를 펼쳐 확인할 수 있어요.
             </p>
