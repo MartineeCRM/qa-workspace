@@ -360,7 +360,6 @@ export function QaItemSpecDiffTable({
                     : "bg-[#fdf3e3] text-[#b45309]",
               )}
             >
-              판정 요약 ·{" "}
               {eventVerdict === "passed" ? "통과" : eventVerdict === "failed" ? "오류" : "미발생"}
             </span>
           </div>

@@ -788,7 +788,7 @@ export function QaItemView({
                                 : "bg-[#fdf3e3] text-[#b45309]",
                         )}
                       >
-                        판정 요약 · {displayedVerdictLabel}
+                        {displayedVerdictLabel}
                       </span>
                     </div>
                     <div className="flex flex-col gap-1">
