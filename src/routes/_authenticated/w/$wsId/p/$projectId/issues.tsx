@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/lib/auth";
 import { errorMessage, formatDateTime } from "@/lib/domain";
-import { createIssueShare } from "@/lib/issue-share.functions";
+import { createProjectIssueShare } from "@/lib/issue-share.functions";
 import {
   useAddDiscussionComment,
   useDeleteQaIssue,
@@ -124,6 +124,25 @@ function QaIssuesPage() {
             </p>
           </div>
           <div className="flex-1" />
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-9 bg-white text-xs"
+            onClick={async () => {
+              try {
+                const share = await createProjectIssueShare({ data: { projectId } });
+                const url = `${window.location.origin}/share/${share.token}`;
+                await navigator.clipboard.writeText(url);
+                window.open(url, "_blank", "noopener,noreferrer");
+                toast.success("고객용 이슈 모아보기 주소를 복사했어요");
+              } catch (error) {
+                toast.error(errorMessage(error));
+              }
+            }}
+          >
+            <Share2 className="mr-1.5 size-3.5" />
+            고객용 이슈 모아보기
+          </Button>
           <div className="flex items-center gap-[18px]">
             {STATUSES.map((status) => {
               const value = count(status);
@@ -392,26 +411,6 @@ function QaIssuesPage() {
                           >
                             검증 근거 보기
                           </Link>
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-8 text-xs"
-                          onClick={async () => {
-                            try {
-                              const share = await createIssueShare({
-                                data: { discussionId: issue.id },
-                              });
-                              const url = `${window.location.origin}/share/${share.token}`;
-                              await navigator.clipboard.writeText(url);
-                              toast.success("고객 공유 링크를 복사했어요 · 30일간 유효해요");
-                            } catch (error) {
-                              toast.error(errorMessage(error));
-                            }
-                          }}
-                        >
-                          <Share2 className="mr-1 size-3" />
-                          고객 공유
                         </Button>
                         <span
                           className="text-[11.5px] font-semibold"

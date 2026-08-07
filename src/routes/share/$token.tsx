@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { createFileRoute, useParams } from "@tanstack/react-router";
-import { MessageSquareText, ShieldCheck } from "lucide-react";
+import { ChevronRight, MessageSquareText, Search, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,178 +8,314 @@ import { Textarea } from "@/components/ui/textarea";
 import { formatDateTime } from "@/lib/domain";
 import {
   commentOnSharedIssue,
-  getSharedIssue,
+  getSharedIssuePortal,
   updateSharedIssue,
 } from "@/lib/issue-share.functions";
+import { cn } from "@/lib/utils";
 
-export const Route = createFileRoute("/share/$token")({
-  ssr: false,
-  component: SharedIssuePage,
-});
+export const Route = createFileRoute("/share/$token")({ ssr: false, component: SharedIssuesPage });
 
 const STATUS = {
-  open: "이슈 있음",
-  talk: "논의중",
-  fixing: "개발 수정 중",
-  done: "해결",
+  open: { label: "이슈 있음", color: "bg-[#fff1f2] text-[#c81e3a]" },
+  talk: { label: "논의중", color: "bg-[#fff7e6] text-[#a85708]" },
+  fixing: { label: "개발 수정 중", color: "bg-[#eaf3ff] text-[#23669b]" },
+  done: { label: "해결", color: "bg-[#eaf8ef] text-[#16803a]" },
 } as const;
+type Status = keyof typeof STATUS;
 
-function SharedIssuePage() {
+function SharedIssuesPage() {
   const { token } = useParams({ from: "/share/$token" });
-  const [issue, setIssue] = useState<any>(undefined);
+  const [portal, setPortal] = useState<any>(undefined);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState<"all" | Status>("all");
   const [authorName, setAuthorName] = useState("");
   const [body, setBody] = useState("");
   const [saving, setSaving] = useState(false);
   const load = useCallback(
     () =>
-      getSharedIssue({ data: { token } })
-        .then(setIssue)
-        .catch(() => setIssue(null)),
+      getSharedIssuePortal({ data: { token } })
+        .then((value) => {
+          setPortal(value);
+          setSelectedId((current) => current ?? value?.issues?.[0]?.id ?? null);
+        })
+        .catch(() => setPortal(null)),
     [token],
   );
   useEffect(() => void load(), [load]);
 
-  if (issue === undefined)
+  const shown = useMemo(
+    () =>
+      (portal?.issues ?? []).filter(
+        (issue: any) =>
+          (filter === "all" || issue.workflowStatus === filter) &&
+          issue.targetLabel.toLowerCase().includes(query.trim().toLowerCase()),
+      ),
+    [portal, filter, query],
+  );
+  const selected = portal?.issues.find((issue: any) => issue.id === selectedId) ?? shown[0] ?? null;
+
+  if (portal === undefined)
     return (
       <div className="grid min-h-screen place-items-center text-sm text-[#64748b]">
         불러오는 중…
       </div>
     );
-  if (issue === null)
+  if (portal === null)
     return (
       <div className="grid min-h-screen place-items-center bg-[#f4f7fa] px-5">
         <div className="text-center">
           <ShieldCheck className="mx-auto size-8 text-[#64748b]" />
-          <h1 className="mt-3 text-lg font-bold">공유 링크를 열 수 없어요</h1>
+          <h1 className="mt-3 text-lg font-bold">공유 페이지를 열 수 없어요</h1>
           <p className="mt-1 text-sm text-[#64748b]">만료되었거나 비활성화된 링크입니다.</p>
         </div>
       </div>
     );
 
   return (
-    <main className="min-h-screen bg-[#f4f7fa] px-4 py-8 text-[#1c2431]">
-      <div className="mx-auto max-w-[920px] space-y-4">
-        <header className="rounded-[14px] border border-[#cbd5e1] bg-white p-5 shadow-sm">
-          <p className="text-xs font-semibold text-[#2b6a9c]">QA Workspace · 공유 이슈</p>
-          <div className="mt-2 flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <h1 className="font-mono text-xl font-bold">{issue.targetLabel}</h1>
-              <p className="mt-1 text-xs text-[#64748b]">
-                {[
-                  issue.projectName,
-                  issue.environmentName,
-                  issue.channelName,
-                  issue.sessionName,
-                  `${issue.roundNumber}차`,
-                ]
-                  .filter(Boolean)
-                  .join(" · ")}
-              </p>
+    <main className="min-h-screen bg-[#eef2f6] text-[#1c2431]">
+      <header className="border-b border-[#cad4df] bg-[#172331] px-5 py-5 text-white">
+        <div className="mx-auto flex max-w-[1320px] items-end justify-between gap-4">
+          <div>
+            <p className="text-[11px] font-semibold tracking-[0.12em] text-[#8fb9dc]">
+              QA WORKSPACE
+            </p>
+            <h1 className="mt-1 text-xl font-bold">{portal.projectName} · 이슈 모아보기</h1>
+            <p className="mt-1 text-xs text-[#aebdcb]">
+              검증 이슈를 확인하고 상태와 댓글을 함께 관리합니다.
+            </p>
+          </div>
+          <p className="text-xs text-[#aebdcb]">전체 {portal.issues.length}건</p>
+        </div>
+      </header>
+
+      <div className="mx-auto grid max-w-[1320px] grid-cols-[390px_minmax(0,1fr)] gap-4 px-4 py-4 max-lg:grid-cols-1">
+        <aside className="overflow-hidden rounded-[14px] border border-[#cbd5e1] bg-white shadow-sm">
+          <div className="border-b border-[#dbe2ea] p-3">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[#7b8998]" />
+              <Input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="이벤트·프로퍼티·어트리뷰트 검색"
+                className="pl-9"
+              />
             </div>
-            <select
-              value={issue.workflowStatus}
-              onChange={async (event) => {
-                const status = event.target.value;
-                setSaving(true);
-                try {
-                  await updateSharedIssue({ data: { token, status } });
-                  setIssue((current: any) => ({ ...current, workflowStatus: status }));
-                  toast.success("상태를 변경했어요");
-                } catch (error) {
-                  toast.error(error instanceof Error ? error.message : "상태 변경에 실패했어요");
-                } finally {
-                  setSaving(false);
-                }
-              }}
-              disabled={saving}
-              className="h-9 rounded-md border border-[#cbd5e1] bg-white px-3 text-sm font-semibold"
-            >
-              {Object.entries(STATUS).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
+            <div className="mt-2 flex flex-wrap gap-1">
+              {(["all", ...Object.keys(STATUS)] as const).map((value) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setFilter(value)}
+                  className={cn(
+                    "rounded-md px-2.5 py-1.5 text-xs font-semibold",
+                    filter === value ? "bg-[#26394d] text-white" : "bg-[#eef2f6] text-[#526173]",
+                  )}
+                >
+                  {value === "all" ? "전체" : STATUS[value].label}
+                </button>
               ))}
-            </select>
+            </div>
           </div>
-        </header>
-
-        <section className="rounded-[14px] border border-[#cbd5e1] bg-white p-5 shadow-sm">
-          <h2 className="text-sm font-bold">판정 및 근거</h2>
-          <p className="mt-3 whitespace-pre-wrap text-[13px] leading-6 text-[#3c4757]">
-            {issue.reasoning || "별도의 판정 설명이 없습니다."}
-          </p>
-          {issue.evidence ? (
-            <details className="mt-3 rounded-lg border border-[#dbe2ea] bg-[#f8fafc]">
-              <summary className="cursor-pointer px-3 py-2 text-xs font-semibold text-[#64748b]">
-                전체 판정 데이터
-              </summary>
-              <pre className="max-h-80 overflow-auto border-t border-[#dbe2ea] p-3 text-[11px] leading-5">
-                {JSON.stringify(issue.evidence, null, 2)}
-              </pre>
-            </details>
-          ) : null}
-          <details className="mt-3 rounded-lg border border-[#202938] bg-[#0d1117] text-[#d7e0ea]">
-            <summary className="cursor-pointer px-3 py-2 text-xs font-semibold">
-              원본 근거 로그 {issue.logs.length}건
-            </summary>
-            <pre className="max-h-[480px] overflow-auto whitespace-pre-wrap break-all border-t border-[#202938] p-3 text-[11px] leading-5">
-              {JSON.stringify(issue.logs, null, 2)}
-            </pre>
-          </details>
-        </section>
-
-        <section className="rounded-[14px] border border-[#cbd5e1] bg-white p-5 shadow-sm">
-          <div className="flex items-center gap-2">
-            <MessageSquareText className="size-4 text-[#2b6a9c]" />
-            <h2 className="text-sm font-bold">댓글</h2>
-          </div>
-          <div className="mt-3 space-y-2">
-            {issue.comments.map((comment: any) => (
-              <article key={comment.id} className="rounded-lg bg-[#f8fafc] px-3 py-2.5">
-                <p className="text-[11px] font-semibold text-[#64748b]">
-                  {comment.author} · {formatDateTime(comment.createdAt)}
-                </p>
-                <p className="mt-1 whitespace-pre-wrap text-[13px] leading-5">{comment.body}</p>
-              </article>
+          <ul className="max-h-[calc(100vh-220px)] overflow-y-auto">
+            {shown.map((issue: any) => (
+              <li key={issue.id}>
+                <button
+                  type="button"
+                  onClick={() => setSelectedId(issue.id)}
+                  className={cn(
+                    "flex w-full items-start gap-3 border-b border-[#e5eaf0] px-4 py-4 text-left transition-colors hover:bg-[#f7f9fb]",
+                    selected?.id === issue.id &&
+                      "border-l-[3px] border-l-[#2b6a9c] bg-[#f0f6fb] pl-[13px]",
+                  )}
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <code className="break-all text-[13px] font-bold">{issue.targetLabel}</code>
+                      <span
+                        className={cn(
+                          "shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold",
+                          STATUS[issue.workflowStatus as Status]?.color,
+                        )}
+                      >
+                        {STATUS[issue.workflowStatus as Status]?.label}
+                      </span>
+                    </div>
+                    <p className="mt-1.5 text-[11px] text-[#6d7b8b]">
+                      {[
+                        issue.environmentName,
+                        issue.channelName,
+                        issue.sessionName,
+                        `${issue.roundNumber}차`,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </p>
+                    <p className="mt-1 text-[11px] text-[#8a97a5]">
+                      댓글 {issue.comments.length}개 · {formatDateTime(issue.updatedAt)}
+                    </p>
+                  </div>
+                  <ChevronRight className="mt-1 size-4 shrink-0 text-[#9aa7b5]" />
+                </button>
+              </li>
             ))}
-          </div>
-          <div className="mt-4 grid gap-2">
-            <Input
-              value={authorName}
-              onChange={(event) => setAuthorName(event.target.value)}
-              placeholder="이름 또는 소속"
-              maxLength={80}
-            />
-            <Textarea
-              value={body}
-              onChange={(event) => setBody(event.target.value)}
-              placeholder="확인 내용이나 질문을 남겨주세요"
-              maxLength={5000}
-            />
-            <Button
-              disabled={saving || !authorName.trim() || !body.trim()}
-              onClick={async () => {
-                setSaving(true);
-                try {
-                  await commentOnSharedIssue({ data: { token, authorName, body } });
-                  setBody("");
-                  await load();
-                  toast.success("댓글을 남겼어요");
-                } catch (error) {
-                  toast.error(error instanceof Error ? error.message : "댓글 저장에 실패했어요");
-                } finally {
-                  setSaving(false);
-                }
-              }}
-            >
-              댓글 남기기
-            </Button>
-          </div>
+            {!shown.length ? (
+              <li className="px-4 py-14 text-center text-xs text-[#7b8998]">
+                조건에 맞는 이슈가 없어요.
+              </li>
+            ) : null}
+          </ul>
+        </aside>
+
+        <section className="min-w-0 space-y-4">
+          {!selected ? (
+            <div className="grid min-h-72 place-items-center rounded-[14px] border border-[#cbd5e1] bg-white text-sm text-[#64748b]">
+              확인할 이슈를 선택하세요.
+            </div>
+          ) : (
+            <>
+              <article className="rounded-[14px] border border-[#cbd5e1] bg-white p-5 shadow-sm">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <code className="break-all text-lg font-bold">{selected.targetLabel}</code>
+                      <span
+                        className={cn(
+                          "rounded-full px-2.5 py-1 text-[11px] font-bold",
+                          STATUS[selected.workflowStatus as Status]?.color,
+                        )}
+                      >
+                        {STATUS[selected.workflowStatus as Status]?.label}
+                      </span>
+                    </div>
+                    <p className="mt-1.5 text-xs text-[#64748b]">
+                      {[
+                        selected.environmentName,
+                        selected.channelName,
+                        selected.sessionName,
+                        `${selected.roundNumber}차`,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </p>
+                  </div>
+                  <select
+                    value={selected.workflowStatus}
+                    disabled={saving}
+                    onChange={async (event) => {
+                      const status = event.target.value;
+                      setSaving(true);
+                      try {
+                        await updateSharedIssue({
+                          data: { token, discussionId: selected.id, status },
+                        });
+                        await load();
+                        toast.success("상태를 변경했어요");
+                      } catch (error) {
+                        toast.error(
+                          error instanceof Error ? error.message : "상태 변경에 실패했어요",
+                        );
+                      } finally {
+                        setSaving(false);
+                      }
+                    }}
+                    className="h-9 rounded-md border border-[#cbd5e1] bg-white px-3 text-sm font-semibold"
+                  >
+                    {Object.entries(STATUS).map(([value, meta]) => (
+                      <option key={value} value={value}>
+                        {meta.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </article>
+
+              <article className="rounded-[14px] border border-[#cbd5e1] bg-white p-5 shadow-sm">
+                <h2 className="text-sm font-bold">판정 및 근거</h2>
+                <p className="mt-3 whitespace-pre-wrap text-[13px] leading-6 text-[#3c4757]">
+                  {selected.reasoning || "별도의 판정 설명이 없습니다."}
+                </p>
+                {selected.evidence ? (
+                  <details className="mt-3 rounded-lg border border-[#dbe2ea] bg-[#f8fafc]">
+                    <summary className="cursor-pointer px-3 py-2 text-xs font-semibold text-[#64748b]">
+                      전체 판정 데이터
+                    </summary>
+                    <pre className="max-h-80 overflow-auto border-t border-[#dbe2ea] p-3 text-[11px] leading-5">
+                      {JSON.stringify(selected.evidence, null, 2)}
+                    </pre>
+                  </details>
+                ) : null}
+                <details className="mt-3 rounded-lg border border-[#202938] bg-[#0d1117] text-[#d7e0ea]">
+                  <summary className="cursor-pointer px-3 py-2 text-xs font-semibold">
+                    원본 근거 로그 {selected.logs.length}건
+                  </summary>
+                  <pre className="max-h-[440px] overflow-auto whitespace-pre-wrap break-all border-t border-[#202938] p-3 text-[11px] leading-5">
+                    {JSON.stringify(selected.logs, null, 2)}
+                  </pre>
+                </details>
+              </article>
+
+              <article className="rounded-[14px] border border-[#cbd5e1] bg-white p-5 shadow-sm">
+                <div className="flex items-center gap-2">
+                  <MessageSquareText className="size-4 text-[#2b6a9c]" />
+                  <h2 className="text-sm font-bold">댓글</h2>
+                </div>
+                <div className="mt-3 space-y-2">
+                  {selected.comments.map((comment: any) => (
+                    <div key={comment.id} className="rounded-lg bg-[#f5f7fa] px-3 py-2.5">
+                      <p className="text-[11px] font-semibold text-[#64748b]">
+                        {comment.author} · {formatDateTime(comment.createdAt)}
+                      </p>
+                      <p className="mt-1 whitespace-pre-wrap text-[13px] leading-5">
+                        {comment.body}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-4 grid gap-2">
+                  <Input
+                    value={authorName}
+                    onChange={(event) => setAuthorName(event.target.value)}
+                    placeholder="이름 또는 소속"
+                    maxLength={80}
+                  />
+                  <Textarea
+                    value={body}
+                    onChange={(event) => setBody(event.target.value)}
+                    placeholder="확인 내용이나 질문을 남겨주세요"
+                    maxLength={5000}
+                  />
+                  <Button
+                    disabled={saving || !authorName.trim() || !body.trim()}
+                    onClick={async () => {
+                      setSaving(true);
+                      try {
+                        await commentOnSharedIssue({
+                          data: { token, discussionId: selected.id, authorName, body },
+                        });
+                        setBody("");
+                        await load();
+                        toast.success("댓글을 남겼어요");
+                      } catch (error) {
+                        toast.error(
+                          error instanceof Error ? error.message : "댓글 저장에 실패했어요",
+                        );
+                      } finally {
+                        setSaving(false);
+                      }
+                    }}
+                  >
+                    댓글 남기기
+                  </Button>
+                </div>
+              </article>
+            </>
+          )}
         </section>
-        <p className="text-center text-[11px] text-[#8b97a8]">
-          링크 만료 {formatDateTime(issue.expiresAt)}
-        </p>
       </div>
+      <p className="pb-5 text-center text-[11px] text-[#7b8998]">
+        공유 페이지 만료 {formatDateTime(portal.expiresAt)}
+      </p>
     </main>
   );
 }
