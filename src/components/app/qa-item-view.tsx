@@ -43,6 +43,7 @@ import {
 } from "@/lib/qa-rounds-queries";
 import {
   useRules,
+  useProject,
   useTaxonomyCustomAttributes,
   useTaxonomyEventProperties,
   useTaxonomyEvents,
@@ -145,6 +146,7 @@ export function QaItemView({
   item: QaChecklistItemWithDisposition;
   result: QaChecklistItemResult | undefined;
 }) {
+  const { data: project } = useProject(projectId);
   const navigate = useNavigate();
   const { user } = useAuth();
   const { data: events = [] } = useTaxonomyEvents(projectId);
@@ -1063,7 +1065,7 @@ export function QaItemView({
                                 >
                                   {comment.external_author_name ? (
                                     <span className="mr-1.5 rounded bg-[#ccece5] px-1.5 py-0.5 text-[10px] font-bold">
-                                      고객사
+                                      {project?.name ?? "고객사"}
                                     </span>
                                   ) : null}
                                   {comment.external_author_name ??

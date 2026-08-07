@@ -20,7 +20,7 @@ import {
   useUpdateQaIssue,
   type ProjectQaIssue,
 } from "@/lib/qa-rounds-queries";
-import { useEnvironments, useMembers, useTaxonomyEvents } from "@/lib/queries";
+import { useEnvironments, useMembers, useProject, useTaxonomyEvents } from "@/lib/queries";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/w/$wsId/p/$projectId/issues")({
@@ -43,6 +43,7 @@ function QaIssuesPage() {
   const { wsId, projectId } = useParams({ from: "/_authenticated/w/$wsId/p/$projectId/issues" });
   const { user } = useAuth();
   const { data: issues = [] } = useProjectQaIssues(projectId);
+  const { data: project } = useProject(projectId);
   const { data: events = [] } = useTaxonomyEvents(projectId);
   const { data: environments = [] } = useEnvironments(projectId);
   const { data: channels = [] } = useQaChannels(projectId);
@@ -310,7 +311,7 @@ function QaIssuesPage() {
                                   >
                                     {external ? (
                                       <span className="mr-1.5 rounded bg-[#ccece5] px-1.5 py-0.5 text-[10px] font-bold">
-                                        고객사
+                                        {project?.name ?? "고객사"}
                                       </span>
                                     ) : null}
                                     {comment.external_author_name ??

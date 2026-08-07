@@ -387,7 +387,7 @@ function SharedIssuesPage() {
                       >
                         {comment.external ? (
                           <span className="mr-1.5 rounded bg-[#ccece5] px-1.5 py-0.5 text-[10px] font-bold">
-                            고객사
+                            {portal.projectName}
                           </span>
                         ) : null}
                         {comment.author} · {formatDateTime(comment.createdAt)}
