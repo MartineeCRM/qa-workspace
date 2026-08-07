@@ -417,6 +417,41 @@ describe("buildMergedTimeline", () => {
       "snapshot:sn2:cart_item_count",
     ]);
   });
+
+  it("does not diff snapshots belonging to different external users", () => {
+    const rows = buildMergedTimeline(
+      [],
+      [
+        {
+          ...snapshots[0],
+          id: "user-a-1",
+          external_user_id: "user-a",
+          payload: { search_history: ["수영복"] },
+          captured_at: "2026-08-07T08:00:00Z",
+        },
+        {
+          ...snapshots[0],
+          id: "user-b-1",
+          external_user_id: "user-b",
+          payload: { search_history: ["정샘물"] },
+          captured_at: "2026-08-07T09:00:00Z",
+        },
+        {
+          ...snapshots[0],
+          id: "user-a-2",
+          external_user_id: "user-a",
+          payload: { search_history: ["수영복", "롱샴"] },
+          captured_at: "2026-08-07T10:00:00Z",
+        },
+      ],
+    );
+
+    expect(rows.map((row) => row.change)).toEqual([
+      '— → ["수영복"]',
+      '— → ["정샘물"]',
+      '["수영복"] → ["수영복","롱샴"]',
+    ]);
+  });
 });
 
 describe("checklist item navigation", () => {

@@ -256,9 +256,9 @@ export function buildMergedTimeline(
     .sort((a, b) => (a.captured_at ?? "").localeCompare(b.captured_at ?? ""));
 
   const snapshotRows: MergedTimelineRow[] = [];
-  capturedSnapshots.forEach((snapshot, index) => {
-    const previous = capturedSnapshots[index - 1];
-    const prevPayload = previous?.payload ?? {};
+  const previousPayloadByUser = new Map<string, Record<string, unknown>>();
+  capturedSnapshots.forEach((snapshot) => {
+    const prevPayload = previousPayloadByUser.get(snapshot.external_user_id) ?? {};
     const payload = snapshot.payload ?? {};
     const keys = new Set([...Object.keys(prevPayload), ...Object.keys(payload)]);
     for (const key of keys) {
@@ -273,6 +273,7 @@ export function buildMergedTimeline(
         change: `${formatValue(before)} → ${formatValue(after)}`,
       });
     }
+    previousPayloadByUser.set(snapshot.external_user_id, payload);
   });
 
   return [...snapshotRows, ...eventRows].sort(
