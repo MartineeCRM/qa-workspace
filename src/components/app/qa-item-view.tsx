@@ -485,27 +485,6 @@ export function QaItemView({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {item.target_type === "event" ? (
-            <button
-              type="button"
-              onClick={() => {
-                if (!result) return toast.error("분석 결과가 있어야 이슈로 등록할 수 있어요");
-                createIssue.mutate(
-                  { type: "event", id: item.target_id, label: "이벤트 전체" },
-                  {
-                    onSuccess: (issue) => {
-                      setSelectedIssueId(issue.id);
-                      setCommentBody("");
-                      toast.success(`${label} 이벤트 전체 이슈를 추가했어요`);
-                    },
-                  },
-                );
-              }}
-              className="h-9 rounded-md border border-[#f0dfc0] bg-[#fdf9f1] px-3 text-sm font-semibold text-[#b45309] hover:border-[#d9bd8d]"
-            >
-              이벤트 이슈 있음
-            </button>
-          ) : null}
           <select
             aria-label="판정 결과 항목 선택"
             value={item.id}
@@ -689,6 +668,11 @@ export function QaItemView({
             <QaItemSpecDiffTable
               projectId={projectId}
               eventId={item.target_id}
+              eventName={label ?? item.target_id}
+              eventDescription={
+                events.find((event) => event.id === item.target_id)?.description ?? null
+              }
+              eventVerdict={finalStatus}
               properties={thisEventProperties}
               rawPropertiesList={matchedRawPropertiesList}
               aiFailedPropertyIds={aiFailedPropertyIds}
@@ -710,6 +694,25 @@ export function QaItemView({
                   },
                 );
               }}
+              onCreateEventIssue={() => {
+                if (!result) return toast.error("분석 결과가 있어야 이슈로 등록할 수 있어요");
+                createIssue.mutate(
+                  { type: "event", id: item.target_id, label: "이벤트 전체" },
+                  {
+                    onSuccess: (issue) => {
+                      setSelectedIssueId(issue.id);
+                      setCommentBody("");
+                      toast.success(`${label} 이벤트 전체 이슈를 추가했어요`);
+                    },
+                  },
+                );
+              }}
+              onEditEvent={() =>
+                navigate({
+                  to: "/w/$wsId/p/$projectId/taxonomy",
+                  params: (prev) => ({ wsId: prev.wsId, projectId: prev.projectId }),
+                })
+              }
               onEditProperty={(propertyId) => {
                 const property = eventProperties.find((candidate) => candidate.id === propertyId);
                 if (property) {
@@ -720,105 +723,125 @@ export function QaItemView({
           ) : currentAttribute ? (
             <Panel title="스펙 대조" description="스냅샷 수신 값과 어트리뷰트 정의를 비교해요.">
               <div className="overflow-x-auto">
-                <div className="grid min-w-[760px] grid-cols-[minmax(140px,1fr)_minmax(150px,1fr)_minmax(160px,1.1fr)_minmax(68px,0.5fr)_minmax(125px,0.65fr)] gap-4 bg-[#fbfcfd] px-4 py-2.5 text-[11.5px] font-semibold tracking-wide text-[#64748b]">
-                  <div>어트리뷰트</div>
-                  <div>AS-IS · 실제 수신</div>
-                  <div>TO-BE · 택소노미 정의</div>
-                  <div className="text-center">판정</div>
-                  <div>확인 및 처리</div>
-                </div>
-                <div className="grid min-w-[760px] grid-cols-[minmax(140px,1fr)_minmax(150px,1fr)_minmax(160px,1.1fr)_minmax(68px,0.5fr)_minmax(125px,0.65fr)] items-start gap-4 border-t border-[#f4f6f9] px-4 py-3">
-                  <code className="mono-token break-all text-[12.5px]">
-                    {currentAttribute.technical_name}
-                  </code>
-                  <div className="min-w-0">
-                    <code className="rounded-md bg-[#f1f4f8] px-1.5 py-0.5 font-mono text-[12.5px] text-[#64748b]">
-                      {latestAttributeValue === null
-                        ? "null"
-                        : Array.isArray(latestAttributeValue)
-                          ? "array"
-                          : typeof latestAttributeValue}
-                    </code>
-                    <p
-                      className={cn(
-                        "mt-1 break-words whitespace-pre-wrap text-[12.5px] leading-[1.45]",
-                        finalStatus === "failed" ? "font-bold text-[#dc2626]" : "text-[#64748b]",
-                      )}
-                    >
-                      {latestAttributeValue === undefined
-                        ? "수신 값 없음"
-                        : `수신 값: ${JSON.stringify(
-                            latestAttributeValue,
-                            null,
-                            Array.isArray(latestAttributeValue) ? 2 : undefined,
-                          )}`}
-                    </p>
-                  </div>
-                  <div className="min-w-0">
-                    <code className="rounded-md bg-[#f1f4f8] px-1.5 py-0.5 font-mono text-[12.5px] text-[#64748b]">
-                      {currentAttribute.data_type}
-                    </code>
-                    <p className="mt-1 break-words whitespace-pre-wrap text-[12.5px] leading-[1.45] text-[#64748b]">
-                      {currentAttribute.example_value != null
-                        ? `예: ${formatAttributeExample(
-                            currentAttribute.example_value,
-                            currentAttribute.data_type,
-                          )}`
-                        : "예시값 없음"}
-                    </p>
-                  </div>
-                  <div className="flex justify-center">
-                    <span
-                      className={cn(
-                        "inline-block whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold",
-                        attributeAiPending
-                          ? "bg-[#e8f1f8] text-[#2b6a9c]"
-                          : finalStatus === "passed"
-                            ? "bg-[#e8f5ec] text-[#16a34a]"
-                            : finalStatus === "failed"
-                              ? "bg-[#fdecec] text-[#dc2626]"
-                              : "bg-[#fdf3e3] text-[#b45309]",
-                      )}
-                    >
-                      {displayedVerdictLabel}
+                <div className="border-b border-[#cbd5e1] bg-[#f2f7fb] px-4 py-4">
+                  <div className="mb-2 flex items-center gap-2">
+                    <span className="rounded-md bg-[#26394d] px-2 py-1 text-[10.5px] font-bold text-white">
+                      상위 검증 대상 · 어트리뷰트
                     </span>
+                    <span className="h-px flex-1 bg-[#c9d8e5]" />
                   </div>
-                  <div className="flex flex-col gap-1">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (!result)
-                          return toast.error("분석 결과가 있어야 이슈로 등록할 수 있어요");
-                        createIssue.mutate(
-                          {
-                            type: "custom_attribute",
-                            id: currentAttribute.id,
-                            label: currentAttribute.technical_name,
-                          },
-                          {
-                            onSuccess: (issue) => {
-                              setSelectedIssueId(issue.id);
-                              setCommentBody("");
-                              toast.success(`${currentAttribute.technical_name} 이슈를 추가했어요`);
+                  <div className="grid min-w-[760px] grid-cols-[minmax(140px,1fr)_minmax(150px,1fr)_minmax(160px,1.1fr)_minmax(68px,0.5fr)_minmax(125px,0.65fr)] items-start gap-4 rounded-[10px] border border-[#b9cddd] bg-white px-4 py-3 shadow-sm">
+                    <div>
+                      <code className="mono-token break-all text-[13px] font-bold text-[#1f4f73]">
+                        {currentAttribute.technical_name}
+                      </code>
+                      <p className="mt-1 text-[11px] font-semibold text-[#6a7e90]">
+                        어트리뷰트 전체
+                      </p>
+                    </div>
+                    <div>AS-IS · 실제 수신</div>
+                    <div>TO-BE · 택소노미 정의</div>
+                    <div className="text-center">판정</div>
+                    <div>확인 및 처리</div>
+                  </div>
+                  <div className="grid min-w-[760px] grid-cols-[minmax(140px,1fr)_minmax(150px,1fr)_minmax(160px,1.1fr)_minmax(68px,0.5fr)_minmax(125px,0.65fr)] items-start gap-4 rounded-b-[10px] border-x border-b border-[#b9cddd] bg-white px-4 py-3">
+                    <span />
+                    <div className="min-w-0">
+                      <code className="rounded-md bg-[#f1f4f8] px-1.5 py-0.5 font-mono text-[12.5px] text-[#64748b]">
+                        {latestAttributeValue === null
+                          ? "null"
+                          : Array.isArray(latestAttributeValue)
+                            ? "array"
+                            : typeof latestAttributeValue}
+                      </code>
+                      <p
+                        className={cn(
+                          "mt-1 break-words whitespace-pre-wrap text-[12.5px] leading-[1.45]",
+                          finalStatus === "failed" ? "font-bold text-[#dc2626]" : "text-[#64748b]",
+                        )}
+                      >
+                        {latestAttributeValue === undefined
+                          ? "수신 값 없음"
+                          : `수신 값: ${JSON.stringify(
+                              latestAttributeValue,
+                              null,
+                              Array.isArray(latestAttributeValue) ? 2 : undefined,
+                            )}`}
+                      </p>
+                    </div>
+                    <div className="min-w-0">
+                      <code className="rounded-md bg-[#f1f4f8] px-1.5 py-0.5 font-mono text-[12.5px] text-[#64748b]">
+                        {currentAttribute.data_type}
+                      </code>
+                      <p className="mt-1 break-words whitespace-pre-wrap text-[12.5px] leading-[1.45] text-[#64748b]">
+                        {currentAttribute.example_value != null
+                          ? `예: ${formatAttributeExample(
+                              currentAttribute.example_value,
+                              currentAttribute.data_type,
+                            )}`
+                          : "예시값 없음"}
+                      </p>
+                    </div>
+                    <div className="flex justify-center">
+                      <span
+                        className={cn(
+                          "inline-block whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold",
+                          attributeAiPending
+                            ? "bg-[#e8f1f8] text-[#2b6a9c]"
+                            : finalStatus === "passed"
+                              ? "bg-[#e8f5ec] text-[#16a34a]"
+                              : finalStatus === "failed"
+                                ? "bg-[#fdecec] text-[#dc2626]"
+                                : "bg-[#fdf3e3] text-[#b45309]",
+                        )}
+                      >
+                        판정 요약 · {displayedVerdictLabel}
+                      </span>
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!result)
+                            return toast.error("분석 결과가 있어야 이슈로 등록할 수 있어요");
+                          createIssue.mutate(
+                            {
+                              type: "custom_attribute",
+                              id: currentAttribute.id,
+                              label: currentAttribute.technical_name,
                             },
-                          },
-                        );
-                      }}
-                      className="rounded-md border border-[#f0dfc0] bg-[#fdf9f1] px-2 py-1 text-left text-[11.5px] font-semibold leading-tight text-[#b45309]"
-                    >
-                      이슈 있음
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setTaxonomyDialog({ attribute: currentAttribute, eventId: null })
-                      }
-                      className="rounded-md border border-[#e3e8ef] px-2 py-1 text-left text-[11.5px] leading-tight text-[#64748b] hover:border-[#2b6a9c] hover:text-[#2b6a9c]"
-                    >
-                      택소노미에서 수정
-                    </button>
+                            {
+                              onSuccess: (issue) => {
+                                setSelectedIssueId(issue.id);
+                                setCommentBody("");
+                                toast.success(
+                                  `${currentAttribute.technical_name} 이슈를 추가했어요`,
+                                );
+                              },
+                            },
+                          );
+                        }}
+                        className="rounded-md border border-[#f0dfc0] bg-[#fdf9f1] px-2 py-1 text-left text-[11.5px] font-semibold leading-tight text-[#b45309]"
+                      >
+                        이슈 있음
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setTaxonomyDialog({ attribute: currentAttribute, eventId: null })
+                        }
+                        className="rounded-md border border-[#e3e8ef] px-2 py-1 text-left text-[11.5px] leading-tight text-[#64748b] hover:border-[#2b6a9c] hover:text-[#2b6a9c]"
+                      >
+                        택소노미에서 수정
+                      </button>
+                    </div>
                   </div>
                 </div>
+                {currentAttribute.data_type === "array of object" ? (
+                  <div className="border-b border-[#e3e9ef] bg-[#f8fafc] px-4 py-2 text-[11px] font-bold text-[#657789]">
+                    하위 필드 · Array of Object
+                  </div>
+                ) : null}
               </div>
             </Panel>
           ) : null}
