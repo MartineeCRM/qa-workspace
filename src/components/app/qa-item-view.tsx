@@ -741,7 +741,7 @@ export function QaItemView({
               <div className="overflow-x-auto">
                 <div className="border-b border-[#dbe2ea] bg-white">
                   <SpecHierarchyLabel>상위 검증 대상 · 어트리뷰트</SpecHierarchyLabel>
-                  <div className="grid min-w-[760px] grid-cols-[minmax(140px,1fr)_minmax(150px,1fr)_minmax(160px,1.1fr)_minmax(68px,0.5fr)_minmax(125px,0.65fr)] items-start gap-4 border-l-[3px] border-l-[#6f9aba] bg-[#f7fafc] py-3 pr-4 pl-[13px]">
+                  <div className="grid min-w-[760px] grid-cols-[minmax(140px,1fr)_minmax(150px,1fr)_minmax(160px,1.1fr)_minmax(68px,0.5fr)_minmax(125px,0.65fr)] items-center gap-4 border-l-[3px] border-l-[#6f9aba] bg-[#f7fafc] py-3 pr-4 pl-[13px]">
                     <div className="self-center">
                       <code className="mono-token break-all text-[13px] font-bold text-[#334155]">
                         {currentAttribute.technical_name}
