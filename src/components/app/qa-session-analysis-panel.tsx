@@ -4,7 +4,11 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { errorMessage, formatMergedTimelineTime } from "@/lib/domain";
 import { parseRunEventsCsv } from "@/lib/run-events-csv";
-import { buildMergedTimeline, unexpectedSnapshotAttributeIds } from "@/lib/qa-workflow";
+import {
+  buildMergedTimeline,
+  snapshotsForRunUsers,
+  unexpectedSnapshotAttributeIds,
+} from "@/lib/qa-workflow";
 import {
   useAddChecklistItems,
   useQaAttributeSnapshots,
@@ -40,6 +44,7 @@ export function QaSessionAnalysisPanel({
   const { data: attributes = [] } = useTaxonomyCustomAttributes(projectId);
   const { data: runEvents = [] } = useQaRunEvents(session.id);
   const { data: snapshots = [] } = useQaAttributeSnapshots(session.id);
+  const sessionSnapshots = snapshotsForRunUsers(runEvents, snapshots);
   const { data: items = [] } = useQaChecklistItems(session.id);
   const uploadLog = useUploadRunEventsLog(session.id);
   const resetRunEvents = useResetQaRunEvents(session.id);
@@ -64,12 +69,12 @@ export function QaSessionAnalysisPanel({
     ? executedEventItems.filter((item) => !collectedEventIds.has(item.target_id))
     : [];
   const capturedAttributeNames = new Set(
-    snapshots
+    sessionSnapshots
       .filter((snapshot) => snapshot.status === "captured")
       .flatMap((snapshot) => Object.keys(snapshot.payload ?? {})),
   );
   const missingAttributeItems =
-    snapshots.length > 0
+    sessionSnapshots.length > 0
       ? executedAttributeItems.filter((item) => {
           const attribute = attributes.find((candidate) => candidate.id === item.target_id);
           return !attribute || !capturedAttributeNames.has(attribute.technical_name);
@@ -92,14 +97,14 @@ export function QaSessionAnalysisPanel({
   );
   const unexpectedEvents = unexpectedEventIds.map((eventId) => eventName(eventId));
   const unexpectedAttributes = unexpectedSnapshotAttributeIds({
-    snapshots,
+    snapshots: sessionSnapshots,
     attributes,
     checklistItems: items,
   }).flatMap((attributeId) => {
     const attribute = attributes.find((candidate) => candidate.id === attributeId);
     return attribute ? [attribute] : [];
   });
-  const rows = buildMergedTimeline(runEvents, snapshots);
+  const rows = buildMergedTimeline(runEvents, sessionSnapshots);
 
   function eventName(eventId: string) {
     return events.find((event) => event.id === eventId)?.technical_name ?? eventId;
@@ -325,8 +330,8 @@ export function QaSessionAnalysisPanel({
             </p>
             <h3 className="mt-1 text-[17px] font-bold">수집 데이터 미리보기</h3>
             <p className="mt-1 text-xs text-[#7b8798]">
-              이벤트 {runEvents.length}행 · 어트리뷰트 스냅샷 {snapshots.length}개 · 검증 대상{" "}
-              {items.length}개
+              이벤트 {runEvents.length}행 · 어트리뷰트 스냅샷 {sessionSnapshots.length}개 · 검증
+              대상 {items.length}개
             </p>
           </div>
           {analyzing ? (

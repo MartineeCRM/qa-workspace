@@ -70,6 +70,23 @@ export type MergedTimelineRow = {
   raw?: Record<string, unknown>;
 };
 
+/**
+ * Once a CSV has been uploaded, its external users define the evidence boundary
+ * for the session. A snapshot captured with an ID left over from another session
+ * must never participate in this session's timeline or judgment.
+ */
+export function snapshotsForRunUsers<T extends { external_user_id: string }>(
+  runEvents: Array<{ external_user_id: string }>,
+  snapshots: T[],
+): T[] {
+  if (runEvents.length === 0) return snapshots;
+  const runUserIds = new Set(
+    runEvents.map((event) => event.external_user_id.trim()).filter(Boolean),
+  );
+  if (runUserIds.size === 0) return snapshots;
+  return snapshots.filter((snapshot) => runUserIds.has(snapshot.external_user_id.trim()));
+}
+
 type RuleEvidenceTarget = {
   targetType: "event" | "custom_attribute";
   targetId: string;
@@ -251,7 +268,7 @@ export function buildMergedTimeline(
     raw: e.raw_properties,
   }));
 
-  const capturedSnapshots = [...snapshots]
+  const capturedSnapshots = snapshotsForRunUsers(runEvents, snapshots)
     .filter((s) => s.status === "captured" && s.captured_at)
     .sort((a, b) => (a.captured_at ?? "").localeCompare(b.captured_at ?? ""));
 

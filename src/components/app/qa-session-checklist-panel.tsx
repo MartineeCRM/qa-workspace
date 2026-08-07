@@ -16,6 +16,7 @@ import {
   useQaAttributeSnapshots,
   useQaChannelExclusions,
   useQaChecklistItems,
+  useQaRunEvents,
   useQaRounds,
   useRemoveChecklistItem,
   type QaSession,
@@ -57,6 +58,7 @@ export function QaSessionChecklistPanel({
   );
   const { data: items = [] } = useQaChecklistItems(session.id);
   const { data: snapshots = [] } = useQaAttributeSnapshots(session.id);
+  const { data: runEvents = [] } = useQaRunEvents(session.id);
   const { data: rounds = [] } = useQaRounds(environmentId);
   const round = rounds.find((candidate) => candidate.id === session.qa_round_id);
   const { data: pendingCarryOver = [] } = usePendingCarryOverItems(
@@ -76,6 +78,13 @@ export function QaSessionChecklistPanel({
   const [aiSuggestions, setAiSuggestions] = useState<SuggestedAttribute[]>([]);
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
   const requestedEvents = useRef(new Set<string>());
+
+  useEffect(() => {
+    setBrazeId("");
+    setAiSuggestions([]);
+    setDismissed(new Set());
+    requestedEvents.current.clear();
+  }, [session.id]);
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 1_000);
@@ -242,6 +251,13 @@ export function QaSessionChecklistPanel({
     if (!attribute) return;
     if (!brazeId.trim()) {
       toast.error("스냅샷을 촬영할 Braze ID를 먼저 입력해주세요");
+      return;
+    }
+    const csvUserIds = new Set(
+      runEvents.map((event) => event.external_user_id.trim()).filter(Boolean),
+    );
+    if (csvUserIds.size > 0 && !csvUserIds.has(brazeId.trim())) {
+      toast.error("현재 세션 CSV에 없는 사용자 ID예요. 다른 세션의 ID인지 확인해주세요.");
       return;
     }
     capture.mutate(

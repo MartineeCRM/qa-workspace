@@ -1,7 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { Check } from "lucide-react";
 import { toast } from "sonner";
-import { deriveSessionStep, hasCurrentChecklistResult } from "@/lib/qa-workflow";
+import {
+  deriveSessionStep,
+  hasCurrentChecklistResult,
+  snapshotsForRunUsers,
+} from "@/lib/qa-workflow";
 import { errorMessage } from "@/lib/domain";
 import {
   useAnalyzeChecklist,
@@ -141,7 +145,10 @@ export function QaSessionView({
         customAttributes: freshAttributesResult.data ?? customAttributes,
         rules: freshRulesResult.data ?? rules,
         runEvents: freshRunEventsResult.data ?? runEvents,
-        snapshots: freshSnapshotsResult.data ?? snapshots,
+        snapshots: snapshotsForRunUsers(
+          freshRunEventsResult.data ?? runEvents,
+          freshSnapshotsResult.data ?? snapshots,
+        ),
         onProgress: (completed, total) => setAnalysisProgress({ completed, total }),
         shouldCancel: () => cancelAnalysisRef.current,
       });

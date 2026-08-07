@@ -21,6 +21,7 @@ import {
   nextChecklistItemId,
   previousChecklistItemId,
   relatedRuleEvidenceTargets,
+  snapshotsForRunUsers,
   resolveEvidenceHighlightTone,
   type MergedTimelineRow,
 } from "@/lib/qa-workflow";
@@ -260,7 +261,10 @@ export function QaItemView({
     return `${label}.${discussion.target_label}`;
   }
 
-  const normalizedSnapshots = normalizeFlatAttributeArrays(snapshots, customAttributes);
+  const normalizedSnapshots = normalizeFlatAttributeArrays(
+    snapshotsForRunUsers(runEvents, snapshots),
+    customAttributes,
+  );
   const timeline = buildMergedTimeline(runEvents, normalizedSnapshots);
   const latestAttributeValue = currentAttribute
     ? [...normalizedSnapshots]

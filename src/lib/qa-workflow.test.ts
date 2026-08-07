@@ -4,6 +4,7 @@ import {
   deriveSessionStep,
   deriveSessionStepFromRow,
   buildMergedTimeline,
+  snapshotsForRunUsers,
   nextChecklistItemId,
   previousChecklistItemId,
   checklistCoverageIssues,
@@ -451,6 +452,22 @@ describe("buildMergedTimeline", () => {
       '— → ["정샘물"]',
       '["수영복"] → ["수영복","롱샴"]',
     ]);
+  });
+
+  it("excludes snapshots captured for users absent from the session CSV", () => {
+    const wrongUserSnapshot = {
+      ...snapshots[0],
+      id: "wrong-user",
+      external_user_id: "other-session-user",
+      payload: { search_history: ["수영복"] },
+    };
+
+    expect(snapshotsForRunUsers(runEvents, [wrongUserSnapshot, snapshots[0]])).toEqual([
+      snapshots[0],
+    ]);
+    expect(
+      buildMergedTimeline(runEvents, [wrongUserSnapshot, snapshots[0]]).map((row) => row.key),
+    ).not.toContain("snapshot:wrong-user:search_history");
   });
 });
 
