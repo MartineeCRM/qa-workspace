@@ -694,7 +694,7 @@ export type QaDiscussion = {
   status: "open" | "resolved";
   created_by: string;
   created_at: string;
-  target_type: "event" | "property";
+  target_type: "event" | "property" | "custom_attribute";
   target_id: string;
   target_label: string;
   workflow_status: "open" | "talk" | "fixing" | "done" | "dismissed" | "verified";
@@ -721,7 +721,11 @@ export function useQaDiscussions(resultId: string) {
 export function useCreateQaIssue(resultId: string, userId: string | undefined) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (target: { type: "event" | "property"; id: string; label: string }) => {
+    mutationFn: async (target: {
+      type: "event" | "property" | "custom_attribute";
+      id: string;
+      label: string;
+    }) => {
       if (!userId) throw new Error("로그인이 필요해요");
       const { error } = await db.from("qa_discussions").upsert(
         {

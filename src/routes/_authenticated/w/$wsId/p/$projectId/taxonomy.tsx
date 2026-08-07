@@ -16,8 +16,11 @@ import { useWorkspaceContext } from "@/lib/workspace-context";
 import { canEdit } from "@/lib/domain";
 
 export const Route = createFileRoute("/_authenticated/w/$wsId/p/$projectId/taxonomy")({
-  validateSearch: (search: Record<string, unknown>): { propertyId?: string } => ({
+  validateSearch: (
+    search: Record<string, unknown>,
+  ): { propertyId?: string; attributeId?: string } => ({
     propertyId: typeof search.propertyId === "string" ? search.propertyId : undefined,
+    attributeId: typeof search.attributeId === "string" ? search.attributeId : undefined,
   }),
   head: () => ({
     meta: [
@@ -39,7 +42,7 @@ export const Route = createFileRoute("/_authenticated/w/$wsId/p/$projectId/taxon
 
 function TaxonomyPage() {
   const { projectId } = useParams({ from: "/_authenticated/w/$wsId/p/$projectId/taxonomy" });
-  const { propertyId } = Route.useSearch();
+  const { propertyId, attributeId } = Route.useSearch();
   const { role } = useWorkspaceContext();
   const editable = canEdit(role);
   const [view, setView] = useState<"structure" | "rules">("structure");
@@ -89,6 +92,7 @@ function TaxonomyPage() {
           customAttributeProperties={customAttributeProperties}
           editable={editable}
           openPropertyId={propertyId}
+          openAttributeId={attributeId}
         />
       ) : (
         <RulesTab

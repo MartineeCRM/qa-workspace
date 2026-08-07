@@ -175,6 +175,10 @@ export function QaItemView({
     item.target_type === "event"
       ? events.find((e) => e.id === item.target_id)?.technical_name
       : customAttributes.find((a) => a.id === item.target_id)?.technical_name;
+  const currentAttribute =
+    item.target_type === "custom_attribute"
+      ? customAttributes.find((attribute) => attribute.id === item.target_id)
+      : undefined;
   const finalStatus = result?.final_status ?? "not_collected";
   const verdictStyle = VERDICT_STYLE[finalStatus];
   const verdictLabel =
@@ -182,8 +186,26 @@ export function QaItemView({
   const selectedIssue =
     discussions.find((discussion) => discussion.id === selectedIssueId) ?? discussions[0] ?? null;
 
+  function discussionDisplayLabel(discussion: (typeof discussions)[number]) {
+    return discussion.target_type === "custom_attribute"
+      ? discussion.target_label
+      : `${label}.${discussion.target_label}`;
+  }
+
   const normalizedSnapshots = normalizeFlatAttributeArrays(snapshots, customAttributes);
   const timeline = buildMergedTimeline(runEvents, normalizedSnapshots);
+  const latestAttributeValue = currentAttribute
+    ? [...normalizedSnapshots]
+        .filter(
+          (snapshot) =>
+            snapshot.status === "captured" &&
+            snapshot.captured_at &&
+            currentAttribute.technical_name in (snapshot.payload ?? {}),
+        )
+        .sort((a, b) => (b.captured_at ?? "").localeCompare(a.captured_at ?? ""))[0]?.payload?.[
+        currentAttribute.technical_name
+      ]
+    : undefined;
   const evidenceTargets = relatedRuleEvidenceTargets({
     itemTargetType: item.target_type,
     itemTargetId: item.target_id,
@@ -630,6 +652,101 @@ export function QaItemView({
                 );
               }}
             />
+          ) : currentAttribute ? (
+            <Panel title="스펙 대조" description="스냅샷 수신 값과 어트리뷰트 정의를 비교해요.">
+              <div className="overflow-x-auto">
+                <div className="grid min-w-[760px] grid-cols-[minmax(140px,1fr)_minmax(150px,1fr)_minmax(160px,1.1fr)_minmax(68px,0.5fr)_minmax(125px,0.65fr)] gap-4 bg-[#fbfcfd] px-4 py-2.5 text-[11.5px] font-semibold tracking-wide text-[#64748b]">
+                  <div>어트리뷰트</div>
+                  <div>AS-IS · 실제 수신</div>
+                  <div>TO-BE · 택소노미 정의</div>
+                  <div className="text-center">판정</div>
+                  <div>확인 및 처리</div>
+                </div>
+                <div className="grid min-w-[760px] grid-cols-[minmax(140px,1fr)_minmax(150px,1fr)_minmax(160px,1.1fr)_minmax(68px,0.5fr)_minmax(125px,0.65fr)] items-start gap-4 border-t border-[#f4f6f9] px-4 py-3">
+                  <code className="mono-token break-all text-[12.5px]">
+                    {currentAttribute.technical_name}
+                  </code>
+                  <div className="min-w-0">
+                    <code className="rounded-md bg-[#f1f4f8] px-1.5 py-0.5 font-mono text-[12.5px] text-[#64748b]">
+                      {latestAttributeValue === null
+                        ? "null"
+                        : Array.isArray(latestAttributeValue)
+                          ? "array"
+                          : typeof latestAttributeValue}
+                    </code>
+                    <p
+                      className={cn(
+                        "mt-1 break-words text-[12.5px] leading-[1.45]",
+                        finalStatus === "failed" ? "font-bold text-[#dc2626]" : "text-[#64748b]",
+                      )}
+                    >
+                      {latestAttributeValue === undefined
+                        ? "수신 값 없음"
+                        : `수신 값: ${JSON.stringify(latestAttributeValue)}`}
+                    </p>
+                  </div>
+                  <div className="min-w-0">
+                    <code className="rounded-md bg-[#f1f4f8] px-1.5 py-0.5 font-mono text-[12.5px] text-[#64748b]">
+                      {currentAttribute.data_type}
+                    </code>
+                    <p className="mt-1 break-words text-[12.5px] leading-[1.45] text-[#64748b]">
+                      {currentAttribute.example_value != null
+                        ? `예: ${String(currentAttribute.example_value)}`
+                        : "예시값 없음"}
+                    </p>
+                  </div>
+                  <div className="flex justify-center">
+                    <span
+                      className={cn(
+                        "inline-block whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold",
+                        finalStatus === "passed"
+                          ? "bg-[#e8f5ec] text-[#16a34a]"
+                          : finalStatus === "failed"
+                            ? "bg-[#fdecec] text-[#dc2626]"
+                            : "bg-[#fdf3e3] text-[#b45309]",
+                      )}
+                    >
+                      {verdictLabel}
+                    </span>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!result)
+                          return toast.error("분석 결과가 있어야 이슈로 등록할 수 있어요");
+                        createIssue.mutate(
+                          {
+                            type: "custom_attribute",
+                            id: currentAttribute.id,
+                            label: currentAttribute.technical_name,
+                          },
+                          {
+                            onSuccess: (issue) => {
+                              setSelectedIssueId(issue.id);
+                              setCommentBody("");
+                              toast.success(`${currentAttribute.technical_name} 이슈를 추가했어요`);
+                            },
+                          },
+                        );
+                      }}
+                      className="rounded-md border border-[#f0dfc0] bg-[#fdf9f1] px-2 py-1 text-left text-[11.5px] font-semibold leading-tight text-[#b45309]"
+                    >
+                      이슈 있음
+                    </button>
+                    <Link
+                      from="/w/$wsId/p/$projectId/qa/$stageSlug/$roundId/$sessionId/$itemId"
+                      to="/w/$wsId/p/$projectId/taxonomy"
+                      params={(prev) => ({ wsId: prev.wsId, projectId: prev.projectId })}
+                      search={{ attributeId: currentAttribute.id }}
+                      className="rounded-md border border-[#e3e8ef] px-2 py-1 text-left text-[11.5px] leading-tight text-[#64748b] hover:border-[#2b6a9c] hover:text-[#2b6a9c]"
+                    >
+                      택소노미에서 수정
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            </Panel>
           ) : null}
 
           <Panel
@@ -775,7 +892,7 @@ export function QaItemView({
           ) : null}
           <Panel
             title="이슈 처리"
-            description="스펙 대조에서 선택한 프로퍼티별로 댓글을 남겨요. 상태 변경과 이월은 이슈 모아보기에서 합니다."
+            description={`스펙 대조에서 선택한 ${item.target_type === "event" ? "프로퍼티" : "어트리뷰트"}에 댓글을 남겨요. 상태 변경과 이월은 이슈 모아보기에서 합니다.`}
           >
             <div className="space-y-3 p-4">
               {discussions.length === 0 ? (
@@ -789,7 +906,7 @@ export function QaItemView({
                       <button
                         key={discussion.id}
                         type="button"
-                        title={`${label}.${discussion.target_label}`}
+                        title={discussionDisplayLabel(discussion)}
                         onMouseEnter={() => setHoveredIssueProperty(discussion.target_label)}
                         onMouseLeave={() => setHoveredIssueProperty(null)}
                         onClick={() => {
@@ -803,9 +920,7 @@ export function QaItemView({
                             : "border-[#e3e8ef] text-[#64748b]",
                         )}
                       >
-                        <span className="block truncate">
-                          {label}.{discussion.target_label}
-                        </span>
+                        <span className="block truncate">{discussionDisplayLabel(discussion)}</span>
                       </button>
                     ))}
                   </div>
@@ -814,16 +929,16 @@ export function QaItemView({
                     <div className="space-y-3">
                       <div className="flex items-center justify-between gap-2">
                         <p
-                          title={`${label}.${selectedIssue.target_label}`}
+                          title={discussionDisplayLabel(selectedIssue)}
                           onMouseEnter={() => setHoveredIssueProperty(selectedIssue.target_label)}
                           onMouseLeave={() => setHoveredIssueProperty(null)}
                           className="truncate font-mono text-[12px] font-semibold text-[#4b4f8a]"
                         >
-                          {label}.{selectedIssue.target_label}
+                          {discussionDisplayLabel(selectedIssue)}
                         </p>
                         <QaIssueDeleteButton
                           compact
-                          targetLabel={`${label}.${selectedIssue.target_label}`}
+                          targetLabel={discussionDisplayLabel(selectedIssue)}
                           pending={deleteIssue.isPending}
                           onDelete={() => {
                             deleteIssue.mutate(selectedIssue.id, {
@@ -913,7 +1028,7 @@ export function QaItemView({
                       <Textarea
                         value={commentBody}
                         onChange={(event) => setCommentBody(event.target.value)}
-                        placeholder={`${label}.${selectedIssue.target_label}에 대한 원인·수정 내용을 남겨보세요`}
+                        placeholder={`${discussionDisplayLabel(selectedIssue)}에 대한 원인·수정 내용을 남겨보세요`}
                         className="min-h-[68px]"
                       />
                       <Button

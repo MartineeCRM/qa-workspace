@@ -92,6 +92,7 @@ export function TaxonomyTab({
   customAttributeProperties,
   editable,
   openPropertyId,
+  openAttributeId,
 }: {
   projectId: string;
   events: TaxonomyEvent[];
@@ -104,6 +105,7 @@ export function TaxonomyTab({
   // already structurally passing, so this just gets the reviewer to where they
   // can make whatever change (allowed values, description, etc.) by hand.
   openPropertyId?: string;
+  openAttributeId?: string;
 }) {
   const qc = useQueryClient();
   const { user } = useAuth();
@@ -138,6 +140,15 @@ export function TaxonomyTab({
     setOpen((s) => ({ ...s, [prop.event_id]: true }));
     setAttrDialog({ attribute: prop, eventId: prop.event_id });
   }, [openPropertyId, eventProperties]);
+
+  useEffect(() => {
+    if (!openAttributeId || openedFromLinkRef.current) return;
+    const attribute = customAttributes.find((candidate) => candidate.id === openAttributeId);
+    if (!attribute) return;
+    openedFromLinkRef.current = true;
+    setActiveTab("attributes");
+    setAttrDialog({ attribute, eventId: null });
+  }, [openAttributeId, customAttributes]);
 
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ["events", projectId] });
