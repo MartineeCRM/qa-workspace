@@ -800,7 +800,7 @@ export function QaItemView({
                         {displayedVerdictLabel}
                       </span>
                     </div>
-                    <div className="flex flex-col gap-1">
+                    <div className="flex self-center flex-col gap-1">
                       <button
                         type="button"
                         onClick={() => {
