@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { formatDateTime } from "@/lib/domain";
+import { formatDateTime, formatMergedTimelineTime } from "@/lib/domain";
 import {
   commentOnSharedIssue,
   getSharedIssuePortal,
@@ -230,29 +230,51 @@ function SharedIssuesPage() {
                 </div>
               </article>
 
-              <article className="rounded-[14px] border border-[#cbd5e1] bg-white p-5 shadow-sm">
-                <h2 className="text-sm font-bold">판정 및 근거</h2>
-                <p className="mt-3 whitespace-pre-wrap text-[13px] leading-6 text-[#3c4757]">
-                  {selected.reasoning || "별도의 판정 설명이 없습니다."}
-                </p>
-                {selected.evidence ? (
-                  <details className="mt-3 rounded-lg border border-[#dbe2ea] bg-[#f8fafc]">
-                    <summary className="cursor-pointer px-3 py-2 text-xs font-semibold text-[#64748b]">
-                      전체 판정 데이터
-                    </summary>
-                    <pre className="max-h-80 overflow-auto border-t border-[#dbe2ea] p-3 text-[11px] leading-5">
-                      {JSON.stringify(selected.evidence, null, 2)}
-                    </pre>
-                  </details>
-                ) : null}
-                <details className="mt-3 rounded-lg border border-[#202938] bg-[#0d1117] text-[#d7e0ea]">
-                  <summary className="cursor-pointer px-3 py-2 text-xs font-semibold">
-                    원본 근거 로그 {selected.logs.length}건
-                  </summary>
-                  <pre className="max-h-[440px] overflow-auto whitespace-pre-wrap break-all border-t border-[#202938] p-3 text-[11px] leading-5">
-                    {JSON.stringify(selected.logs, null, 2)}
-                  </pre>
-                </details>
+              <article className="overflow-hidden rounded-[14px] border border-[#cbd5e1] bg-white shadow-sm">
+                <div className="border-b border-[#dbe2ea] px-5 py-4">
+                  <h2 className="text-sm font-bold">근거 로그</h2>
+                  <p className="mt-0.5 text-xs text-[#64748b]">
+                    이 항목의 실제 이벤트·어트리뷰트 로그
+                  </p>
+                </div>
+                <div className="max-h-[520px] overflow-auto bg-[#0d1117] p-4 font-mono text-[12px] leading-[1.7]">
+                  {selected.logs.length ? (
+                    selected.logs.map((row: any) => (
+                      <div key={row.key} className="mb-2 text-[#c9d1d9] last:mb-0">
+                        <div className="whitespace-pre">
+                          <span>{row.name}</span>
+                          <span className="text-[#6e7681]"> | </span>
+                          <span className="text-[#7ee787]">
+                            {row.source === "snapshot" ? "어트리뷰트" : "이벤트"}
+                          </span>
+                          <span className="text-[#6e7681]"> | </span>
+                          <span className="text-[#6e7681]">
+                            {formatMergedTimelineTime(row.source, row.occurredAt)}
+                          </span>
+                          {row.source === "snapshot" ? (
+                            <span className="whitespace-pre-wrap">
+                              {` ${row.change.replace(/,\s*/g, ",\n")}`}
+                            </span>
+                          ) : null}
+                        </div>
+                        {row.source === "event" ? (
+                          <div className="pl-4">
+                            <div>{"{"}</div>
+                            {Object.entries(row.raw ?? {}).map(([key, value], index, entries) => (
+                              <div key={key} className="pl-4">
+                                {JSON.stringify(key)}: {JSON.stringify(value)}
+                                {index < entries.length - 1 ? "," : ""}
+                              </div>
+                            ))}
+                            <div>{"}"}</div>
+                          </div>
+                        ) : null}
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-[#6e7681]">관련된 로그가 없어요.</p>
+                  )}
+                </div>
               </article>
 
               <article className="rounded-[14px] border border-[#cbd5e1] bg-white p-5 shadow-sm">

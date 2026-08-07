@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { buildMergedTimeline } from "@/lib/qa-workflow";
 
 const STATUSES = new Set(["open", "talk", "fixing", "done"]);
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -181,8 +182,6 @@ export const getSharedIssuePortal = createServerFn({ method: "GET" })
           channelName: channelById.get(session.qa_channel_id) ?? null,
           sessionName: session.name,
           roundNumber: round.round_number,
-          reasoning: result.ai_reasoning,
-          evidence: result.ai_evidence,
           qaSessionId: session.id,
           itemTargetType: item.target_type,
           itemTargetId: item.target_id,
@@ -195,12 +194,12 @@ export const getSharedIssuePortal = createServerFn({ method: "GET" })
       ? await Promise.all([
           db
             .from("qa_run_events")
-            .select("qa_session_id, event_id, occurred_at, raw_properties")
+            .select("*")
             .in("qa_session_id", sessionIds)
             .order("occurred_at", { ascending: false }),
           db
             .from("qa_attribute_snapshots")
-            .select("qa_session_id, captured_at, payload")
+            .select("*")
             .in("qa_session_id", sessionIds)
             .order("captured_at", { ascending: false }),
         ])
@@ -223,13 +222,19 @@ export const getSharedIssuePortal = createServerFn({ method: "GET" })
       expiresAt: portal.expires_at,
       issues: hydrated.map((issue: any) => ({
         ...issue,
-        logs:
+        logs: buildMergedTimeline(
           issue.itemTargetType === "event"
             ? (eventLogs ?? []).filter(
                 (log: any) =>
                   log.qa_session_id === issue.qaSessionId && log.event_id === issue.itemTargetId,
               )
-            : (attributeLogs ?? []).filter((log: any) => log.qa_session_id === issue.qaSessionId),
+            : [],
+          issue.itemTargetType === "custom_attribute"
+            ? (attributeLogs ?? []).filter((log: any) => log.qa_session_id === issue.qaSessionId)
+            : [],
+        )
+          .filter((row) => issue.itemTargetType === "event" || row.name === issue.targetLabel)
+          .reverse(),
         qaSessionId: undefined,
         itemTargetType: undefined,
         itemTargetId: undefined,
@@ -273,14 +278,12 @@ export const commentOnSharedIssue = createServerFn({ method: "POST" })
     if (!(await readPortalIssue(data.token, data.discussionId)))
       throw new Error("이 이슈에 댓글을 남길 수 없어요.");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { error } = await (supabaseAdmin as any)
-      .from("qa_discussion_comments")
-      .insert({
-        discussion_id: data.discussionId,
-        author_id: null,
-        external_author_name: authorName,
-        body,
-      });
+    const { error } = await (supabaseAdmin as any).from("qa_discussion_comments").insert({
+      discussion_id: data.discussionId,
+      author_id: null,
+      external_author_name: authorName,
+      body,
+    });
     if (error) throw error;
     return { ok: true };
   });
