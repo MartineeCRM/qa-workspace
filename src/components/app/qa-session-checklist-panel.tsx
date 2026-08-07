@@ -432,6 +432,92 @@ export function QaSessionChecklistPanel({
           </header>
 
           <div className="space-y-3 p-5">
+            {suggestions.map((suggestion) => {
+              const eventItem = itemByKey.get(`event:${suggestion.eventId}`);
+              const event = events.find((candidate) => candidate.id === suggestion.eventId);
+              const attribute = attributes.find(
+                (candidate) => candidate.id === suggestion.attributeId,
+              );
+              if (!eventItem?.executed_at || !attribute) return null;
+              const readyAt = Date.parse(eventItem.executed_at) + SNAPSHOT_DELAY_MS;
+              const remainingSeconds = Math.max(0, Math.ceil((readyAt - now) / 1_000));
+              const capturedAfterExecution = snapshots.some(
+                (snapshot) =>
+                  snapshot.status === "captured" &&
+                  Boolean(snapshot.captured_at) &&
+                  Date.parse(snapshot.captured_at as string) >=
+                    Date.parse(eventItem.executed_at as string) &&
+                  Boolean(
+                    snapshot.payload &&
+                    suggestion.attributeId &&
+                    attribute.technical_name in snapshot.payload,
+                  ),
+              );
+              if (capturedAfterExecution) return null;
+              const suggestionKey = `${suggestion.eventId}:${suggestion.attributeId}`;
+              return (
+                <div
+                  key={suggestionKey}
+                  className={cn(
+                    "rounded-xl border p-4",
+                    remainingSeconds > 0
+                      ? "border-[#dfe5ec] bg-white"
+                      : "border-[#c9ddee] bg-[#f3f8fc]",
+                  )}
+                >
+                  <div className="flex gap-3">
+                    <span className="inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-[#e8f1f8] text-[#2b6a9c]">
+                      <Sparkles className="size-3.5" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="mono-token text-[13px] font-semibold">
+                          {attribute.technical_name}
+                        </span>
+                        <span className="text-[10.5px] font-semibold text-[#2b6a9c]">
+                          {suggestion.source === "rule" ? "검증 규칙" : "AI 추천"}
+                        </span>
+                      </div>
+                      <p className="mt-1 text-xs leading-5 text-[#64748b]">{suggestion.reason}</p>
+                      <p className="mt-1 text-[11.5px] text-[#8b97a8]">
+                        {remainingSeconds > 0 ? (
+                          <>
+                            {event?.technical_name ?? "이벤트"} 반영 대기 중 ·{" "}
+                            <span
+                              className={cn(remainingSeconds <= 10 && "font-bold text-[#dc2626]")}
+                            >
+                              {remainingSeconds}초
+                            </span>{" "}
+                            후 촬영 권장
+                          </>
+                        ) : (
+                          "API에 반영됐을 가능성이 높아요. 지금 촬영하세요."
+                        )}
+                      </p>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <Button
+                          size="sm"
+                          onClick={() => captureAttribute(attribute.id)}
+                          disabled={capture.isPending}
+                        >
+                          {remainingSeconds > 0 ? "지금 촬영" : "스냅샷 촬영"}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() =>
+                            setDismissed((previous) => new Set(previous).add(suggestionKey))
+                          }
+                        >
+                          이번에는 제외
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+
             {boardItems.length === 0 ? (
               <EmptyState
                 title="아직 실행 기록이 없어요"
@@ -510,82 +596,6 @@ export function QaSessionChecklistPanel({
                 );
               })
             )}
-
-            {suggestions.map((suggestion) => {
-              const eventItem = itemByKey.get(`event:${suggestion.eventId}`);
-              const event = events.find((candidate) => candidate.id === suggestion.eventId);
-              const attribute = attributes.find(
-                (candidate) => candidate.id === suggestion.attributeId,
-              );
-              if (!eventItem?.executed_at || !attribute) return null;
-              const readyAt = Date.parse(eventItem.executed_at) + SNAPSHOT_DELAY_MS;
-              const remainingSeconds = Math.max(0, Math.ceil((readyAt - now) / 1_000));
-              const capturedAfterExecution = snapshots.some(
-                (snapshot) =>
-                  snapshot.status === "captured" &&
-                  Boolean(snapshot.captured_at) &&
-                  Date.parse(snapshot.captured_at as string) >=
-                    Date.parse(eventItem.executed_at as string) &&
-                  Boolean(
-                    snapshot.payload &&
-                    suggestion.attributeId &&
-                    attribute.technical_name in snapshot.payload,
-                  ),
-              );
-              if (capturedAfterExecution) return null;
-              const suggestionKey = `${suggestion.eventId}:${suggestion.attributeId}`;
-              return (
-                <div
-                  key={suggestionKey}
-                  className={cn(
-                    "rounded-xl border p-4",
-                    remainingSeconds > 0
-                      ? "border-[#dfe5ec] bg-white"
-                      : "border-[#c9ddee] bg-[#f3f8fc]",
-                  )}
-                >
-                  <div className="flex gap-3">
-                    <span className="inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-[#e8f1f8] text-[#2b6a9c]">
-                      <Sparkles className="size-3.5" />
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="mono-token text-[13px] font-semibold">
-                          {attribute.technical_name}
-                        </span>
-                        <span className="text-[10.5px] font-semibold text-[#2b6a9c]">
-                          {suggestion.source === "rule" ? "검증 규칙" : "AI 추천"}
-                        </span>
-                      </div>
-                      <p className="mt-1 text-xs leading-5 text-[#64748b]">{suggestion.reason}</p>
-                      <p className="mt-1 text-[11.5px] text-[#8b97a8]">
-                        {remainingSeconds > 0
-                          ? `${event?.technical_name ?? "이벤트"} 반영 대기 중 · ${remainingSeconds}초 후 촬영 권장`
-                          : "API에 반영됐을 가능성이 높아요. 지금 촬영하세요."}
-                      </p>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        <Button
-                          size="sm"
-                          onClick={() => captureAttribute(attribute.id)}
-                          disabled={capture.isPending}
-                        >
-                          {remainingSeconds > 0 ? "지금 촬영" : "스냅샷 촬영"}
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() =>
-                            setDismissed((previous) => new Set(previous).add(suggestionKey))
-                          }
-                        >
-                          이번에는 제외
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
           </div>
 
           <footer className="sticky bottom-0 flex items-center justify-between border-t border-[#e3e8ef] bg-white px-5 py-4">
