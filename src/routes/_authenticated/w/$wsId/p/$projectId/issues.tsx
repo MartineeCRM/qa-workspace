@@ -129,13 +129,19 @@ function QaIssuesPage() {
             variant="outline"
             className="h-9 bg-white text-xs"
             onClick={async () => {
+              const sharedPage = window.open("about:blank", "_blank");
               try {
                 const share = await createProjectIssueShare({ data: { projectId } });
                 const url = `${window.location.origin}/share/${share.token}`;
-                await navigator.clipboard.writeText(url);
-                window.open(url, "_blank", "noopener,noreferrer");
-                toast.success("고객용 이슈 모아보기 주소를 복사했어요");
+                if (sharedPage) sharedPage.location.href = url;
+                try {
+                  await navigator.clipboard.writeText(url);
+                  toast.success("고객용 이슈 모아보기를 열고 주소를 복사했어요");
+                } catch {
+                  toast.success("고객용 이슈 모아보기를 열었어요");
+                }
               } catch (error) {
+                sharedPage?.close();
                 toast.error(errorMessage(error));
               }
             }}
