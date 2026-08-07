@@ -349,26 +349,29 @@ export type Database = {
       };
       qa_discussion_comments: {
         Row: {
-          author_id: string;
+          author_id: string | null;
           body: string;
           created_at: string;
           discussion_id: string;
+          external_author_name: string | null;
           id: string;
           is_resolution: boolean;
         };
         Insert: {
-          author_id: string;
+          author_id?: string | null;
           body: string;
           created_at?: string;
           discussion_id: string;
+          external_author_name?: string | null;
           id?: string;
           is_resolution?: boolean;
         };
         Update: {
-          author_id?: string;
+          author_id?: string | null;
           body?: string;
           created_at?: string;
           discussion_id?: string;
+          external_author_name?: string | null;
           id?: string;
           is_resolution?: boolean;
         };

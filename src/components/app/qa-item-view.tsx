@@ -1032,7 +1032,9 @@ export function QaItemView({
                             <div key={comment.id}>
                               <div className="flex items-center justify-between gap-2">
                                 <p className="text-[11px] text-[#8b97a8]">
-                                  {formatDateTime(comment.created_at)}
+                                  {comment.external_author_name ??
+                                    (comment.author_id === user?.id ? "나" : "내부 담당자")}{" "}
+                                  · {formatDateTime(comment.created_at)}
                                 </p>
                                 {comment.author_id === user?.id &&
                                 editingComment?.id !== comment.id ? (

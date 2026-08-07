@@ -695,7 +695,8 @@ export function useCarryOverItems(environmentId: string) {
 export type QaDiscussionComment = {
   id: string;
   discussion_id: string;
-  author_id: string;
+  author_id: string | null;
+  external_author_name: string | null;
   body: string;
   is_resolution: boolean;
   created_at: string;

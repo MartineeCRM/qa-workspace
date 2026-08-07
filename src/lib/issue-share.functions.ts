@@ -86,21 +86,19 @@ export const getSharedIssue = createServerFn({ method: "GET" })
       .select("*")
       .eq("id", session.qa_round_id)
       .single();
-    const [
-      { data: project },
-      { data: environment },
-      { data: channel },
-      { data: externalComments },
-    ] = await Promise.all([
+    const [{ data: project }, { data: environment }, { data: channel }] = await Promise.all([
       db.from("projects").select("name").eq("id", round.project_id).single(),
       db.from("qa_environments").select("name").eq("id", round.qa_environment_id).single(),
       session.qa_channel_id
         ? db.from("qa_channels").select("name").eq("id", session.qa_channel_id).single()
         : Promise.resolve({ data: null }),
-      db.from("qa_issue_share_comments").select("*").eq("share_id", share.id).order("created_at"),
     ]);
     const authorIds = [
-      ...new Set((issue.qa_discussion_comments ?? []).map((comment: any) => comment.author_id)),
+      ...new Set(
+        (issue.qa_discussion_comments ?? [])
+          .map((comment: any) => comment.author_id)
+          .filter(Boolean),
+      ),
     ];
     const { data: profiles } = authorIds.length
       ? await db.from("profiles").select("id, display_name, email").in("id", authorIds)
@@ -138,17 +136,11 @@ export const getSharedIssue = createServerFn({ method: "GET" })
       comments: [
         ...(issue.qa_discussion_comments ?? []).map((comment: any) => ({
           id: comment.id,
-          author: authorById.get(comment.author_id) ?? "내부 담당자",
+          author:
+            comment.external_author_name ?? authorById.get(comment.author_id) ?? "내부 담당자",
           body: comment.body,
           createdAt: comment.created_at,
           source: "internal",
-        })),
-        ...(externalComments ?? []).map((comment: any) => ({
-          id: comment.id,
-          author: comment.author_name,
-          body: comment.body,
-          createdAt: comment.created_at,
-          source: "customer",
         })),
       ].sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
     };
@@ -179,9 +171,10 @@ export const commentOnSharedIssue = createServerFn({ method: "POST" })
     const share = await readShare(data.token);
     if (!share) throw new Error("만료되었거나 비활성화된 링크예요.");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { error } = await (supabaseAdmin as any).from("qa_issue_share_comments").insert({
-      share_id: share.id,
-      author_name: authorName,
+    const { error } = await (supabaseAdmin as any).from("qa_discussion_comments").insert({
+      discussion_id: share.discussion_id,
+      author_id: null,
+      external_author_name: authorName,
       body,
     });
     if (error) throw error;
