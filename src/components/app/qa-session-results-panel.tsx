@@ -8,13 +8,15 @@ import { useQaChecklistItems, type QaSession } from "@/lib/qa-rounds-queries";
 import { useTaxonomyCustomAttributes, useTaxonomyEvents } from "@/lib/queries";
 import { compactVerdictReason, hasCurrentChecklistResult } from "@/lib/qa-workflow";
 
-type ResultFilter = "all" | "failed" | "not_collected" | "passed";
+type DisplayStatus = "passed" | "failed" | "not_collected" | "ai_pending";
+type ResultFilter = "all" | DisplayStatus;
 
-function verdictBadge(finalStatus: "passed" | "failed" | "not_collected") {
+function verdictBadge(finalStatus: DisplayStatus) {
   const map = {
     passed: { label: "통과", bg: "#f2faf5", fg: "#16a34a", border: "#cfe8d8" },
     failed: { label: "오류", bg: "#fdf5f5", fg: "#dc2626", border: "#f4d0d0" },
     not_collected: { label: "미발생", bg: "#fdf9f1", fg: "#b45309", border: "#f0dfc0" },
+    ai_pending: { label: "AI 확인 필요", bg: "#e8f1f8", fg: "#2b6a9c", border: "#c9ddee" },
   } as const;
   const style = map[finalStatus];
   return (
@@ -48,11 +50,19 @@ export function QaSessionResultsPanel({
     return label ?? targetId;
   }
 
-  const rows = checklistItems.filter(hasCurrentChecklistResult).map((item) => ({
-    item,
-    result: item.qa_checklist_item_results[0],
-    finalStatus: item.qa_checklist_item_results[0]?.final_status ?? "not_collected",
-  }));
+  const rows = checklistItems.filter(hasCurrentChecklistResult).map((item) => {
+    const result = item.qa_checklist_item_results[0];
+    const finalStatus = result?.final_status ?? "not_collected";
+    return {
+      item,
+      result,
+      finalStatus,
+      displayStatus:
+        finalStatus === "not_collected" && result?.judged_by === "ai" && result.ai_reasoning
+          ? ("ai_pending" as const)
+          : finalStatus,
+    };
+  });
   const filters: Array<{ key: ResultFilter; label: string; count: number }> = [
     { key: "all", label: "전체", count: rows.length },
     {
@@ -63,7 +73,12 @@ export function QaSessionResultsPanel({
     {
       key: "not_collected",
       label: "미발생",
-      count: rows.filter((row) => row.finalStatus === "not_collected").length,
+      count: rows.filter((row) => row.displayStatus === "not_collected").length,
+    },
+    {
+      key: "ai_pending",
+      label: "AI 확인 필요",
+      count: rows.filter((row) => row.displayStatus === "ai_pending").length,
     },
     {
       key: "passed",
@@ -74,7 +89,7 @@ export function QaSessionResultsPanel({
   const query = search.trim().toLowerCase();
   const shownRows = rows.filter(
     (row) =>
-      (filter === "all" || row.finalStatus === filter) &&
+      (filter === "all" || row.displayStatus === filter) &&
       (!query || itemLabel(row.item.target_type, row.item.target_id).toLowerCase().includes(query)),
   );
 
@@ -120,7 +135,7 @@ export function QaSessionResultsPanel({
         <span className="text-center">결과</span>
         <span />
       </div>
-      {shownRows.map(({ item, result, finalStatus }) => {
+      {shownRows.map(({ item, result, finalStatus, displayStatus }) => {
         const summary =
           result?.ai_reasoning ??
           (finalStatus === "passed"
@@ -141,7 +156,7 @@ export function QaSessionResultsPanel({
             <span title={summary} className="line-clamp-2 text-xs leading-[1.55] text-[#475569]">
               {compactSummary}
             </span>
-            {verdictBadge(finalStatus)}
+            {verdictBadge(displayStatus)}
             <span className="text-[#c3ccd8]">›</span>
           </Link>
         );

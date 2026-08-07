@@ -237,11 +237,22 @@ export function QaItemView({
   const evidenceRows = timeline.filter((row) => relevantKeys.has(row.key)).reverse();
   const aiFailedPropertyIds = aiFailedTaxonomyPropertyIds(result?.ai_evidence);
   const aiAnalysisIncomplete = Boolean(
-    result?.ai_evidence &&
-    typeof result.ai_evidence === "object" &&
-    !Array.isArray(result.ai_evidence) &&
-    (result.ai_evidence as { qualitative_error?: unknown }).qualitative_error,
+    (result?.ai_evidence &&
+      typeof result.ai_evidence === "object" &&
+      !Array.isArray(result.ai_evidence) &&
+      (result.ai_evidence as { qualitative_error?: unknown }).qualitative_error) ||
+    (result?.judged_by === "ai" && result.final_status === "not_collected" && result.ai_reasoning),
   );
+  const attributeAiPending = Boolean(
+    currentAttribute &&
+    latestAttributeValue !== undefined &&
+    aiAnalysisIncomplete &&
+    (currentAttribute.description?.trim() || currentAttribute.example_value != null),
+  );
+  const displayedVerdictLabel = attributeAiPending ? "AI 확인 필요" : verdictLabel;
+  const displayedVerdictStyle = attributeAiPending
+    ? { border: "#c9ddee", bg: "#e8f1f8", fg: "#2b6a9c" }
+    : verdictStyle;
   const evidenceIsLong =
     evidenceRows.length > 6 ||
     evidenceRows.reduce(
@@ -499,9 +510,12 @@ export function QaItemView({
                 <span>판정 요약</span>
                 <span
                   className="rounded-full px-2.5 py-[3px] text-[11px] font-bold"
-                  style={{ color: verdictStyle.fg, backgroundColor: verdictStyle.bg }}
+                  style={{
+                    color: displayedVerdictStyle.fg,
+                    backgroundColor: displayedVerdictStyle.bg,
+                  }}
                 >
-                  {verdictLabel}
+                  {displayedVerdictLabel}
                 </span>
               </span>
             }
@@ -699,14 +713,16 @@ export function QaItemView({
                     <span
                       className={cn(
                         "inline-block whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold",
-                        finalStatus === "passed"
-                          ? "bg-[#e8f5ec] text-[#16a34a]"
-                          : finalStatus === "failed"
-                            ? "bg-[#fdecec] text-[#dc2626]"
-                            : "bg-[#fdf3e3] text-[#b45309]",
+                        attributeAiPending
+                          ? "bg-[#e8f1f8] text-[#2b6a9c]"
+                          : finalStatus === "passed"
+                            ? "bg-[#e8f5ec] text-[#16a34a]"
+                            : finalStatus === "failed"
+                              ? "bg-[#fdecec] text-[#dc2626]"
+                              : "bg-[#fdf3e3] text-[#b45309]",
                       )}
                     >
-                      {verdictLabel}
+                      {displayedVerdictLabel}
                     </span>
                   </div>
                   <div className="flex flex-col gap-1">
