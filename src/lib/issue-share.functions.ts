@@ -23,15 +23,50 @@ export const createIssueShare = createServerFn({ method: "POST" })
   .validator((data: { discussionId: string }) => data)
   .handler(async ({ data, context }) => {
     if (!UUID.test(data.discussionId)) throw new Error("올바르지 않은 이슈예요.");
-    const { data: issue, error } = await context.supabase
-      .from("qa_discussions")
-      .select("id")
-      .eq("id", data.discussionId)
-      .maybeSingle();
-    if (error || !issue) throw new Error("이 이슈를 공유할 권한이 없어요.");
-
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const db = supabaseAdmin as any;
+    const { data: issue } = await db
+      .from("qa_discussions")
+      .select("checklist_item_result_id")
+      .eq("id", data.discussionId)
+      .maybeSingle();
+    const { data: result } = issue
+      ? await db
+          .from("qa_checklist_item_results")
+          .select("checklist_item_id")
+          .eq("id", issue.checklist_item_result_id)
+          .maybeSingle()
+      : { data: null };
+    const { data: item } = result
+      ? await db
+          .from("qa_round_checklist_items")
+          .select("qa_session_id")
+          .eq("id", result.checklist_item_id)
+          .maybeSingle()
+      : { data: null };
+    const { data: session } = item
+      ? await db
+          .from("qa_sessions")
+          .select("qa_round_id")
+          .eq("id", item.qa_session_id)
+          .maybeSingle()
+      : { data: null };
+    const { data: round } = session
+      ? await db.from("qa_rounds").select("project_id").eq("id", session.qa_round_id).maybeSingle()
+      : { data: null };
+    const { data: project } = round
+      ? await db.from("projects").select("workspace_id").eq("id", round.project_id).maybeSingle()
+      : { data: null };
+    const { data: membership } = project
+      ? await db
+          .from("workspace_members")
+          .select("user_id")
+          .eq("workspace_id", project.workspace_id)
+          .eq("user_id", context.userId)
+          .maybeSingle()
+      : { data: null };
+    if (!membership) throw new Error("이 이슈를 공유할 권한이 없어요.");
+
     const { data: existing } = await db
       .from("qa_issue_shares")
       .select("token, expires_at")
