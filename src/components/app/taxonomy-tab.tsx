@@ -541,7 +541,7 @@ export function TaxonomyTab({
       ) : null}
 
       {attrDialog ? (
-        <AttributeDialog
+        <TaxonomyAttributeDialog
           projectId={projectId}
           userId={user?.id ?? ""}
           events={events}
@@ -912,7 +912,7 @@ function EventDialog({
   );
 }
 
-function AttributeDialog({
+export function TaxonomyAttributeDialog({
   projectId,
   userId,
   events,

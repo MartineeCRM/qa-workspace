@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Panel } from "@/components/app/layout-parts";
 import { QaItemSpecDiffTable } from "@/components/app/qa-item-spec-diff";
 import { QaIssueDeleteButton } from "@/components/app/qa-issue-delete-button";
+import { TaxonomyAttributeDialog } from "@/components/app/taxonomy-tab";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/lib/auth";
@@ -31,6 +32,7 @@ import {
   useDeleteQaIssue,
   useQaAttributeSnapshots,
   useQaChannelExclusions,
+  useQaChannels,
   useQaChecklistItems,
   useQaDiscussions,
   useQaRunEvents,
@@ -44,6 +46,8 @@ import {
   useTaxonomyCustomAttributes,
   useTaxonomyEventProperties,
   useTaxonomyEvents,
+  type TaxonomyCustomAttribute,
+  type TaxonomyEventProperty,
 } from "@/lib/queries";
 
 const VERDICT_STYLE = {
@@ -144,9 +148,11 @@ export function QaItemView({
   const navigate = useNavigate();
   const { user } = useAuth();
   const { data: events = [] } = useTaxonomyEvents(projectId);
-  const { data: customAttributes = [] } = useTaxonomyCustomAttributes(projectId);
+  const { data: customAttributes = [], refetch: refetchCustomAttributes } =
+    useTaxonomyCustomAttributes(projectId);
   const { data: eventProperties = [], refetch: refetchEventProperties } =
     useTaxonomyEventProperties(projectId);
+  const { data: channels = [] } = useQaChannels(projectId);
   const { data: exclusions } = useQaChannelExclusions(
     events.map((event) => event.id),
     eventProperties.map((property) => property.id),
@@ -172,6 +178,10 @@ export function QaItemView({
   } | null>(null);
   const [hoveredIssueProperty, setHoveredIssueProperty] = useState<string | null>(null);
   const [editingComment, setEditingComment] = useState<{ id: string; body: string } | null>(null);
+  const [taxonomyDialog, setTaxonomyDialog] = useState<{
+    attribute: TaxonomyEventProperty | TaxonomyCustomAttribute;
+    eventId: string | null;
+  } | null>(null);
 
   // "이전/다음 항목" links only change the :itemId path param, so this component
   // doesn't remount between items.
@@ -182,6 +192,7 @@ export function QaItemView({
     setEvidenceHighlight(null);
     setHoveredIssueProperty(null);
     setEditingComment(null);
+    setTaxonomyDialog(null);
   }, [item.id]);
 
   const label =
@@ -678,6 +689,12 @@ export function QaItemView({
                   },
                 );
               }}
+              onEditProperty={(propertyId) => {
+                const property = eventProperties.find((candidate) => candidate.id === propertyId);
+                if (property) {
+                  setTaxonomyDialog({ attribute: property, eventId: property.event_id });
+                }
+              }}
             />
           ) : currentAttribute ? (
             <Panel title="스펙 대조" description="스냅샷 수신 값과 어트리뷰트 정의를 비교해요.">
@@ -770,15 +787,15 @@ export function QaItemView({
                     >
                       이슈 있음
                     </button>
-                    <Link
-                      from="/w/$wsId/p/$projectId/qa/$stageSlug/$roundId/$sessionId/$itemId"
-                      to="/w/$wsId/p/$projectId/taxonomy"
-                      params={(prev) => ({ wsId: prev.wsId, projectId: prev.projectId })}
-                      search={{ attributeId: currentAttribute.id }}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setTaxonomyDialog({ attribute: currentAttribute, eventId: null })
+                      }
                       className="rounded-md border border-[#e3e8ef] px-2 py-1 text-left text-[11.5px] leading-tight text-[#64748b] hover:border-[#2b6a9c] hover:text-[#2b6a9c]"
                     >
                       택소노미에서 수정
-                    </Link>
+                    </button>
                   </div>
                 </div>
               </div>
@@ -1105,6 +1122,23 @@ export function QaItemView({
           </Panel>
         </div>
       </div>
+      {taxonomyDialog ? (
+        <TaxonomyAttributeDialog
+          projectId={projectId}
+          userId={user?.id ?? ""}
+          events={events}
+          eventProperties={eventProperties}
+          attribute={taxonomyDialog.attribute}
+          eventId={taxonomyDialog.eventId}
+          channels={channels}
+          excludedKeys={exclusions?.properties ?? new Set<string>()}
+          onClose={() => setTaxonomyDialog(null)}
+          onSaved={() => {
+            void refetchEventProperties();
+            void refetchCustomAttributes();
+          }}
+        />
+      ) : null}
     </div>
   );
 }

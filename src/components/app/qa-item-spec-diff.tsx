@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { Panel } from "@/components/app/layout-parts";
 import { Button } from "@/components/ui/button";
@@ -90,6 +89,7 @@ export function QaItemSpecDiffTable({
   aiPendingPropertyIds,
   onReanalyze,
   onCreateIssue,
+  onEditProperty,
   onHighlightChange,
 }: {
   projectId: string;
@@ -100,6 +100,7 @@ export function QaItemSpecDiffTable({
   aiPendingPropertyIds?: Set<string>;
   onReanalyze: () => Promise<void>;
   onCreateIssue: (target: { id: string; label: string }) => void;
+  onEditProperty: (propertyId: string) => void;
   onHighlightChange: (propertyNames: string[], tone: "pass" | "issue" | null) => void;
 }) {
   const { user } = useAuth();
@@ -411,15 +412,13 @@ export function QaItemSpecDiffTable({
                         이슈 있음
                       </button>
                       {row.propertyId ? (
-                        <Link
-                          from="/w/$wsId/p/$projectId/qa/$stageSlug/$roundId/$sessionId/$itemId"
-                          to="/w/$wsId/p/$projectId/taxonomy"
-                          params={(prev) => ({ wsId: prev.wsId, projectId: prev.projectId })}
-                          search={{ propertyId: row.propertyId }}
+                        <button
+                          type="button"
+                          onClick={() => onEditProperty(row.propertyId as string)}
                           className="rounded-md border border-[#e3e8ef] px-2 py-1 text-left text-[11.5px] leading-tight text-[#64748b] hover:border-[#2b6a9c] hover:text-[#2b6a9c]"
                         >
                           택소노미에서 수정
-                        </Link>
+                        </button>
                       ) : null}
                       {actionsFor(row).map((a) => (
                         <button
