@@ -28,7 +28,9 @@ function SharedIssuesPage() {
   const [portal, setPortal] = useState<any>(undefined);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
-  const [filter, setFilter] = useState<"all" | Status>("all");
+  const [environmentFilter, setEnvironmentFilter] = useState("all");
+  const [channelFilter, setChannelFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | Status>("all");
   const [authorName, setAuthorName] = useState("");
   const [body, setBody] = useState("");
   const [saving, setSaving] = useState(false);
@@ -44,16 +46,31 @@ function SharedIssuesPage() {
   );
   useEffect(() => void load(), [load]);
 
+  const filterOptions = useMemo(
+    () => ({
+      environments: [
+        ...new Set<string>((portal?.issues ?? []).map((issue: any) => issue.environmentName)),
+      ],
+      channels: [
+        ...new Set<string>(
+          (portal?.issues ?? []).map((issue: any) => issue.channelName).filter(Boolean),
+        ),
+      ],
+    }),
+    [portal],
+  );
   const shown = useMemo(
     () =>
       (portal?.issues ?? []).filter(
         (issue: any) =>
-          (filter === "all" || issue.workflowStatus === filter) &&
+          (environmentFilter === "all" || issue.environmentName === environmentFilter) &&
+          (channelFilter === "all" || issue.channelName === channelFilter) &&
+          (statusFilter === "all" || issue.workflowStatus === statusFilter) &&
           issue.displayLabel.toLowerCase().includes(query.trim().toLowerCase()),
       ),
-    [portal, filter, query],
+    [portal, environmentFilter, channelFilter, statusFilter, query],
   );
-  const selected = portal?.issues.find((issue: any) => issue.id === selectedId) ?? shown[0] ?? null;
+  const selected = shown.find((issue: any) => issue.id === selectedId) ?? shown[0] ?? null;
 
   if (portal === undefined)
     return (
@@ -101,20 +118,52 @@ function SharedIssuesPage() {
                 className="pl-9"
               />
             </div>
-            <div className="mt-2 flex flex-wrap gap-1">
-              {(["all", ...Object.keys(STATUS)] as const).map((value) => (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => setFilter(value)}
-                  className={cn(
-                    "rounded-md px-2.5 py-1.5 text-xs font-semibold",
-                    filter === value ? "bg-[#26394d] text-white" : "bg-[#eef2f6] text-[#526173]",
-                  )}
+            <div className="mt-2 grid grid-cols-3 gap-1.5">
+              <label className="grid gap-1 text-[10px] font-semibold text-[#64748b]">
+                QA 환경
+                <select
+                  value={environmentFilter}
+                  onChange={(event) => setEnvironmentFilter(event.target.value)}
+                  className="h-8 min-w-0 rounded-md border border-[#cbd5e1] bg-white px-2 text-xs font-medium text-[#334155]"
                 >
-                  {value === "all" ? "전체" : STATUS[value].label}
-                </button>
-              ))}
+                  <option value="all">전체</option>
+                  {filterOptions.environments.map((name) => (
+                    <option key={name} value={name}>
+                      {name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="grid gap-1 text-[10px] font-semibold text-[#64748b]">
+                OS
+                <select
+                  value={channelFilter}
+                  onChange={(event) => setChannelFilter(event.target.value)}
+                  className="h-8 min-w-0 rounded-md border border-[#cbd5e1] bg-white px-2 text-xs font-medium text-[#334155]"
+                >
+                  <option value="all">전체</option>
+                  {filterOptions.channels.map((name) => (
+                    <option key={name} value={name}>
+                      {name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="grid gap-1 text-[10px] font-semibold text-[#64748b]">
+                상태
+                <select
+                  value={statusFilter}
+                  onChange={(event) => setStatusFilter(event.target.value as "all" | Status)}
+                  className="h-8 min-w-0 rounded-md border border-[#cbd5e1] bg-white px-2 text-xs font-medium text-[#334155]"
+                >
+                  <option value="all">전체</option>
+                  {Object.entries(STATUS).map(([value, meta]) => (
+                    <option key={value} value={value}>
+                      {meta.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
             </div>
           </div>
           <ul className="max-h-[calc(100vh-220px)] overflow-y-auto">
@@ -142,12 +191,7 @@ function SharedIssuesPage() {
                       </span>
                     </div>
                     <p className="mt-1.5 text-[11px] text-[#6d7b8b]">
-                      {[
-                        issue.environmentName,
-                        issue.channelName,
-                        issue.sessionName,
-                        `${issue.roundNumber}차`,
-                      ]
+                      {[issue.environmentName, issue.channelName, `${issue.roundNumber}차`]
                         .filter(Boolean)
                         .join(" · ")}
                     </p>
@@ -189,12 +233,7 @@ function SharedIssuesPage() {
                       </span>
                     </div>
                     <p className="mt-1.5 text-xs text-[#64748b]">
-                      {[
-                        selected.environmentName,
-                        selected.channelName,
-                        selected.sessionName,
-                        `${selected.roundNumber}차`,
-                      ]
+                      {[selected.environmentName, selected.channelName, `${selected.roundNumber}차`]
                         .filter(Boolean)
                         .join(" · ")}
                     </p>
