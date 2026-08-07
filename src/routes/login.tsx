@@ -12,21 +12,28 @@ import { useAuth } from "@/lib/auth";
 
 export const Route = createFileRoute("/login")({
   ssr: false,
+  validateSearch: (search: Record<string, unknown>) => ({
+    redirect:
+      typeof search.redirect === "string" && search.redirect.startsWith("/share/")
+        ? search.redirect
+        : undefined,
+  }),
   head: () => ({
     meta: [
       { title: "로그인 — QA Workspace" },
       { name: "description", content: "회사 이메일로 로그인해요." },
     ],
   }),
-  beforeLoad: async () => {
+  beforeLoad: async ({ search }) => {
     const { data } = await supabase.auth.getSession();
-    if (data.session) throw redirect({ to: "/workspaces" });
+    if (data.session) throw redirect({ href: search.redirect ?? "/workspaces" });
   },
   component: LoginPage,
 });
 
 function LoginPage() {
   const navigate = useNavigate();
+  const { redirect: redirectTo } = Route.useSearch();
   const { signIn } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -38,7 +45,7 @@ function LoginPage() {
     const { error } = await signIn(email.trim(), password);
     setBusy(false);
     if (error) return toast.error(authErrorMessage(error, "로그인에 실패했어요"));
-    navigate({ to: "/workspaces" });
+    navigate({ href: redirectTo ?? "/workspaces" });
   }
 
   return (
@@ -48,7 +55,11 @@ function LoginPage() {
       footer={
         <>
           계정이 없으신가요?{" "}
-          <Link to="/signup" className="font-medium text-primary hover:underline">
+          <Link
+            to="/signup"
+            search={{ redirect: redirectTo }}
+            className="font-medium text-primary hover:underline"
+          >
             가입하기
           </Link>
         </>

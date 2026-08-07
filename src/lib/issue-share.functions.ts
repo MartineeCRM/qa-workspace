@@ -99,6 +99,7 @@ export const createProjectIssueShare = createServerFn({ method: "POST" })
   });
 
 export const getSharedIssuePortal = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
   .validator((data: { token: string }) => data)
   .handler(async ({ data }) => {
     const portal = await readPortal(data.token);
@@ -271,20 +272,25 @@ export const getSharedIssuePortal = createServerFn({ method: "GET" })
   });
 
 export const updateSharedIssue = createServerFn({ method: "POST" })
-  .validator(
-    (data: { token: string; discussionId: string; status: string; authorName?: string }) => data,
-  )
-  .handler(async ({ data }) => {
+  .middleware([requireSupabaseAuth])
+  .validator((data: { token: string; discussionId: string; status: string }) => data)
+  .handler(async ({ data, context }) => {
     if (!STATUSES.has(data.status)) throw new Error("올바르지 않은 상태예요.");
     if (!(await readPortalIssue(data.token, data.discussionId)))
       throw new Error("이 이슈를 변경할 수 없어요.");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: profile } = await (supabaseAdmin as any)
+      .from("profiles")
+      .select("display_name, email")
+      .eq("id", context.userId)
+      .maybeSingle();
+    const actorName = profile?.display_name || profile?.email || "고객사 사용자";
     const { error } = await (supabaseAdmin as any)
       .from("qa_discussions")
       .update({
         workflow_status: data.status,
-        workflow_updated_by: null,
-        workflow_updated_by_external_name: data.authorName?.trim() || "고객사",
+        workflow_updated_by: context.userId,
+        workflow_updated_by_external_name: actorName,
         updated_at: new Date().toISOString(),
       })
       .eq("id", data.discussionId);
@@ -293,21 +299,24 @@ export const updateSharedIssue = createServerFn({ method: "POST" })
   });
 
 export const commentOnSharedIssue = createServerFn({ method: "POST" })
-  .validator(
-    (data: { token: string; discussionId: string; authorName: string; body: string }) => data,
-  )
-  .handler(async ({ data }) => {
-    const authorName = data.authorName.trim();
+  .middleware([requireSupabaseAuth])
+  .validator((data: { token: string; discussionId: string; body: string }) => data)
+  .handler(async ({ data, context }) => {
     const body = data.body.trim();
-    if (!authorName || authorName.length > 80 || !body || body.length > 5000)
-      throw new Error("이름과 댓글 내용을 확인해주세요.");
+    if (!body || body.length > 5000) throw new Error("댓글 내용을 확인해주세요.");
     if (!(await readPortalIssue(data.token, data.discussionId)))
       throw new Error("이 이슈에 댓글을 남길 수 없어요.");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: profile } = await (supabaseAdmin as any)
+      .from("profiles")
+      .select("display_name, email")
+      .eq("id", context.userId)
+      .maybeSingle();
+    const actorName = profile?.display_name || profile?.email || "고객사 사용자";
     const { error } = await (supabaseAdmin as any).from("qa_discussion_comments").insert({
       discussion_id: data.discussionId,
-      author_id: null,
-      external_author_name: authorName,
+      author_id: context.userId,
+      external_author_name: actorName,
       body,
     });
     if (error) throw error;

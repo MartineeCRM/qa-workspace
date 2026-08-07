@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { createFileRoute, useParams } from "@tanstack/react-router";
-import { ChevronRight, MessageSquareText, Search, ShieldCheck } from "lucide-react";
+import { createFileRoute, Link, useParams } from "@tanstack/react-router";
+import { ChevronRight, LogOut, MessageSquareText, Search, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,6 +12,7 @@ import {
   updateSharedIssue,
 } from "@/lib/issue-share.functions";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/lib/auth";
 
 export const Route = createFileRoute("/share/$token")({ ssr: false, component: SharedIssuesPage });
 
@@ -25,13 +26,13 @@ type Status = keyof typeof STATUS;
 
 function SharedIssuesPage() {
   const { token } = useParams({ from: "/share/$token" });
+  const { user, profile, loading: authLoading, signOut } = useAuth();
   const [portal, setPortal] = useState<any>(undefined);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [environmentFilter, setEnvironmentFilter] = useState("all");
   const [channelFilter, setChannelFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState<"all" | Status>("all");
-  const [authorName, setAuthorName] = useState("");
   const [body, setBody] = useState("");
   const [saving, setSaving] = useState(false);
   const load = useCallback(
@@ -44,7 +45,9 @@ function SharedIssuesPage() {
         .catch(() => setPortal(null)),
     [token],
   );
-  useEffect(() => void load(), [load]);
+  useEffect(() => {
+    if (!authLoading && user) void load();
+  }, [authLoading, user, load]);
 
   const filterOptions = useMemo(
     () => ({
@@ -72,6 +75,36 @@ function SharedIssuesPage() {
   );
   const selected = shown.find((issue: any) => issue.id === selectedId) ?? shown[0] ?? null;
 
+  if (authLoading)
+    return (
+      <div className="grid min-h-screen place-items-center text-sm text-[#64748b]">
+        불러오는 중…
+      </div>
+    );
+  if (!user)
+    return (
+      <div className="grid min-h-screen place-items-center bg-[#eef2f6] px-5">
+        <div className="w-full max-w-sm rounded-[14px] border border-[#cbd5e1] bg-white p-6 text-center shadow-sm">
+          <ShieldCheck className="mx-auto size-8 text-[#2b6a9c]" />
+          <h1 className="mt-3 text-lg font-bold">로그인 후 확인할 수 있어요</h1>
+          <p className="mt-1 text-sm leading-6 text-[#64748b]">
+            댓글과 상태 변경자를 정확히 기록하기 위해 고객사 계정으로 로그인해주세요.
+          </p>
+          <Button asChild className="mt-5 w-full">
+            <Link to="/login" search={{ redirect: `/share/${token}` }}>
+              로그인
+            </Link>
+          </Button>
+          <Link
+            to="/signup"
+            search={{ redirect: `/share/${token}` }}
+            className="mt-3 inline-block text-xs font-semibold text-[#2b6a9c] hover:underline"
+          >
+            고객사 계정 만들기
+          </Link>
+        </div>
+      </div>
+    );
   if (portal === undefined)
     return (
       <div className="grid min-h-screen place-items-center text-sm text-[#64748b]">
@@ -102,7 +135,17 @@ function SharedIssuesPage() {
               검증 이슈를 확인하고 상태와 댓글을 함께 관리합니다.
             </p>
           </div>
-          <p className="text-xs text-[#aebdcb]">전체 {portal.issues.length}건</p>
+          <div className="flex items-center gap-3 text-xs text-[#aebdcb]">
+            <span>{profile?.display_name || user.email}</span>
+            <span>전체 {portal.issues.length}건</span>
+            <button
+              type="button"
+              onClick={() => void signOut()}
+              className="inline-flex items-center gap-1 rounded-md border border-white/20 px-2 py-1 hover:bg-white/10"
+            >
+              <LogOut className="size-3" /> 로그아웃
+            </button>
+          </div>
         </div>
       </header>
 
@@ -250,7 +293,6 @@ function SharedIssuesPage() {
                             token,
                             discussionId: selected.id,
                             status,
-                            authorName,
                           },
                         });
                         await load();
@@ -357,12 +399,6 @@ function SharedIssuesPage() {
                   ))}
                 </div>
                 <div className="mt-4 grid gap-2">
-                  <Input
-                    value={authorName}
-                    onChange={(event) => setAuthorName(event.target.value)}
-                    placeholder="이름 또는 소속"
-                    maxLength={80}
-                  />
                   <Textarea
                     value={body}
                     onChange={(event) => setBody(event.target.value)}
@@ -370,12 +406,12 @@ function SharedIssuesPage() {
                     maxLength={5000}
                   />
                   <Button
-                    disabled={saving || !authorName.trim() || !body.trim()}
+                    disabled={saving || !body.trim()}
                     onClick={async () => {
                       setSaving(true);
                       try {
                         await commentOnSharedIssue({
-                          data: { token, discussionId: selected.id, authorName, body },
+                          data: { token, discussionId: selected.id, body },
                         });
                         setBody("");
                         await load();
