@@ -100,8 +100,9 @@ function QaIssuesPage() {
         return next;
       });
     }
+    if (!user) return;
     updateIssue.mutate(
-      { issueId: issue.id, status },
+      { issueId: issue.id, status, userId: user.id },
       {
         onSuccess: () => toast.success(`상태를 ${STATUS[status].label}(으)로 바꿨어요`),
         onError: (error) => {
@@ -443,7 +444,12 @@ function QaIssuesPage() {
                           style={{ color: STATUS[status].color }}
                         >
                           {STATUS[status].label} ·{" "}
-                          {formatDateTime(issue.updated_at ?? issue.created_at)} 업데이트
+                          {formatDateTime(issue.updated_at ?? issue.created_at)} 업데이트 by{" "}
+                          {issue.workflow_updated_by_external_name ??
+                            (issue.workflow_updated_by
+                              ? authorById.get(issue.workflow_updated_by)
+                              : null) ??
+                            "알 수 없는 사용자"}
                         </span>
                         <div className="flex-1" />
                         <QaIssueDeleteButton

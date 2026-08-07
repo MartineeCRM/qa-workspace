@@ -395,7 +395,10 @@ export type Database = {
           target_id: string;
           target_label: string;
           target_type: string;
+          updated_at: string;
           workflow_status: string;
+          workflow_updated_by: string | null;
+          workflow_updated_by_external_name: string | null;
         };
         Insert: {
           checklist_item_result_id: string;
@@ -406,7 +409,10 @@ export type Database = {
           target_id?: string;
           target_label?: string;
           target_type?: string;
+          updated_at?: string;
           workflow_status?: string;
+          workflow_updated_by?: string | null;
+          workflow_updated_by_external_name?: string | null;
         };
         Update: {
           checklist_item_result_id?: string;
@@ -417,7 +423,10 @@ export type Database = {
           target_id?: string;
           target_label?: string;
           target_type?: string;
+          updated_at?: string;
           workflow_status?: string;
+          workflow_updated_by?: string | null;
+          workflow_updated_by_external_name?: string | null;
         };
         Relationships: [
           {

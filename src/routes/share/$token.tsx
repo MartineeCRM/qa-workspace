@@ -207,7 +207,12 @@ function SharedIssuesPage() {
                       setSaving(true);
                       try {
                         await updateSharedIssue({
-                          data: { token, discussionId: selected.id, status },
+                          data: {
+                            token,
+                            discussionId: selected.id,
+                            status,
+                            authorName,
+                          },
                         });
                         await load();
                         toast.success("상태를 변경했어요");

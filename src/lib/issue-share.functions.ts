@@ -271,7 +271,9 @@ export const getSharedIssuePortal = createServerFn({ method: "GET" })
   });
 
 export const updateSharedIssue = createServerFn({ method: "POST" })
-  .validator((data: { token: string; discussionId: string; status: string }) => data)
+  .validator(
+    (data: { token: string; discussionId: string; status: string; authorName?: string }) => data,
+  )
   .handler(async ({ data }) => {
     if (!STATUSES.has(data.status)) throw new Error("올바르지 않은 상태예요.");
     if (!(await readPortalIssue(data.token, data.discussionId)))
@@ -279,7 +281,12 @@ export const updateSharedIssue = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { error } = await (supabaseAdmin as any)
       .from("qa_discussions")
-      .update({ workflow_status: data.status, updated_at: new Date().toISOString() })
+      .update({
+        workflow_status: data.status,
+        workflow_updated_by: null,
+        workflow_updated_by_external_name: data.authorName?.trim() || "고객사",
+        updated_at: new Date().toISOString(),
+      })
       .eq("id", data.discussionId);
     if (error) throw error;
     return { ok: true };

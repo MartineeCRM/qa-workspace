@@ -712,6 +712,8 @@ export type QaDiscussion = {
   target_id: string;
   target_label: string;
   workflow_status: "open" | "talk" | "fixing" | "done" | "dismissed" | "verified";
+  workflow_updated_by: string | null;
+  workflow_updated_by_external_name: string | null;
   updated_at: string;
   qa_discussion_comments: QaDiscussionComment[];
 };
@@ -995,13 +997,20 @@ export function useUpdateQaIssue(projectId: string) {
     mutationFn: async ({
       issueId,
       status,
+      userId,
     }: {
       issueId: string;
       status: ProjectQaIssue["workflow_status"];
+      userId: string;
     }) => {
       const { error } = await db
         .from("qa_discussions")
-        .update({ workflow_status: status, updated_at: new Date().toISOString() })
+        .update({
+          workflow_status: status,
+          workflow_updated_by: userId,
+          workflow_updated_by_external_name: null,
+          updated_at: new Date().toISOString(),
+        })
         .eq("id", issueId);
       if (error) throw error;
     },
