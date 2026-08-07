@@ -7,7 +7,6 @@ import { parseRunEventsCsv } from "@/lib/run-events-csv";
 import { buildMergedTimeline, unexpectedSnapshotAttributeIds } from "@/lib/qa-workflow";
 import {
   useAddChecklistItems,
-  useMarkChecklistItemExecuted,
   useQaAttributeSnapshots,
   useQaChecklistItems,
   useQaRunEvents,
@@ -31,7 +30,6 @@ export function QaSessionAnalysisPanel({
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
-  const [dismissedAttributes, setDismissedAttributes] = useState<Set<string>>(new Set());
   const { data: events = [] } = useTaxonomyEvents(projectId);
   const { data: attributes = [] } = useTaxonomyCustomAttributes(projectId);
   const { data: runEvents = [] } = useQaRunEvents(session.id);
@@ -39,7 +37,6 @@ export function QaSessionAnalysisPanel({
   const { data: items = [] } = useQaChecklistItems(session.id);
   const uploadLog = useUploadRunEventsLog(session.id);
   const addItems = useAddChecklistItems(session.id);
-  const markExecuted = useMarkChecklistItemExecuted(session.id);
   const eventByName = useMemo(
     () => new Map(events.map((event) => [event.technical_name, event])),
     [events],
@@ -70,12 +67,10 @@ export function QaSessionAnalysisPanel({
     snapshots,
     attributes,
     checklistItems: items,
-  })
-    .filter((attributeId) => !dismissedAttributes.has(attributeId))
-    .flatMap((attributeId) => {
-      const attribute = attributes.find((candidate) => candidate.id === attributeId);
-      return attribute ? [attribute] : [];
-    });
+  }).flatMap((attributeId) => {
+    const attribute = attributes.find((candidate) => candidate.id === attributeId);
+    return attribute ? [attribute] : [];
+  });
   const rows = buildMergedTimeline(runEvents, snapshots);
 
   function eventName(eventId: string) {
@@ -98,19 +93,6 @@ export function QaSessionAnalysisPanel({
     } finally {
       setUploading(false);
       if (fileRef.current) fileRef.current.value = "";
-    }
-  }
-
-  async function addUnexpectedAttribute(attributeId: string) {
-    try {
-      const existing = items.find(
-        (item) => item.target_type === "custom_attribute" && item.target_id === attributeId,
-      );
-      if (existing) await markExecuted.mutateAsync(existing.id);
-      else await addItems.mutateAsync({ eventIds: [], customAttributeIds: [attributeId] });
-      toast.success("어트리뷰트를 이번 검증에 추가했어요");
-    } catch (error) {
-      toast.error(errorMessage(error, "어트리뷰트 추가에 실패했어요"));
     }
   }
 
@@ -168,23 +150,32 @@ export function QaSessionAnalysisPanel({
         </div>
 
         {unexpectedEvents.length + unexpectedAttributes.length > 0 ? (
-          <div className="mx-5 mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#cfd9e6] bg-[#f5f8fb] px-4 py-3">
-            <div>
-              <p className="text-[13px] font-semibold text-[#263547]">
-                체크하지 않은 항목 {unexpectedEvents.length + unexpectedAttributes.length}개를
-                발견했어요
-              </p>
-              <p className="mt-0.5 text-xs text-[#6f7f91]">
-                이벤트 {unexpectedEvents.length}개 · 어트리뷰트 {unexpectedAttributes.length}개
-              </p>
+          <div className="mx-5 mb-5 rounded-xl border border-[#cfd9e6] bg-[#f5f8fb] p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-[13px] font-semibold text-[#263547]">
+                  체크하지 않은 항목 {unexpectedEvents.length + unexpectedAttributes.length}개를
+                  발견했어요
+                </p>
+                <p className="mt-0.5 text-xs text-[#6f7f91]">
+                  이벤트 {unexpectedEvents.length}개 · 어트리뷰트 {unexpectedAttributes.length}개
+                </p>
+              </div>
+              <Button
+                size="sm"
+                onClick={() => void addAllUnexpectedItems()}
+                disabled={addItems.isPending}
+              >
+                모두 이번 검증에 추가
+              </Button>
             </div>
-            <Button
-              size="sm"
-              onClick={() => void addAllUnexpectedItems()}
-              disabled={addItems.isPending}
-            >
-              모두 이번 검증에 추가
-            </Button>
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              <DiscoveredItemList title="이벤트" items={unexpectedEvents} />
+              <DiscoveredItemList
+                title="어트리뷰트"
+                items={unexpectedAttributes.map((attribute) => attribute.technical_name)}
+              />
+            </div>
           </div>
         ) : null}
 
@@ -211,53 +202,6 @@ export function QaSessionAnalysisPanel({
                   ))}
                 </div>
               </div>
-            </div>
-          </div>
-        ) : null}
-
-        {unexpectedEvents.length > 0 ? (
-          <div className="mx-5 mb-5 rounded-xl border border-[#dfe5ec] bg-[#f8fafc] p-4">
-            <p className="text-[13px] font-semibold">체크하지 않았지만 CSV에서 발견됐어요</p>
-            <p className="mt-1 text-xs text-[#7b8798]">
-              이번 실행의 판정 대상에는 자동으로 포함하지 않습니다.
-            </p>
-            <p className="mono-token mt-2 text-xs text-[#475569]">{unexpectedEvents.join(" · ")}</p>
-          </div>
-        ) : null}
-
-        {unexpectedAttributes.length > 0 ? (
-          <div className="mx-5 mb-5 rounded-xl border border-[#d9dcf3] bg-[#f7f7fd] p-4">
-            <p className="text-[13px] font-semibold">체크하지 않았지만 스냅샷에서 발견됐어요</p>
-            <p className="mt-1 text-xs text-[#7b8798]">
-              이번 검증에 추가하면 현재 스냅샷을 근거로 함께 분석합니다.
-            </p>
-            <div className="mt-3 space-y-2">
-              {unexpectedAttributes.map((attribute) => (
-                <div
-                  key={attribute.id}
-                  className="flex flex-wrap items-center gap-2 rounded-lg border border-[#dfe2f1] bg-white px-3 py-2"
-                >
-                  <span className="mono-token min-w-0 flex-1 truncate text-xs font-semibold">
-                    {attribute.technical_name}
-                  </span>
-                  <Button
-                    size="sm"
-                    onClick={() => void addUnexpectedAttribute(attribute.id)}
-                    disabled={addItems.isPending || markExecuted.isPending}
-                  >
-                    이번 검증에 추가
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() =>
-                      setDismissedAttributes((current) => new Set(current).add(attribute.id))
-                    }
-                  >
-                    제외
-                  </Button>
-                </div>
-              ))}
             </div>
           </div>
         ) : null}
@@ -331,6 +275,31 @@ export function QaSessionAnalysisPanel({
           )}
         </div>
       </section>
+    </div>
+  );
+}
+
+function DiscoveredItemList({ title, items }: { title: string; items: string[] }) {
+  return (
+    <div className="overflow-hidden rounded-lg border border-[#dce4ed] bg-white">
+      <p className="border-b border-[#e8edf3] px-3 py-2 text-xs font-semibold text-[#526174]">
+        {title} {items.length}개
+      </p>
+      <ul className="max-h-44 overflow-y-auto p-2">
+        {items.length === 0 ? (
+          <li className="px-1 py-2 text-xs text-[#94a3b8]">발견된 항목이 없어요.</li>
+        ) : (
+          items.map((item) => (
+            <li
+              key={item}
+              title={item}
+              className="mono-token truncate rounded-md px-2 py-1.5 text-xs text-[#354255] odd:bg-[#f7f9fb]"
+            >
+              {item}
+            </li>
+          ))
+        )}
+      </ul>
     </div>
   );
 }
