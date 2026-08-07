@@ -343,10 +343,10 @@ export function QaItemSpecDiffTable({
             </code>
             <p className="mt-1 text-[11px] text-[#8b97a8]">이벤트 전체</p>
           </div>
-          <p className="text-[12.5px] leading-[1.5] text-[#475569]">
+          <p className="self-center text-[12.5px] leading-[1.5] text-[#475569]">
             이벤트 로그 {rawPropertiesList.length}건 수신
           </p>
-          <p className="text-[12.5px] leading-[1.5] text-[#64748b]">
+          <p className="self-center text-[12.5px] leading-[1.5] text-[#64748b]">
             {eventDescription || "이벤트 설명이 없습니다."}
           </p>
           <div className="flex self-center justify-center">
