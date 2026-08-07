@@ -59,7 +59,7 @@ function QaIssuesPage() {
   const eventById = new Map(events.map((event) => [event.id, event]));
   const environmentById = new Map(environments.map((environment) => [environment.id, environment]));
   const channelById = new Map(channels.map((channel) => [channel.id, channel]));
-  const reporterById = new Map(
+  const authorById = new Map(
     members.map((member) => [
       member.user_id,
       member.profiles?.display_name || member.profiles?.email || "알 수 없는 사용자",
@@ -253,7 +253,6 @@ function QaIssuesPage() {
                           channel?.name ?? "채널 미지정",
                           issue.session_name,
                           `${issue.round_number}차`,
-                          `리포팅한 사람 ${reporterById.get(issue.created_by) ?? "알 수 없는 사용자"}`,
                         ]
                           .filter(Boolean)
                           .join(" · ")}
@@ -263,6 +262,7 @@ function QaIssuesPage() {
                         <div className="mt-3 rounded-[10px] border border-[#cbd5e1] bg-[#f8fafc] px-3 py-2.5">
                           <div className="flex items-center justify-between gap-2">
                             <p className="text-[11.5px] font-medium text-[#64748b]">
+                              {authorById.get(latestComment.author_id) ?? "알 수 없는 사용자"} ·{" "}
                               {formatDateTime(latestComment.created_at)}
                             </p>
                             {latestComment.author_id === user?.id &&
@@ -414,6 +414,7 @@ function QaIssuesPage() {
                                 <div key={comment.id} className="py-2.5">
                                   <div className="flex items-center justify-between gap-2">
                                     <p className="text-[11px] font-medium text-[#64748b]">
+                                      {authorById.get(comment.author_id) ?? "알 수 없는 사용자"} ·{" "}
                                       {formatDateTime(comment.created_at)}
                                     </p>
                                     {comment.author_id === user?.id &&
