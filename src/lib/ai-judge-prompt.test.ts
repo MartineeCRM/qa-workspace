@@ -1,7 +1,26 @@
 import { describe, expect, it } from "vitest";
-import { buildJudgePrompt, JUDGE_RESPONSE_FORMAT, parseJudgeResponse } from "./ai-judge-prompt";
+import {
+  buildJudgePrompt,
+  buildJudgeRequest,
+  JUDGE_RESPONSE_FORMAT,
+  JUDGE_SYSTEM_PROMPT,
+  parseJudgeResponse,
+} from "./ai-judge-prompt";
 
 describe("buildJudgePrompt", () => {
+  it("keeps reusable instructions separate from request-specific evidence", () => {
+    const request = buildJudgeRequest({
+      rules: [{ id: "rule-1", name: "등급", description: "GOLD만 허용" }],
+      targets: [],
+    });
+
+    expect(JUDGE_SYSTEM_PROMPT).toContain("판정 원칙");
+    expect(JUDGE_SYSTEM_PROMPT).toContain("응답 형식");
+    expect(JUDGE_SYSTEM_PROMPT).not.toContain("rule-1");
+    expect(request).toContain("rule-1");
+    expect(request).not.toContain("판정 원칙");
+  });
+
   it("includes the rule description and every target's evidence", () => {
     const prompt = buildJudgePrompt({
       rules: [

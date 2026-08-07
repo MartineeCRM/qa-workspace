@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import {
-  buildJudgePrompt,
+  buildJudgeRequest,
+  JUDGE_SYSTEM_PROMPT,
   JUDGE_RESPONSE_FORMAT,
   parseJudgeResponse,
   type JudgePromptInput,
@@ -56,7 +57,11 @@ export const judgeChecklistItemWithAI = createServerFn({ method: "POST" })
         },
         body: JSON.stringify({
           model: process.env.OPENAI_MODEL ?? "gpt-5.6-luna",
-          input: buildJudgePrompt(data),
+          input: [
+            { role: "developer", content: JUDGE_SYSTEM_PROMPT },
+            { role: "user", content: buildJudgeRequest(data) },
+          ],
+          prompt_cache_key: "qa-workspace-judge-v1",
           reasoning: { effort: "low" },
           text: { format: JUDGE_RESPONSE_FORMAT },
           max_output_tokens: judgeOutputTokenBudget(data.rules.length),
