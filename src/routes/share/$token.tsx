@@ -86,9 +86,9 @@ function SharedIssuesPage() {
       <div className="grid min-h-screen place-items-center bg-[#eef2f6] px-5">
         <div className="w-full max-w-sm rounded-[14px] border border-[#cbd5e1] bg-white p-6 text-center shadow-sm">
           <ShieldCheck className="mx-auto size-8 text-[#2b6a9c]" />
-          <h1 className="mt-3 text-lg font-bold">로그인 후 확인할 수 있어요</h1>
+          <h1 className="mt-3 text-lg font-bold">초대받은 계정으로 로그인해주세요</h1>
           <p className="mt-1 text-sm leading-6 text-[#64748b]">
-            댓글과 상태 변경자를 정확히 기록하기 위해 고객사 계정으로 로그인해주세요.
+            계정이 없다면 초대받은 이메일로 먼저 가입해주세요.
           </p>
           <Button asChild className="mt-5 w-full">
             <Link to="/login" search={{ redirect: `/share/${token}` }}>
@@ -100,7 +100,7 @@ function SharedIssuesPage() {
             search={{ redirect: `/share/${token}` }}
             className="mt-3 inline-block text-xs font-semibold text-[#2b6a9c] hover:underline"
           >
-            고객사 계정 만들기
+            계정이 없어요 · 가입하기
           </Link>
         </div>
       </div>
