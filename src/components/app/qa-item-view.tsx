@@ -734,13 +734,6 @@ export function QaItemView({
                       </code>
                       <p className="mt-1 text-[11px] text-[#8b97a8]">어트리뷰트 전체</p>
                     </div>
-                    <div>AS-IS · 실제 수신</div>
-                    <div>TO-BE · 택소노미 정의</div>
-                    <div className="text-center">판정</div>
-                    <div>확인 및 처리</div>
-                  </div>
-                  <div className="grid min-w-[760px] grid-cols-[minmax(140px,1fr)_minmax(150px,1fr)_minmax(160px,1.1fr)_minmax(68px,0.5fr)_minmax(125px,0.65fr)] items-start gap-4 bg-[#f7fafc] px-4 pb-3">
-                    <span />
                     <div className="min-w-0">
                       <code className="rounded-md bg-[#f1f4f8] px-1.5 py-0.5 font-mono text-[12.5px] text-[#64748b]">
                         {latestAttributeValue === null
