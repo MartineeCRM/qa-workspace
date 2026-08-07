@@ -154,16 +154,27 @@ export const getSharedIssuePortal = createServerFn({ method: "GET" })
     const channelIds = [
       ...new Set((sessions ?? []).map((row: any) => row.qa_channel_id).filter(Boolean)),
     ];
-    const [{ data: environments }, { data: channels }] = await Promise.all([
+    const eventIds = [
+      ...new Set(
+        (items ?? [])
+          .filter((row: any) => row.target_type === "event")
+          .map((row: any) => row.target_id),
+      ),
+    ];
+    const [{ data: environments }, { data: channels }, { data: events }] = await Promise.all([
       environmentIds.length
         ? db.from("qa_environments").select("id, name").in("id", environmentIds)
         : Promise.resolve({ data: [] }),
       channelIds.length
         ? db.from("qa_channels").select("id, name").in("id", channelIds)
         : Promise.resolve({ data: [] }),
+      eventIds.length
+        ? db.from("taxonomy_events").select("id, technical_name").in("id", eventIds)
+        : Promise.resolve({ data: [] }),
     ]);
     const environmentById = new Map((environments ?? []).map((row: any) => [row.id, row.name]));
     const channelById = new Map((channels ?? []).map((row: any) => [row.id, row.name]));
+    const eventById = new Map((events ?? []).map((row: any) => [row.id, row.technical_name]));
 
     const hydrated = (issues ?? []).flatMap((issue: any) => {
       const result = resultById.get(issue.checklist_item_result_id) as any;
@@ -171,11 +182,18 @@ export const getSharedIssuePortal = createServerFn({ method: "GET" })
       const session = item ? (sessionById.get(item.qa_session_id) as any) : null;
       const round = session ? (roundById.get(session.qa_round_id) as any) : null;
       if (!result || !item || !session || !round) return [];
+      const eventName = item.target_type === "event" ? eventById.get(item.target_id) : null;
       return [
         {
           id: issue.id,
           targetType: issue.target_type,
           targetLabel: issue.target_label,
+          displayLabel:
+            issue.target_type === "property" && eventName
+              ? `${eventName}.${issue.target_label}`
+              : issue.target_type === "event" && eventName
+                ? eventName
+                : issue.target_label,
           workflowStatus: issue.workflow_status,
           updatedAt: issue.updated_at ?? issue.created_at,
           environmentName: environmentById.get(round.qa_environment_id) ?? "QA",

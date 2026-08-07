@@ -49,7 +49,7 @@ function SharedIssuesPage() {
       (portal?.issues ?? []).filter(
         (issue: any) =>
           (filter === "all" || issue.workflowStatus === filter) &&
-          issue.targetLabel.toLowerCase().includes(query.trim().toLowerCase()),
+          issue.displayLabel.toLowerCase().includes(query.trim().toLowerCase()),
       ),
     [portal, filter, query],
   );
@@ -131,7 +131,7 @@ function SharedIssuesPage() {
                 >
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <code className="break-all text-[13px] font-bold">{issue.targetLabel}</code>
+                      <code className="break-all text-[13px] font-bold">{issue.displayLabel}</code>
                       <span
                         className={cn(
                           "shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold",
@@ -178,7 +178,7 @@ function SharedIssuesPage() {
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
-                      <code className="break-all text-lg font-bold">{selected.targetLabel}</code>
+                      <code className="break-all text-lg font-bold">{selected.displayLabel}</code>
                       <span
                         className={cn(
                           "rounded-full px-2.5 py-1 text-[11px] font-bold",
