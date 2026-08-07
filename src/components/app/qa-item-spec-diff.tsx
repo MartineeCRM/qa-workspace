@@ -325,19 +325,16 @@ export function QaItemSpecDiffTable({
         </div>
       }
     >
-      <div className="border-b border-[#cbd5e1] bg-[#f2f7fb] px-4 py-4">
-        <div className="mb-2 flex items-center gap-2">
-          <span className="rounded-md bg-[#26394d] px-2 py-1 text-[10.5px] font-bold text-white">
-            상위 검증 대상 · 이벤트
-          </span>
-          <span className="h-px flex-1 bg-[#c9d8e5]" />
+      <div className="border-b border-[#dbe2ea] bg-white">
+        <div className="border-b border-[#e8edf2] bg-[#fbfcfd] px-4 py-2 text-[11px] font-bold text-[#64748b]">
+          상위 대상 · 이벤트
         </div>
-        <div className="grid min-w-[760px] grid-cols-[minmax(140px,1fr)_minmax(150px,1fr)_minmax(160px,1.1fr)_minmax(68px,0.5fr)_minmax(125px,0.65fr)] items-start gap-4 rounded-[10px] border border-[#b9cddd] bg-white px-4 py-3 shadow-sm">
+        <div className="grid min-w-[760px] grid-cols-[minmax(140px,1fr)_minmax(150px,1fr)_minmax(160px,1.1fr)_minmax(68px,0.5fr)_minmax(125px,0.65fr)] items-start gap-4 border-l-[3px] border-l-[#6f9aba] bg-[#f7fafc] py-3 pr-4 pl-[13px]">
           <div>
-            <code className="mono-token break-all text-[13px] font-bold text-[#1f4f73]">
+            <code className="mono-token break-all text-[13px] font-bold text-[#334155]">
               {eventName}
             </code>
-            <p className="mt-1 text-[11px] font-semibold text-[#6a7e90]">이벤트 전체</p>
+            <p className="mt-1 text-[11px] text-[#8b97a8]">이벤트 전체</p>
           </div>
           <p className="text-[12.5px] leading-[1.5] text-[#475569]">
             이벤트 로그 {rawPropertiesList.length}건 수신
@@ -379,7 +376,7 @@ export function QaItemSpecDiffTable({
         </div>
       </div>
       <div className="overflow-x-auto">
-        <div className="border-b border-[#e3e9ef] bg-[#f8fafc] px-4 py-2 text-[11px] font-bold text-[#657789]">
+        <div className="border-b border-[#e8edf2] bg-white px-4 py-2 text-[11px] font-semibold text-[#8b97a8]">
           하위 프로퍼티 · {rows.length}개
         </div>
         <div className="grid min-w-[760px] grid-cols-[minmax(140px,1fr)_minmax(150px,1fr)_minmax(160px,1.1fr)_minmax(68px,0.5fr)_minmax(125px,0.65fr)] gap-4 bg-[#fbfcfd] px-4 py-2.5 text-[11.5px] font-semibold tracking-wide text-[#64748b]">
