@@ -349,11 +349,16 @@ export function QaItemSpecDiffTable({
                       {row.observedSample !== undefined ? (
                         <p
                           className={cn(
-                            "mt-1 break-words text-[12.5px] leading-[1.45]",
+                            "mt-1 break-words whitespace-pre-wrap text-[12.5px] leading-[1.45]",
                             observedValueHasIssue ? "font-bold text-[#dc2626]" : "text-[#64748b]",
                           )}
                         >
-                          수신 값: {JSON.stringify(row.observedSample)}
+                          수신 값:{" "}
+                          {JSON.stringify(
+                            row.observedSample,
+                            null,
+                            Array.isArray(row.observedSample) ? 2 : undefined,
+                          )}
                         </p>
                       ) : null}
                     </div>

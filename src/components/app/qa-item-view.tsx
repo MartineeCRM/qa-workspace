@@ -690,13 +690,17 @@ export function QaItemView({
                     </code>
                     <p
                       className={cn(
-                        "mt-1 break-words text-[12.5px] leading-[1.45]",
+                        "mt-1 break-words whitespace-pre-wrap text-[12.5px] leading-[1.45]",
                         finalStatus === "failed" ? "font-bold text-[#dc2626]" : "text-[#64748b]",
                       )}
                     >
                       {latestAttributeValue === undefined
                         ? "수신 값 없음"
-                        : `수신 값: ${JSON.stringify(latestAttributeValue)}`}
+                        : `수신 값: ${JSON.stringify(
+                            latestAttributeValue,
+                            null,
+                            Array.isArray(latestAttributeValue) ? 2 : undefined,
+                          )}`}
                     </p>
                   </div>
                   <div className="min-w-0">
