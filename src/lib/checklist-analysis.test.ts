@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { judgeChecklistItem } from "./checklist-analysis";
+import { formatTaxonomyExampleForAI, judgeChecklistItem } from "./checklist-analysis";
 import type { AttributeSnapshot } from "./checklist-judge";
 import type { QaChecklistItem } from "./qa-rounds-queries";
 import type { TaxonomyCustomAttribute, TaxonomyEvent, TaxonomyEventProperty } from "./queries";
@@ -149,6 +149,13 @@ describe("judgeChecklistItem — custom attribute with no validation rule", () =
 });
 
 describe("judgeChecklistItem — taxonomy example format", () => {
+  it("normalizes a JSON-looking array example into an actual array for the AI prompt", () => {
+    expect(formatTaxonomyExampleForAI('["PUSH", "SMS", "DM"]', "array")).toBe(
+      '["PUSH","SMS","DM"]',
+    );
+    expect(formatTaxonomyExampleForAI("PUSH, SMS, DM", "array")).toBe('["PUSH","SMS","DM"]');
+  });
+
   it("sends property examples and observed values to AI as an implicit format rule", async () => {
     judgeWithAI.mockResolvedValue({
       ok: true,

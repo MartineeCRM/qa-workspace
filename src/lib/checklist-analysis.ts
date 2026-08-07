@@ -29,6 +29,26 @@ export type ChecklistItemVerdict = {
   judged_by: "rule" | "ai";
 };
 
+export function formatTaxonomyExampleForAI(example: unknown, dataType: string): string {
+  if ((dataType === "array" || dataType === "array of object") && typeof example === "string") {
+    try {
+      const parsed = JSON.parse(example);
+      if (Array.isArray(parsed)) return JSON.stringify(parsed);
+    } catch {
+      if (dataType === "array") {
+        return JSON.stringify(
+          example
+            .replace(/^\s*\[|\]\s*$/g, "")
+            .split(",")
+            .map((value) => value.trim().replace(/^["']|["']$/g, ""))
+            .filter(Boolean),
+        );
+      }
+    }
+  }
+  return JSON.stringify(example);
+}
+
 export async function judgeChecklistItem(
   item: QaChecklistItem,
   ctx: {
@@ -252,9 +272,10 @@ async function judgeQualitative(
             name: `${property.technical_name} 값 형식`,
             description: [
               `${property.technical_name}의 실제 값은 택소노미 정의와 같은 형식·의미여야 합니다.`,
+              `택소노미 데이터 타입: ${property.data_type}.`,
               property.description?.trim() ? `설명: ${property.description.trim()}` : null,
               property.example_value != null
-                ? `형식 예시: ${JSON.stringify(property.example_value)} (고정값이 아니라 형식 표본)`
+                ? `형식 예시: ${formatTaxonomyExampleForAI(property.example_value, property.data_type)} (고정값이 아니라 형식 표본)`
                 : null,
             ]
               .filter(Boolean)
@@ -271,9 +292,10 @@ async function judgeQualitative(
               name: `${attribute.technical_name} 값 형식`,
               description: [
                 `${attribute.technical_name}의 실제 값은 택소노미 정의와 같은 형식·의미여야 합니다.`,
+                `택소노미 데이터 타입: ${attribute.data_type}.`,
                 attribute.description?.trim() ? `설명: ${attribute.description.trim()}` : null,
                 attribute.example_value != null
-                  ? `형식 예시: ${JSON.stringify(attribute.example_value)} (고정값이 아니라 형식 표본)`
+                  ? `형식 예시: ${formatTaxonomyExampleForAI(attribute.example_value, attribute.data_type)} (고정값이 아니라 형식 표본)`
                   : null,
               ]
                 .filter(Boolean)

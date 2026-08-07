@@ -75,6 +75,9 @@ describe("buildJudgePrompt", () => {
     expect(prompt).toContain("A가 없으면 통과");
     expect(prompt).toContain("A가 있는데 B가 없으면 실패");
     expect(prompt).toContain("데이터 타입, 구조, 표현 체계, 의미 영역, 정규화 규칙");
+    expect(prompt).toContain(
+      "택소노미 타입이 array이면 실제 배열을 문자열이어야 한다고 판단하지 마세요",
+    );
     expect(prompt).toContain("사람이 읽는 명칭과 URL");
     expect(prompt).toContain("임의로 기대값에 맞춰 해석하지 마세요");
     expect(prompt).toContain("mismatch_dimensions");
