@@ -211,9 +211,9 @@ export function QaItemView({
     discussions.find((discussion) => discussion.id === selectedIssueId) ?? discussions[0] ?? null;
 
   function discussionDisplayLabel(discussion: (typeof discussions)[number]) {
-    return discussion.target_type === "custom_attribute"
-      ? discussion.target_label
-      : `${label}.${discussion.target_label}`;
+    if (discussion.target_type === "custom_attribute") return discussion.target_label;
+    if (discussion.target_type === "event") return `${label} · 이벤트 전체`;
+    return `${label}.${discussion.target_label}`;
   }
 
   const normalizedSnapshots = normalizeFlatAttributeArrays(snapshots, customAttributes);
@@ -485,6 +485,27 @@ export function QaItemView({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {item.target_type === "event" ? (
+            <button
+              type="button"
+              onClick={() => {
+                if (!result) return toast.error("분석 결과가 있어야 이슈로 등록할 수 있어요");
+                createIssue.mutate(
+                  { type: "event", id: item.target_id, label: "이벤트 전체" },
+                  {
+                    onSuccess: (issue) => {
+                      setSelectedIssueId(issue.id);
+                      setCommentBody("");
+                      toast.success(`${label} 이벤트 전체 이슈를 추가했어요`);
+                    },
+                  },
+                );
+              }}
+              className="h-9 rounded-md border border-[#f0dfc0] bg-[#fdf9f1] px-3 text-sm font-semibold text-[#b45309] hover:border-[#d9bd8d]"
+            >
+              이벤트 이슈 있음
+            </button>
+          ) : null}
           <select
             aria-label="판정 결과 항목 선택"
             value={item.id}
@@ -945,12 +966,12 @@ export function QaItemView({
           ) : null}
           <Panel
             title="이슈 처리"
-            description={`스펙 대조에서 선택한 ${item.target_type === "event" ? "프로퍼티" : "어트리뷰트"}에 댓글을 남겨요. 상태 변경과 이월은 이슈 모아보기에서 합니다.`}
+            description={`${item.target_type === "event" ? "이벤트 전체나 프로퍼티" : "어트리뷰트"} 이슈에 댓글을 남겨요. 상태 변경과 이월은 이슈 모아보기에서 합니다.`}
           >
             <div className="space-y-3 p-4">
               {discussions.length === 0 ? (
                 <p className="rounded-lg border border-dashed px-3 py-5 text-center text-[12.5px] text-[#8b97a8]">
-                  스펙 대조에서 이슈 있음을 누르면 여기에 추가돼요.
+                  이슈 있음 버튼을 누르면 여기에 추가돼요.
                 </p>
               ) : (
                 <>
