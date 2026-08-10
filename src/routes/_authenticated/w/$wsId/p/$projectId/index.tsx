@@ -1,9 +1,19 @@
 import { createFileRoute, Link, useParams } from "@tanstack/react-router";
-import { Activity, AlertTriangle, Layers, ListTree, ShieldCheck } from "lucide-react";
+import {
+  Activity,
+  Braces,
+  CircleAlert,
+  CircleCheck,
+  Layers,
+  ListTree,
+  MessagesSquare,
+  ShieldCheck,
+  Wrench,
+  type LucideIcon,
+} from "lucide-react";
 
 import { EmptyState, Panel, Stat } from "@/components/app/layout-parts";
 import { CoverageBar } from "@/components/app/coverage";
-import { Pill } from "@/components/app/badges";
 import {
   buildCoverageItems,
   useActivity,
@@ -22,6 +32,36 @@ import {
 } from "@/lib/qa-rounds-queries";
 import { checklistCoverageItems, environmentChecklistCoverage } from "@/lib/qa-workflow";
 import { formatDateTime } from "@/lib/domain";
+
+const issueStatus: Record<
+  "open" | "talk" | "fixing" | "done",
+  { label: string; icon: LucideIcon; iconClass: string; badgeClass: string }
+> = {
+  open: {
+    label: "이슈 있음",
+    icon: CircleAlert,
+    iconClass: "bg-destructive/10 text-destructive",
+    badgeClass: "border-destructive/25 bg-destructive/10 text-destructive",
+  },
+  talk: {
+    label: "확인 필요",
+    icon: MessagesSquare,
+    iconClass: "bg-amber-100 text-amber-700",
+    badgeClass: "border-amber-200 bg-amber-50 text-amber-700",
+  },
+  fixing: {
+    label: "개발 수정 중",
+    icon: Wrench,
+    iconClass: "bg-blue-100 text-blue-700",
+    badgeClass: "border-blue-200 bg-blue-50 text-blue-700",
+  },
+  done: {
+    label: "다음 검증 대기",
+    icon: CircleCheck,
+    iconClass: "bg-emerald-100 text-emerald-700",
+    badgeClass: "border-emerald-200 bg-emerald-50 text-emerald-700",
+  },
+};
 
 export const Route = createFileRoute("/_authenticated/w/$wsId/p/$projectId/")({
   head: () => ({
@@ -62,7 +102,9 @@ function ProjectOverview() {
 
   const items = buildCoverageItems(events, eventProperties, customAttributes);
   const activeEvents = events.filter((e) => e.is_active).length;
+  const activeEventProperties = eventProperties.filter((property) => property.is_active).length;
   const activeAttributes = customAttributes.filter((a) => a.is_active).length;
+  const coverageChannels = channels.filter((channel) => channel.is_active);
 
   // See checklistCoverageItems in qa-workflow.ts: the checklist schema only
   // tracks events/custom attributes, so this is a narrower set than `items`.
@@ -79,8 +121,9 @@ function ProjectOverview() {
         <p className="max-w-2xl text-sm text-muted-foreground">{project.description}</p>
       ) : null}
 
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid gap-3 sm:grid-cols-3">
         <Stat icon={ListTree} label="이벤트" value={activeEvents} />
+        <Stat icon={Braces} label="이벤트 프로퍼티" value={activeEventProperties} />
         <Stat icon={Layers} label="어트리뷰트" value={activeAttributes} />
       </div>
 
@@ -109,7 +152,7 @@ function ProjectOverview() {
                 checklistItems,
                 coverageRows,
                 stage.id,
-                channels.filter((channel) => channel.is_required).map((channel) => channel.id),
+                coverageChannels.map((channel) => channel.id),
                 exclusions?.events,
               );
               return (
@@ -132,6 +175,38 @@ function ProjectOverview() {
                     failed={cov.failed}
                     total={cov.total}
                   />
+                  {coverageChannels.length > 0 ? (
+                    <ul className="ml-3 mt-4 space-y-3 border-l border-border/70 pl-4">
+                      {coverageChannels.map((channel) => {
+                        const channelCoverage = environmentChecklistCoverage(
+                          checklistItems,
+                          coverageRows,
+                          stage.id,
+                          [channel.id],
+                          exclusions?.events,
+                        );
+                        return (
+                          <li
+                            key={channel.id}
+                            className="grid gap-2 sm:grid-cols-[8rem_1fr] sm:items-center"
+                          >
+                            <div>
+                              <p className="text-xs font-medium">{channel.name}</p>
+                              <p className="mt-0.5 text-[11px] text-muted-foreground">
+                                실패 {channelCoverage.failed} · 미시작 {channelCoverage.notStarted}
+                              </p>
+                            </div>
+                            <CoverageBar
+                              verified={channelCoverage.verified}
+                              failed={channelCoverage.failed}
+                              total={channelCoverage.total}
+                              className="[&_span]:text-xs"
+                            />
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  ) : null}
                 </li>
               );
             })}
@@ -156,16 +231,17 @@ function ProjectOverview() {
                 const stage = environmentById.get(issue.qa_environment_id);
                 const event = eventById.get(issue.event_id);
                 const channel = channels.find((candidate) => candidate.id === issue.qa_channel_id);
+                const status = issueStatus[issue.workflow_status as keyof typeof issueStatus];
+                if (!status) return null;
+                const StatusIcon = status.icon;
                 return (
                   <li key={issue.id} className="px-4 py-2.5">
-                    <div className="flex items-start gap-2">
-                      <AlertTriangle
-                        className={
-                          issue.workflow_status === "open"
-                            ? "mt-0.5 size-4 text-destructive"
-                            : "mt-0.5 size-4 text-muted-foreground"
-                        }
-                      />
+                    <div className="flex items-start gap-3">
+                      <span
+                        className={`mt-0.5 grid size-7 shrink-0 place-items-center rounded-md ${status.iconClass}`}
+                      >
+                        <StatusIcon className="size-3.5" />
+                      </span>
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
                           <Link
@@ -182,19 +258,17 @@ function ProjectOverview() {
                                 ? (event?.technical_name ?? issue.event_id)
                                 : `${event?.technical_name ?? issue.event_id}.${issue.target_label}`}
                           </Link>
-                          {stage ? <Pill>{stage.name}</Pill> : null}
-                          <Pill>{channel?.name ?? "채널 미지정"}</Pill>
-                          <Pill>{issue.session_name}</Pill>
-                          <Pill>
-                            {issue.workflow_status === "open"
-                              ? "이슈 있음"
-                              : issue.workflow_status === "talk"
-                                ? "논의중"
-                                : issue.workflow_status === "fixing"
-                                  ? "개발 수정 중"
-                                  : "해결"}
-                          </Pill>
+                          <span
+                            className={`rounded-full border px-2 py-0.5 text-[11px] font-medium ${status.badgeClass}`}
+                          >
+                            {status.label}
+                          </span>
                         </div>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {[stage?.name, channel?.name ?? "플랫폼 미지정", issue.session_name]
+                            .filter(Boolean)
+                            .join(" · ")}
+                        </p>
                       </div>
                     </div>
                   </li>
