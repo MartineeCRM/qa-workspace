@@ -70,13 +70,13 @@ QA Workspace는 이벤트 택소노미와 실제 수집 로그를 비교하는 �
 
 ### Primary files
 
-| Purpose | Source |
-|---|---|
-| Global tokens and utilities | `src/styles.css` |
-| Shared layout components | `src/components/app/layout-parts.tsx` |
-| Status badges | `src/components/app/badges.tsx` |
-| Base UI components | `src/components/ui/*` |
-| Coverage visualization | `src/components/app/coverage.tsx` |
+| Purpose                     | Source                                |
+| --------------------------- | ------------------------------------- |
+| Global tokens and utilities | `src/styles.css`                      |
+| Shared layout components    | `src/components/app/layout-parts.tsx` |
+| Status badges               | `src/components/app/badges.tsx`       |
+| Base UI components          | `src/components/ui/*`                 |
+| Coverage visualization      | `src/components/app/coverage.tsx`     |
 
 `src/styles.css`와 충돌하는 내용이 있다면 언제나 `src/styles.css`를 우선합니다.
 
@@ -86,37 +86,37 @@ QA Workspace는 이벤트 택소노미와 실제 수집 로그를 비교하는 �
 
 ### Light mode
 
-| Token | OKLCH | Role |
-|---|---|---|
-| `background` | `oklch(0.977 0.005 250)` | 전체 화면 배경 |
-| `foreground` | `oklch(0.33 0.038 214)` | 기본 텍스트 |
-| `card` | `oklch(1 0 0)` | 패널과 카드 |
-| `card-foreground` | `oklch(0.33 0.038 214)` | 카드 텍스트 |
-| `popover` | `oklch(1 0 0)` | 팝오버와 메뉴 |
-| `primary` | `oklch(0.53 0.088 244)` | 주요 행동, 링크, 통과 |
-| `primary-foreground` | `oklch(0.99 0.003 250)` | primary 위 텍스트 |
-| `secondary` | `oklch(0.947 0.012 245)` | 보조 버튼과 영역 |
-| `muted` | `oklch(0.955 0.006 248)` | 비활성·미검증 배경 |
-| `muted-foreground` | `oklch(0.59 0.032 215)` | 설명과 메타데이터 |
-| `accent` | `oklch(0.947 0.012 245)` | hover와 선택 보조 배경 |
-| `destructive` | `oklch(0.55 0.18 27)` | 오류, 이슈, 삭제 |
-| `border` | `oklch(0.9 0.012 245)` | 기본 테두리 |
-| `input` | `oklch(0.89 0.014 245)` | 입력 필드 테두리 |
-| `ring` | `oklch(0.53 0.088 244)` | 키보드 포커스 |
-| `surface` | `oklch(0.977 0.005 250)` | 행 hover와 약한 표면 |
-| `surface-strong` | `oklch(0.947 0.012 245)` | 테이블 헤더와 강조 표면 |
-| `draft` | `oklch(0.93 0.03 90)` | 미시작 상태 배경 |
-| `draft-foreground` | `oklch(0.44 0.09 74)` | 미시작 상태 텍스트 |
-| `published` | `oklch(0.92 0.06 148)` | 완료 상태 배경 |
-| `published-foreground` | `oklch(0.45 0.15 146)` | 완료 상태 텍스트 |
-| `deprecated` | `oklch(0.93 0.006 250)` | 비활성·제외 상태 |
-| `critical` | `oklch(0.55 0.21 27)` | 치명 오류 |
-| `warning` | `oklch(0.62 0.14 72)` | 확인 필요 |
-| `info` | `oklch(0.53 0.088 244)` | 정보와 AI 확인 필요 |
-| `sidebar` | `oklch(0.39 0.042 213)` | 워크스페이스 사이드바 |
-| `sidebar-foreground` | `oklch(0.85 0.026 217)` | 사이드바 기본 텍스트 |
-| `sidebar-accent` | `oklch(0.45 0.042 213)` | 사이드바 선택·hover |
-| `sidebar-accent-foreground` | `oklch(0.99 0.003 250)` | 선택된 사이드바 텍스트 |
+| Token                       | OKLCH                    | Role                    |
+| --------------------------- | ------------------------ | ----------------------- |
+| `background`                | `oklch(0.977 0.005 250)` | 전체 화면 배경          |
+| `foreground`                | `oklch(0.33 0.038 214)`  | 기본 텍스트             |
+| `card`                      | `oklch(1 0 0)`           | 패널과 카드             |
+| `card-foreground`           | `oklch(0.33 0.038 214)`  | 카드 텍스트             |
+| `popover`                   | `oklch(1 0 0)`           | 팝오버와 메뉴           |
+| `primary`                   | `oklch(0.53 0.088 244)`  | 주요 행동, 링크, 통과   |
+| `primary-foreground`        | `oklch(0.99 0.003 250)`  | primary 위 텍스트       |
+| `secondary`                 | `oklch(0.947 0.012 245)` | 보조 버튼과 영역        |
+| `muted`                     | `oklch(0.955 0.006 248)` | 비활성·미검증 배경      |
+| `muted-foreground`          | `oklch(0.59 0.032 215)`  | 설명과 메타데이터       |
+| `accent`                    | `oklch(0.947 0.012 245)` | hover와 선택 보조 배경  |
+| `destructive`               | `oklch(0.55 0.18 27)`    | 오류, 이슈, 삭제        |
+| `border`                    | `oklch(0.9 0.012 245)`   | 기본 테두리             |
+| `input`                     | `oklch(0.89 0.014 245)`  | 입력 필드 테두리        |
+| `ring`                      | `oklch(0.53 0.088 244)`  | 키보드 포커스           |
+| `surface`                   | `oklch(0.977 0.005 250)` | 행 hover와 약한 표면    |
+| `surface-strong`            | `oklch(0.947 0.012 245)` | 테이블 헤더와 강조 표면 |
+| `draft`                     | `oklch(0.93 0.03 90)`    | 미시작 상태 배경        |
+| `draft-foreground`          | `oklch(0.44 0.09 74)`    | 미시작 상태 텍스트      |
+| `published`                 | `oklch(0.92 0.06 148)`   | 완료 상태 배경          |
+| `published-foreground`      | `oklch(0.45 0.15 146)`   | 완료 상태 텍스트        |
+| `deprecated`                | `oklch(0.93 0.006 250)`  | 비활성·제외 상태        |
+| `critical`                  | `oklch(0.55 0.21 27)`    | 치명 오류               |
+| `warning`                   | `oklch(0.62 0.14 72)`    | 확인 필요               |
+| `info`                      | `oklch(0.53 0.088 244)`  | 정보와 AI 확인 필요     |
+| `sidebar`                   | `oklch(0.39 0.042 213)`  | 워크스페이스 사이드바   |
+| `sidebar-foreground`        | `oklch(0.85 0.026 217)`  | 사이드바 기본 텍스트    |
+| `sidebar-accent`            | `oklch(0.45 0.042 213)`  | 사이드바 선택·hover     |
+| `sidebar-accent-foreground` | `oklch(0.99 0.003 250)`  | 선택된 사이드바 텍스트  |
 
 다크 모드 값은 `src/styles.css`의 `.dark` 블록을 그대로 사용합니다. 현재 제품 시안은 라이트 모드를 우선합니다.
 
@@ -124,23 +124,23 @@ QA Workspace는 이벤트 택소노미와 실제 수집 로그를 비교하는 �
 
 ### Font families
 
-| Role | Font |
-|---|---|
-| UI and Korean body | `Pretendard Variable`, Pretendard |
-| Latin fallback | `IBM Plex Sans` |
-| Technical identifiers | `JetBrains Mono` |
+| Role                  | Font                              |
+| --------------------- | --------------------------------- |
+| UI and Korean body    | `Pretendard Variable`, Pretendard |
+| Latin fallback        | `IBM Plex Sans`                   |
+| Technical identifiers | `JetBrains Mono`                  |
 
 ### Type scale
 
-| Role | Size | Weight | Notes |
-|---|---:|---:|---|
-| Page title | 26px | 700 | `-0.02em` tracking |
-| Section title | 22px | 700 | `-0.02em` tracking |
-| Stat value | 30px | 700 | tabular numbers |
-| Panel title | 14px | 600 | 짧고 직접적인 명칭 |
-| Body | 14px | 400–500 | 기본 UI 텍스트 |
-| Supporting text | 12px | 400 | 출처, 설명, 시간 |
-| Badge | 11px | 600 | 상태값에만 사용 |
+| Role            | Size |  Weight | Notes                        |
+| --------------- | ---: | ------: | ---------------------------- |
+| Page title      | 26px |     700 | `-0.02em` tracking           |
+| Section title   | 22px |     700 | `-0.02em` tracking           |
+| Stat value      | 30px |     700 | tabular numbers              |
+| Panel title     | 14px |     600 | 짧고 직접적인 명칭           |
+| Body            | 14px | 400–500 | 기본 UI 텍스트               |
+| Supporting text | 12px |     400 | 출처, 설명, 시간             |
+| Badge           | 11px |     600 | 상태값에만 사용              |
 | Technical token | 13px | 400–600 | 이벤트·프로퍼티·어트리뷰트명 |
 
 ### Technical identifiers
@@ -160,12 +160,12 @@ QA Workspace는 이벤트 택소노미와 실제 수집 로그를 비교하는 �
 
 기본 radius는 `0.375rem`입니다.
 
-| Token | Value | Typical usage |
-|---|---:|---|
-| `radius-sm` | 3px | 작은 상태 칩 |
-| `radius-md` | 5px | 버튼과 입력 필드 |
-| `radius-lg` | 6px | 패널과 카드 |
-| `radius-xl` | 10px | 제한적으로만 사용 |
+| Token       | Value | Typical usage     |
+| ----------- | ----: | ----------------- |
+| `radius-sm` |   3px | 작은 상태 칩      |
+| `radius-md` |   5px | 버튼과 입력 필드  |
+| `radius-lg` |   6px | 패널과 카드       |
+| `radius-xl` |  10px | 제한적으로만 사용 |
 
 ### Elevation
 
@@ -206,14 +206,14 @@ QA Workspace는 이벤트 택소노미와 실제 수집 로그를 비교하는 �
 
 ### Buttons
 
-| Variant | Usage |
-|---|---|
-| `default` | 화면의 주요 행동 하나 |
-| `secondary` | 보조 행동 |
-| `outline` | 중립적인 조작 |
-| `ghost` | 반복 행 안의 가벼운 행동 |
+| Variant       | Usage                          |
+| ------------- | ------------------------------ |
+| `default`     | 화면의 주요 행동 하나          |
+| `secondary`   | 보조 행동                      |
+| `outline`     | 중립적인 조작                  |
+| `ghost`       | 반복 행 안의 가벼운 행동       |
 | `destructive` | 삭제 또는 되돌리기 어려운 행동 |
-| `link` | 화면 이동 |
+| `link`        | 화면 이동                      |
 
 한 영역에 primary 버튼을 여러 개 배치하지 않습니다.
 
@@ -236,15 +236,15 @@ QA Workspace는 이벤트 택소노미와 실제 수집 로그를 비교하는 �
 
 상태값과 출처를 섞지 않습니다.
 
-| Status | Meaning | Visual treatment |
-|---|---|---|
-| 통과 | 수집·타입·형식·의미 검증 통과 | primary 또는 published |
-| AI 확인 필요 | 오류보다 통과에 가까우나 사람 확인 필요 | info blue |
-| 이슈 있음 | 아직 논의로 확인되지 않은 오류 | destructive red |
-| 확인 필요 | 논의와 판단이 필요한 상태 | warning amber |
-| 개발 수정 중 | 수정 작업 진행 중 | info blue |
-| 다음 검증 대기 | 수정됐으며 다음 라운드 검증 필요 | published green |
-| 미검증 | 아직 판정하지 않음 | muted gray |
+| Status         | Meaning                                 | Visual treatment       |
+| -------------- | --------------------------------------- | ---------------------- |
+| 통과           | 수집·타입·형식·의미 검증 통과           | primary 또는 published |
+| AI 확인 필요   | 오류보다 통과에 가까우나 사람 확인 필요 | info blue              |
+| 이슈 있음      | 아직 논의로 확인되지 않은 오류          | destructive red        |
+| 확인 필요      | 논의와 판단이 필요한 상태               | warning amber          |
+| 개발 수정 중   | 수정 작업 진행 중                       | info blue              |
+| 다음 검증 대기 | 수정됐으며 다음 라운드 검증 필요        | published green        |
+| 미검증         | 아직 판정하지 않음                      | muted gray             |
 
 아이콘도 상태에 맞춰 변경합니다.
 
@@ -262,22 +262,22 @@ QA Workspace는 이벤트 택소노미와 실제 수집 로그를 비교하는 �
 
 - `reviewed = passed + issue`
 - `validation progress = reviewed / total`
-- `pass rate = passed / reviewed`
+- `pass rate = passed / total`
 
 ### Display
 
 ```text
-검증 59 / 154
-검증 진행률 38.3% · 통과율 10.2%
-
-[ blue: passed ][ red: issue ][ gray: not reviewed ]
+환경       검증 결과 분포                                      진행률   통과율
+iOS 154   [ blue: passed ][ red: issue ][ gray: not reviewed ]   38.3%    3.9%
 ```
 
 - 파란 영역은 통과한 대상입니다.
 - 빨간 영역은 검증했고 이슈가 발견된 대상입니다.
 - 회색 영역은 아직 검증하지 않은 대상입니다.
+- 통과율은 막대의 파란 구간과 동일하게 `통과 ÷ 전체`로 계산합니다.
 - 빨간색 자체가 검증 진행률은 아닙니다. 파란색과 빨간색의 합이 검증 진행률입니다.
-- 환경 전체 아래에 플랫폼별 진행률을 들여쓰기해 표시합니다.
+- 환경 전체와 플랫폼 행의 막대·퍼센트 열은 같은 x 좌표에 정렬합니다.
+- 전체 건수만 상시 표시하고, 통과·이슈·미검증 건수와 분수는 툴팁으로 제공합니다.
 
 ## 10. Information hierarchy
 
@@ -299,15 +299,15 @@ QA 결과 상세 화면은 다음 순서를 유지합니다.
 
 다음 용어를 일관되게 사용합니다.
 
-| Concept | Korean label |
-|---|---|
-| Event | 이벤트 |
-| Event property | 이벤트 프로퍼티 또는 프로퍼티 |
-| Custom attribute | 어트리뷰트 |
-| Nested attribute field | 어트리뷰트 하위 필드 |
-| Taxonomy | 택소노미 |
-| Evidence log | 근거 로그 |
-| Related log | 연관 로그 |
+| Concept                | Korean label                  |
+| ---------------------- | ----------------------------- |
+| Event                  | 이벤트                        |
+| Event property         | 이벤트 프로퍼티 또는 프로퍼티 |
+| Custom attribute       | 어트리뷰트                    |
+| Nested attribute field | 어트리뷰트 하위 필드          |
+| Taxonomy               | 택소노미                      |
+| Evidence log           | 근거 로그                     |
+| Related log            | 연관 로그                     |
 
 이 프로젝트에서는 이벤트에 딸린 값을 `속성`이나 `어트리뷰트`라고 부르지 않습니다. 반드시 `프로퍼티`라고 부릅니다. `어트리뷰트`는 custom attribute만 의미합니다.
 
@@ -357,4 +357,3 @@ Claude Design이 새 화면이나 수정안을 만들 때 다음 내용을 함�
 5. desktop과 narrow viewport 대응
 6. 기존 시스템에 없는 값이 있다면 `Proposed tokens`
 7. 레거시 하드코딩을 그대로 사용한 부분이 없는지 확인 결과
-

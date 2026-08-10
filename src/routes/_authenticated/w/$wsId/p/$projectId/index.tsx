@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 
 import { EmptyState, Panel, Stat } from "@/components/app/layout-parts";
-import { CoverageBar } from "@/components/app/coverage";
+import { CoverageLegend, CoverageRow, CoverageTableHeader } from "@/components/app/coverage";
 import {
   buildCoverageItems,
   useActivity,
@@ -131,13 +131,16 @@ function ProjectOverview() {
         title="QA 환경별 실시간 커버리지"
         description="모든 환경은 현재 택소노미를 기준으로 측정돼요. 커버리지는 스냅샷으로 굳지 않아요."
         actions={
-          <Link
-            to="/w/$wsId/p/$projectId/taxonomy"
-            params={{ wsId, projectId }}
-            className="text-xs font-medium text-primary hover:underline"
-          >
-            택소노미 편집
-          </Link>
+          <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-2">
+            <CoverageLegend />
+            <Link
+              to="/w/$wsId/p/$projectId/taxonomy"
+              params={{ wsId, projectId }}
+              className="text-xs font-medium text-primary hover:underline"
+            >
+              택소노미 편집
+            </Link>
+          </div>
         }
       >
         {stages.length === 0 ? (
@@ -146,7 +149,8 @@ function ProjectOverview() {
             description="프로젝트를 만들면 기본 환경이 함께 생겨요."
           />
         ) : (
-          <ul className="divide-y">
+          <div role="table" aria-label="QA 환경별 검증 진행률과 통과율">
+            <CoverageTableHeader />
             {stages.map((stage: QaEnvironment) => {
               const cov = environmentChecklistCoverage(
                 checklistItems,
@@ -156,61 +160,44 @@ function ProjectOverview() {
                 exclusions?.events,
               );
               return (
-                <li key={stage.id} className="px-4 py-3">
-                  <div className="flex items-center justify-between gap-4">
-                    <Link
-                      to="/w/$wsId/p/$projectId/qa/$stageSlug"
-                      params={{ wsId, projectId, stageSlug: stage.slug }}
-                      className="text-sm font-medium hover:underline"
-                    >
-                      {stage.name}
-                    </Link>
-                    <span className="text-xs text-muted-foreground">
-                      실패 {cov.failed}건 · 미시작 {cov.notStarted}건
-                    </span>
-                  </div>
-                  <CoverageBar
-                    className="mt-2"
+                <div key={stage.id} role="rowgroup">
+                  <CoverageRow
+                    aggregate
+                    label={
+                      <Link
+                        to="/w/$wsId/p/$projectId/qa/$stageSlug"
+                        params={{ wsId, projectId, stageSlug: stage.slug }}
+                        className="hover:underline"
+                      >
+                        {stage.name}
+                      </Link>
+                    }
                     verified={cov.verified}
                     failed={cov.failed}
                     total={cov.total}
                   />
-                  {coverageChannels.length > 0 ? (
-                    <ul className="ml-3 mt-4 space-y-3 border-l border-border/70 pl-4">
-                      {coverageChannels.map((channel) => {
-                        const channelCoverage = environmentChecklistCoverage(
-                          checklistItems,
-                          coverageRows,
-                          stage.id,
-                          [channel.id],
-                          exclusions?.events,
-                        );
-                        return (
-                          <li
-                            key={channel.id}
-                            className="grid gap-2 sm:grid-cols-[8rem_1fr] sm:items-center"
-                          >
-                            <div>
-                              <p className="text-xs font-medium">{channel.name}</p>
-                              <p className="mt-0.5 text-[11px] text-muted-foreground">
-                                실패 {channelCoverage.failed} · 미시작 {channelCoverage.notStarted}
-                              </p>
-                            </div>
-                            <CoverageBar
-                              verified={channelCoverage.verified}
-                              failed={channelCoverage.failed}
-                              total={channelCoverage.total}
-                              className="[&_span]:text-xs"
-                            />
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  ) : null}
-                </li>
+                  {coverageChannels.map((channel) => {
+                    const channelCoverage = environmentChecklistCoverage(
+                      checklistItems,
+                      coverageRows,
+                      stage.id,
+                      [channel.id],
+                      exclusions?.events,
+                    );
+                    return (
+                      <CoverageRow
+                        key={channel.id}
+                        label={channel.name}
+                        verified={channelCoverage.verified}
+                        failed={channelCoverage.failed}
+                        total={channelCoverage.total}
+                      />
+                    );
+                  })}
+                </div>
               );
             })}
-          </ul>
+          </div>
         )}
       </Panel>
 
