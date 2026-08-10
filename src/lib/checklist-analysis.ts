@@ -287,7 +287,7 @@ async function judgeQualitative(
               `택소노미 데이터 타입: ${property.data_type}.`,
               property.description?.trim() ? `설명: ${property.description.trim()}` : null,
               property.example_value != null
-                ? `형식 예시: ${formatTaxonomyExampleForAI(property.example_value, property.data_type)} (고정값이 아니라 형식 표본)`
+                ? `계약 예시: ${formatTaxonomyExampleForAI(property.example_value, property.data_type)} (정확한 값의 고정 목록은 아니지만, 예시의 구조·표현 방식·의미 종류는 반드시 따라야 함)`
                 : null,
             ]
               .filter(Boolean)
@@ -307,7 +307,7 @@ async function judgeQualitative(
                 `택소노미 데이터 타입: ${attribute.data_type}.`,
                 attribute.description?.trim() ? `설명: ${attribute.description.trim()}` : null,
                 attribute.example_value != null
-                  ? `형식 예시: ${formatTaxonomyExampleForAI(attribute.example_value, attribute.data_type)} (고정값이 아니라 형식 표본)`
+                  ? `계약 예시: ${formatTaxonomyExampleForAI(attribute.example_value, attribute.data_type)} (정확한 값의 고정 목록은 아니지만, 예시의 구조·표현 방식·의미 종류는 반드시 따라야 함)`
                   : null,
               ]
                 .filter(Boolean)

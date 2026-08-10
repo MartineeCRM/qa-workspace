@@ -8,6 +8,7 @@ import { Pill } from "@/components/app/badges";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -245,6 +246,9 @@ function RuleDialog({
 
   const [name, setName] = useState(rule?.name ?? "");
   const [description, setDescription] = useState(rule?.description ?? "");
+  const [scope, setScope] = useState<"project" | "targets">(
+    rule && rule.validation_rule_targets.length > 0 ? "targets" : "project",
+  );
   const [search, setSearch] = useState("");
   const [staged, setStaged] = useState<RuleTarget[]>(() =>
     (rule?.validation_rule_targets ?? []).map((t) => {
@@ -315,6 +319,9 @@ function RuleDialog({
 
   async function submit() {
     if (!name.trim()) return toast.error("규칙 이름은 필수예요");
+    if (scope === "targets" && staged.length === 0) {
+      return toast.error("선택 대상 규칙은 적용 대상을 한 개 이상 골라주세요");
+    }
     setSaving(true);
     const payload = { name: name.trim(), description: description.trim() || null };
 
@@ -340,7 +347,7 @@ function RuleDialog({
         return toast.error(errorMessage(deleteError));
       }
     }
-    if (staged.length > 0) {
+    if (scope === "targets" && staged.length > 0) {
       const { error: targetError } = await db.from("validation_rule_targets").insert(
         staged.map((t) => ({
           rule_id: savedRule.id,
@@ -379,66 +386,95 @@ function RuleDialog({
             </p>
           </div>
           <div className="space-y-1.5">
-            <Label>적용 대상 (비워두면 프로젝트 전체)</Label>
-            <Input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              onKeyDown={handleSearchKeyDown}
-              placeholder="이벤트·프로퍼티·어트리뷰트 이름을 입력하고 엔터"
-            />
-            {search.trim() && searchCandidates.length > 0 ? (
-              <ul className="max-h-40 divide-y overflow-y-auto rounded-md border">
-                {searchCandidates.map((t) => {
-                  const key = `${t.kind}:${t.id}`;
-                  return (
-                    <li key={key}>
-                      <button
-                        type="button"
-                        onClick={() => stageTarget(t)}
-                        className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm hover:bg-muted"
-                      >
-                        <span className="text-xs text-muted-foreground">
-                          {t.kind === "event"
-                            ? "이벤트"
-                            : t.kind === "property"
-                              ? "프로퍼티"
-                              : "어트리뷰트"}
-                        </span>
-                        <span className="mono-token text-xs">{t.label}</span>
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-            ) : null}
-            {staged.length > 0 ? (
-              <ul className="flex flex-wrap gap-1.5">
-                {staged.map((t) => {
-                  const key = `${t.kind}:${t.id}`;
-                  return (
-                    <li
-                      key={key}
-                      className="flex items-center gap-1 rounded-full border bg-surface px-2 py-1 text-xs"
-                    >
-                      <span className="mono-token">{t.label}</span>
-                      <button
-                        type="button"
-                        onClick={() => unstage(key)}
-                        aria-label={`${t.label} 빼기`}
-                        className="text-muted-foreground hover:text-foreground"
-                      >
-                        <X className="size-3" />
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-            ) : null}
-            <p className="text-xs text-muted-foreground">
-              여러 이벤트·프로퍼티·어트리뷰트를 함께 골라서 서로 간의 관계(예: "이 값이 다른
-              이벤트의 값과 같아야 한다")도 이 규칙 하나로 표현할 수 있어요.
-            </p>
+            <Label>적용 범위</Label>
+            <RadioGroup
+              value={scope}
+              onValueChange={(value) => setScope(value as "project" | "targets")}
+              className="grid gap-2 sm:grid-cols-2"
+            >
+              <label className="flex cursor-pointer items-start gap-2 rounded-lg border p-3">
+                <RadioGroupItem value="project" className="mt-0.5" />
+                <span>
+                  <span className="block text-sm font-medium">프로젝트 전체</span>
+                  <span className="mt-0.5 block text-xs text-muted-foreground">
+                    이 프로젝트에서 AI가 판정하는 모든 이벤트·프로퍼티·어트리뷰트에 적용해요.
+                  </span>
+                </span>
+              </label>
+              <label className="flex cursor-pointer items-start gap-2 rounded-lg border p-3">
+                <RadioGroupItem value="targets" className="mt-0.5" />
+                <span>
+                  <span className="block text-sm font-medium">선택 대상</span>
+                  <span className="mt-0.5 block text-xs text-muted-foreground">
+                    지정한 항목과 항목 사이의 관계에만 적용해요.
+                  </span>
+                </span>
+              </label>
+            </RadioGroup>
           </div>
+          {scope === "targets" ? (
+            <div className="space-y-1.5">
+              <Label>적용 대상</Label>
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                onKeyDown={handleSearchKeyDown}
+                placeholder="이벤트·프로퍼티·어트리뷰트 이름을 입력하고 엔터"
+              />
+              {search.trim() && searchCandidates.length > 0 ? (
+                <ul className="max-h-40 divide-y overflow-y-auto rounded-md border">
+                  {searchCandidates.map((t) => {
+                    const key = `${t.kind}:${t.id}`;
+                    return (
+                      <li key={key}>
+                        <button
+                          type="button"
+                          onClick={() => stageTarget(t)}
+                          className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm hover:bg-muted"
+                        >
+                          <span className="text-xs text-muted-foreground">
+                            {t.kind === "event"
+                              ? "이벤트"
+                              : t.kind === "property"
+                                ? "프로퍼티"
+                                : "어트리뷰트"}
+                          </span>
+                          <span className="mono-token text-xs">{t.label}</span>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : null}
+              {staged.length > 0 ? (
+                <ul className="flex flex-wrap gap-1.5">
+                  {staged.map((t) => {
+                    const key = `${t.kind}:${t.id}`;
+                    return (
+                      <li
+                        key={key}
+                        className="flex items-center gap-1 rounded-full border bg-surface px-2 py-1 text-xs"
+                      >
+                        <span className="mono-token">{t.label}</span>
+                        <button
+                          type="button"
+                          onClick={() => unstage(key)}
+                          aria-label={`${t.label} 빼기`}
+                          className="text-muted-foreground hover:text-foreground"
+                        >
+                          <X className="size-3" />
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : null}
+              <p className="text-xs text-muted-foreground">
+                여러 이벤트·프로퍼티·어트리뷰트를 함께 골라서 서로 간의 관계(예: "이 값이 다른
+                이벤트의 값과 같아야 한다")도 이 규칙 하나로 표현할 수 있어요.
+              </p>
+            </div>
+          ) : null}
           <div className="space-y-1.5">
             <Label htmlFor="rule-desc">설명 (AI 판단 기준)</Label>
             <Textarea
