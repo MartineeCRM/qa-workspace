@@ -17,7 +17,7 @@ export function TopBar({ children }: { children?: React.ReactNode }) {
 
   async function handleSignOut() {
     await signOut();
-    navigate({ to: "/login" });
+    navigate({ to: "/login", search: { redirect: undefined } });
   }
 
   return (

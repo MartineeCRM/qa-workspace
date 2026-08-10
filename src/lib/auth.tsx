@@ -51,11 +51,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       (session?.user.user_metadata?.display_name as string | undefined) ??
       session?.user.email?.split("@")[0] ??
       "New user";
-    supabase
-      .rpc("ensure_profile", { _display_name: fallbackName })
-      .then(({ data }) => {
-        if (!cancelled && data) setProfile(data as unknown as Profile);
-      });
+    supabase.rpc("ensure_profile", { _display_name: fallbackName }).then(({ data }) => {
+      if (!cancelled && data) setProfile(data as unknown as Profile);
+    });
     return () => {
       cancelled = true;
     };

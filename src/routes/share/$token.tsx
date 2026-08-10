@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- portal data is returned from a dynamically hydrated server function */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createFileRoute, Link, useParams } from "@tanstack/react-router";
 import {

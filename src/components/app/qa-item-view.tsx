@@ -178,12 +178,18 @@ function formatAttributeExample(value: unknown, dataType: string): string {
 }
 
 export function QaItemView({
+  wsId,
   projectId,
+  stageSlug,
+  roundId,
   session,
   item,
   result,
 }: {
+  wsId: string;
   projectId: string;
+  stageSlug: string;
+  roundId: string;
   environmentId: string;
   session: QaSession;
   item: QaChecklistItemWithDisposition;
@@ -539,7 +545,14 @@ export function QaItemView({
             onChange={(event) =>
               navigate({
                 to: "/w/$wsId/p/$projectId/qa/$stageSlug/$roundId/$sessionId/$itemId",
-                params: (prev) => ({ ...prev, itemId: event.target.value }),
+                params: {
+                  wsId,
+                  projectId,
+                  stageSlug,
+                  roundId,
+                  sessionId: session.id,
+                  itemId: event.target.value,
+                },
               })
             }
             className="h-9 max-w-[280px] rounded-md border border-[#dfe5ec] bg-white px-3 text-sm outline-none focus:border-[#2b6a9c] focus:ring-2 focus:ring-[#2b6a9c]/15"
@@ -758,7 +771,7 @@ export function QaItemView({
               onEditEvent={() =>
                 navigate({
                   to: "/w/$wsId/p/$projectId/taxonomy",
-                  params: (prev) => ({ wsId: prev.wsId, projectId: prev.projectId }),
+                  params: { wsId, projectId },
                 })
               }
               onEditProperty={(propertyId) => {

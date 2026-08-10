@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- access-control tables are newer than the generated Supabase schema */
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 

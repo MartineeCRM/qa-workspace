@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+/* eslint-disable @typescript-eslint/no-explicit-any -- server function results include newly migrated tables that are not in the generated Supabase schema yet */
+import { useCallback, useEffect, useState } from "react";
 import { Copy, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -38,13 +39,13 @@ export function ProjectAccessManager({
   const [role, setRole] = useState<keyof typeof ROLE_LABEL>("client_reviewer");
   const [busy, setBusy] = useState(false);
 
-  async function load() {
+  const load = useCallback(async () => {
     setData(await getProjectAccess({ data: { projectId } }));
-  }
+  }, [projectId]);
 
   useEffect(() => {
     if (open) void load().catch((error) => toast.error(errorMessage(error)));
-  }, [open, projectId]);
+  }, [open, load]);
 
   async function invite() {
     setBusy(true);

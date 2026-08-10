@@ -55,7 +55,10 @@ function ItemPage() {
         ]}
       />
       <QaItemView
+        wsId={wsId}
         projectId={projectId}
+        stageSlug={stageSlug}
+        roundId={roundId}
         environmentId={stage.id}
         session={session}
         item={item}

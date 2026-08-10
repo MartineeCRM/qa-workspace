@@ -1,11 +1,5 @@
 import type { ReactNode } from "react";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-} from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader } from "@/components/ui/card";
 
 export function AuthCard({
   title,
@@ -26,9 +20,7 @@ export function AuthCard({
           <CardDescription>{description}</CardDescription>
         </CardHeader>
         <CardContent>{children}</CardContent>
-        <CardFooter className="justify-center text-sm text-muted-foreground">
-          {footer}
-        </CardFooter>
+        <CardFooter className="justify-center text-sm text-muted-foreground">{footer}</CardFooter>
       </Card>
     </div>
   );
