@@ -1,6 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createFileRoute, Link, useParams } from "@tanstack/react-router";
-import { ChevronRight, LogOut, MessageSquareText, Search, ShieldCheck } from "lucide-react";
+import {
+  ArrowUp,
+  ChevronRight,
+  LogOut,
+  MessageSquareText,
+  Search,
+  ShieldCheck,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,7 +38,7 @@ function SharedIssuesPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [environmentFilter, setEnvironmentFilter] = useState("all");
-  const [channelFilter, setChannelFilter] = useState("all");
+  const [platformFilter, setPlatformFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState<"all" | Status>("all");
   const [body, setBody] = useState("");
   const [saving, setSaving] = useState(false);
@@ -54,9 +61,9 @@ function SharedIssuesPage() {
       environments: [
         ...new Set<string>((portal?.issues ?? []).map((issue: any) => issue.environmentName)),
       ],
-      channels: [
+      platforms: [
         ...new Set<string>(
-          (portal?.issues ?? []).map((issue: any) => issue.channelName).filter(Boolean),
+          (portal?.issues ?? []).map((issue: any) => issue.platformName).filter(Boolean),
         ),
       ],
     }),
@@ -67,11 +74,11 @@ function SharedIssuesPage() {
       (portal?.issues ?? []).filter(
         (issue: any) =>
           (environmentFilter === "all" || issue.environmentName === environmentFilter) &&
-          (channelFilter === "all" || issue.channelName === channelFilter) &&
+          (platformFilter === "all" || issue.platformName === platformFilter) &&
           (statusFilter === "all" || issue.workflowStatus === statusFilter) &&
           issue.displayLabel.toLowerCase().includes(query.trim().toLowerCase()),
       ),
-    [portal, environmentFilter, channelFilter, statusFilter, query],
+    [portal, environmentFilter, platformFilter, statusFilter, query],
   );
   const selected = shown.find((issue: any) => issue.id === selectedId) ?? shown[0] ?? null;
 
@@ -178,14 +185,14 @@ function SharedIssuesPage() {
                 </select>
               </label>
               <label className="grid gap-1 text-[10px] font-semibold text-[#64748b]">
-                OS
+                플랫폼
                 <select
-                  value={channelFilter}
-                  onChange={(event) => setChannelFilter(event.target.value)}
+                  value={platformFilter}
+                  onChange={(event) => setPlatformFilter(event.target.value)}
                   className="h-8 min-w-0 rounded-md border border-[#cbd5e1] bg-white px-2 text-xs font-medium text-[#334155]"
                 >
                   <option value="all">전체</option>
-                  {filterOptions.channels.map((name) => (
+                  {filterOptions.platforms.map((name) => (
                     <option key={name} value={name}>
                       {name}
                     </option>
@@ -234,7 +241,7 @@ function SharedIssuesPage() {
                       </span>
                     </div>
                     <p className="mt-1.5 text-[11px] text-[#6d7b8b]">
-                      {[issue.environmentName, issue.channelName, `${issue.roundNumber}차`]
+                      {[issue.environmentName, issue.platformName, `${issue.roundNumber}차`]
                         .filter(Boolean)
                         .join(" · ")}
                     </p>
@@ -276,7 +283,11 @@ function SharedIssuesPage() {
                       </span>
                     </div>
                     <p className="mt-1.5 text-xs text-[#64748b]">
-                      {[selected.environmentName, selected.channelName, `${selected.roundNumber}차`]
+                      {[
+                        selected.environmentName,
+                        selected.platformName,
+                        `${selected.roundNumber}차`,
+                      ]
                         .filter(Boolean)
                         .join(" · ")}
                     </p>
@@ -325,38 +336,58 @@ function SharedIssuesPage() {
                 </div>
                 <div className="max-h-[520px] overflow-auto bg-[#0d1117] p-4 font-mono text-[12px] leading-[1.7]">
                   {selected.logs.length ? (
-                    selected.logs.map((row: any) => (
-                      <div key={row.key} className="mb-2 text-[#c9d1d9] last:mb-0">
-                        <div className="whitespace-pre">
-                          <span>{row.name}</span>
-                          <span className="text-[#6e7681]"> | </span>
-                          <span className="text-[#7ee787]">
-                            {row.source === "snapshot" ? "어트리뷰트" : "이벤트"}
-                          </span>
-                          <span className="text-[#6e7681]"> | </span>
-                          <span className="text-[#6e7681]">
-                            {formatMergedTimelineTime(row.source, row.occurredAt)}
-                          </span>
-                          {row.source === "snapshot" ? (
-                            <span className="whitespace-pre-wrap">
-                              {` ${row.change.replace(/,\s*/g, ",\n")}`}
+                    selected.logs.map((row: any) => {
+                      const highlightWholeRow =
+                        selected.targetType === "event" ||
+                        (selected.targetType === "custom_attribute" &&
+                          row.name === selected.targetLabel);
+                      return (
+                        <div
+                          key={row.key}
+                          className={cn(
+                            "mb-2 rounded px-1 text-[#c9d1d9] last:mb-0",
+                            highlightWholeRow && "bg-[#facc15]/30",
+                          )}
+                        >
+                          <div className="whitespace-pre">
+                            <span>{row.name}</span>
+                            <span className="text-[#6e7681]"> | </span>
+                            <span className="text-[#7ee787]">
+                              {row.source === "snapshot" ? "어트리뷰트" : "이벤트"}
                             </span>
+                            <span className="text-[#6e7681]"> | </span>
+                            <span className="text-[#6e7681]">
+                              {formatMergedTimelineTime(row.source, row.occurredAt)}
+                            </span>
+                            {row.source === "snapshot" ? (
+                              <span className="whitespace-pre-wrap">
+                                {` ${row.change.replace(/,\s*/g, ",\n")}`}
+                              </span>
+                            ) : null}
+                          </div>
+                          {row.source === "event" ? (
+                            <div className="pl-4">
+                              <div>{"{"}</div>
+                              {Object.entries(row.raw ?? {}).map(([key, value], index, entries) => (
+                                <div
+                                  key={key}
+                                  className={cn(
+                                    "rounded pl-4",
+                                    selected.targetType === "property" &&
+                                      key === selected.targetLabel &&
+                                      "bg-[#facc15]/30",
+                                  )}
+                                >
+                                  {JSON.stringify(key)}: {JSON.stringify(value)}
+                                  {index < entries.length - 1 ? "," : ""}
+                                </div>
+                              ))}
+                              <div>{"}"}</div>
+                            </div>
                           ) : null}
                         </div>
-                        {row.source === "event" ? (
-                          <div className="pl-4">
-                            <div>{"{"}</div>
-                            {Object.entries(row.raw ?? {}).map(([key, value], index, entries) => (
-                              <div key={key} className="pl-4">
-                                {JSON.stringify(key)}: {JSON.stringify(value)}
-                                {index < entries.length - 1 ? "," : ""}
-                              </div>
-                            ))}
-                            <div>{"}"}</div>
-                          </div>
-                        ) : null}
-                      </div>
-                    ))
+                      );
+                    })
                   ) : (
                     <p className="text-[#6e7681]">관련된 로그가 없어요.</p>
                   )}
@@ -398,14 +429,17 @@ function SharedIssuesPage() {
                     </div>
                   ))}
                 </div>
-                <div className="mt-4 grid gap-2">
+                <div className="relative mt-4">
                   <Textarea
                     value={body}
                     onChange={(event) => setBody(event.target.value)}
                     placeholder="확인 내용이나 질문을 남겨주세요"
                     maxLength={5000}
+                    className="min-h-[76px] pr-12"
                   />
-                  <Button
+                  <button
+                    type="button"
+                    aria-label="댓글 입력"
                     disabled={saving || !body.trim()}
                     onClick={async () => {
                       setSaving(true);
@@ -424,9 +458,10 @@ function SharedIssuesPage() {
                         setSaving(false);
                       }
                     }}
+                    className="absolute right-2 top-1/2 inline-flex size-8 -translate-y-1/2 items-center justify-center rounded-full bg-[#e5e9ee] text-[#667384] transition-colors hover:bg-[#d8dee6] hover:text-[#334155] disabled:cursor-not-allowed disabled:opacity-40"
                   >
-                    댓글 남기기
-                  </Button>
+                    <ArrowUp className="size-4" />
+                  </button>
                 </div>
               </article>
             </>
