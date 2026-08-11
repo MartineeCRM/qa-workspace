@@ -21,6 +21,7 @@ import {
 } from "@/lib/issue-share.functions";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/share/$token")({ ssr: false, component: SharedIssuesPage });
 
@@ -56,6 +57,72 @@ function SharedIssuesPage() {
   useEffect(() => {
     if (!authLoading && user) void load();
   }, [authLoading, user, load]);
+
+  useEffect(() => {
+    if (!user) return;
+    const channel = supabase
+      .channel(`shared-issues:${token}`)
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "qa_discussions" },
+        ({ new: row }) =>
+          setPortal((current: any) =>
+            current
+              ? {
+                  ...current,
+                  issues: current.issues.map((issue: any) =>
+                    issue.id === row.id
+                      ? {
+                          ...issue,
+                          ...(issue.updatedAt <= row.updated_at
+                            ? {
+                                workflowStatus: row.workflow_status,
+                                updatedAt: row.updated_at,
+                              }
+                            : {}),
+                        }
+                      : issue,
+                  ),
+                }
+              : current,
+          ),
+      )
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "qa_discussion_comments" },
+        ({ new: row }) =>
+          setPortal((current: any) =>
+            current
+              ? {
+                  ...current,
+                  issues: current.issues.map((issue: any) =>
+                    issue.id !== row.discussion_id ||
+                    issue.comments.some((comment: any) => comment.id === row.id)
+                      ? issue
+                      : {
+                          ...issue,
+                          comments: [
+                            ...issue.comments,
+                            {
+                              id: row.id,
+                              author: row.external_author_name ?? "고객사 사용자",
+                              external: Boolean(row.external_author_name),
+                              body: row.body,
+                              createdAt: row.created_at,
+                            },
+                          ],
+                          updatedAt: row.created_at,
+                        },
+                  ),
+                }
+              : current,
+          ),
+      )
+      .subscribe();
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [user, token]);
 
   const filterOptions = useMemo(
     () => ({
@@ -298,18 +365,47 @@ function SharedIssuesPage() {
                     disabled={saving}
                     onChange={async (event) => {
                       const status = event.target.value;
+                      const previousStatus = selected.workflowStatus;
+                      const changedAt = new Date().toISOString();
+                      setPortal((current: any) => ({
+                        ...current,
+                        issues: current.issues.map((issue: any) =>
+                          issue.id === selected.id
+                            ? { ...issue, workflowStatus: status, updatedAt: changedAt }
+                            : issue,
+                        ),
+                      }));
                       setSaving(true);
                       try {
-                        await updateSharedIssue({
+                        const updated = await updateSharedIssue({
                           data: {
                             token,
                             discussionId: selected.id,
                             status,
                           },
                         });
-                        await load();
+                        setPortal((current: any) => ({
+                          ...current,
+                          issues: current.issues.map((issue: any) =>
+                            issue.id === updated.id && issue.updatedAt <= updated.updated_at
+                              ? {
+                                  ...issue,
+                                  workflowStatus: updated.workflow_status,
+                                  updatedAt: updated.updated_at,
+                                }
+                              : issue,
+                          ),
+                        }));
                         toast.success("상태를 변경했어요");
                       } catch (error) {
+                        setPortal((current: any) => ({
+                          ...current,
+                          issues: current.issues.map((issue: any) =>
+                            issue.id === selected.id
+                              ? { ...issue, workflowStatus: previousStatus }
+                              : issue,
+                          ),
+                        }));
                         toast.error(
                           error instanceof Error ? error.message : "상태 변경에 실패했어요",
                         );
@@ -443,15 +539,71 @@ function SharedIssuesPage() {
                     aria-label="댓글 입력"
                     disabled={saving || !body.trim()}
                     onClick={async () => {
+                      const commentBody = body.trim();
+                      const temporaryId = `pending:${crypto.randomUUID()}`;
+                      const optimisticComment = {
+                        id: temporaryId,
+                        author: profile?.display_name || profile?.email || "고객사 사용자",
+                        external: true,
+                        body: commentBody,
+                        createdAt: new Date().toISOString(),
+                      };
+                      setPortal((current: any) => ({
+                        ...current,
+                        issues: current.issues.map((issue: any) =>
+                          issue.id === selected.id
+                            ? { ...issue, comments: [...issue.comments, optimisticComment] }
+                            : issue,
+                        ),
+                      }));
+                      setBody("");
                       setSaving(true);
                       try {
-                        await commentOnSharedIssue({
-                          data: { token, discussionId: selected.id, body },
+                        const created = await commentOnSharedIssue({
+                          data: { token, discussionId: selected.id, body: commentBody },
                         });
-                        setBody("");
-                        await load();
+                        setPortal((current: any) => ({
+                          ...current,
+                          issues: current.issues.map((issue: any) =>
+                            issue.id === selected.id
+                              ? {
+                                  ...issue,
+                                  comments: issue.comments
+                                    .filter((comment: any) => comment.id !== created.id)
+                                    .map((comment: any) =>
+                                      comment.id === temporaryId
+                                        ? {
+                                            id: created.id,
+                                            author:
+                                              created.external_author_name ??
+                                              optimisticComment.author,
+                                            external: true,
+                                            body: created.body,
+                                            createdAt: created.created_at,
+                                          }
+                                        : comment,
+                                    ),
+                                  updatedAt: created.created_at,
+                                }
+                              : issue,
+                          ),
+                        }));
                         toast.success("댓글을 남겼어요");
                       } catch (error) {
+                        setPortal((current: any) => ({
+                          ...current,
+                          issues: current.issues.map((issue: any) =>
+                            issue.id === selected.id
+                              ? {
+                                  ...issue,
+                                  comments: issue.comments.filter(
+                                    (comment: any) => comment.id !== temporaryId,
+                                  ),
+                                }
+                              : issue,
+                          ),
+                        }));
+                        setBody(commentBody);
                         toast.error(
                           error instanceof Error ? error.message : "댓글 저장에 실패했어요",
                         );

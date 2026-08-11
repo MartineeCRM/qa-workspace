@@ -316,17 +316,20 @@ export const updateSharedIssue = createServerFn({ method: "POST" })
       .eq("id", context.userId)
       .maybeSingle();
     const actorName = profile?.display_name || profile?.email || "고객사 사용자";
-    const { error } = await (supabaseAdmin as any)
+    const updatedAt = new Date().toISOString();
+    const { data: updated, error } = await (supabaseAdmin as any)
       .from("qa_discussions")
       .update({
         workflow_status: data.status,
         workflow_updated_by: context.userId,
         workflow_updated_by_external_name: actorName,
-        updated_at: new Date().toISOString(),
+        updated_at: updatedAt,
       })
-      .eq("id", data.discussionId);
+      .eq("id", data.discussionId)
+      .select("id, workflow_status, updated_at")
+      .single();
     if (error) throw error;
-    return { ok: true };
+    return updated as { id: string; workflow_status: string; updated_at: string };
   });
 
 export const commentOnSharedIssue = createServerFn({ method: "POST" })
@@ -344,12 +347,22 @@ export const commentOnSharedIssue = createServerFn({ method: "POST" })
       .eq("id", context.userId)
       .maybeSingle();
     const actorName = profile?.display_name || profile?.email || "고객사 사용자";
-    const { error } = await (supabaseAdmin as any).from("qa_discussion_comments").insert({
-      discussion_id: data.discussionId,
-      author_id: context.userId,
-      external_author_name: actorName,
-      body,
-    });
+    const { data: created, error } = await (supabaseAdmin as any)
+      .from("qa_discussion_comments")
+      .insert({
+        discussion_id: data.discussionId,
+        author_id: context.userId,
+        external_author_name: actorName,
+        body,
+      })
+      .select("id, discussion_id, body, created_at, external_author_name")
+      .single();
     if (error) throw error;
-    return { ok: true };
+    return created as {
+      id: string;
+      discussion_id: string;
+      body: string;
+      created_at: string;
+      external_author_name: string;
+    };
   });
