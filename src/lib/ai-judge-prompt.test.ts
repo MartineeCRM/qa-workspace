@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildJudgePrompt,
   buildJudgeRequest,
+  buildJudgeResponseFormat,
   JUDGE_RESPONSE_FORMAT,
   JUDGE_SYSTEM_PROMPT,
   parseJudgeResponse,
@@ -62,8 +63,9 @@ describe("buildJudgePrompt", () => {
       targets: [],
     });
 
-    expect(request).toContain('현재 판정 대상: event "cart_add_completed"');
-    expect(request).toContain('허용된 판정 필드: ["item_id"]');
+    expect(request).toContain("현재 판정 대상 종류: event");
+    expect(request).toContain('현재 판정 대상 기술명: "cart_add_completed"');
+    expect(request).toContain('refs.field 허용값: ["item_id","event","occurred_at"]');
     expect(request).toContain("연관 로그는 비교 근거로만 사용하세요");
   });
 
@@ -140,6 +142,13 @@ describe("buildJudgePrompt", () => {
     expect(JSON.stringify(JUDGE_RESPONSE_FORMAT)).not.toContain("expected_contract");
     expect(JSON.stringify(JUDGE_RESPONSE_FORMAT)).toContain("observed_summary");
     expect(JSON.stringify(JUDGE_RESPONSE_FORMAT)).toContain("refs");
+    const scopedFormat = buildJudgeResponseFormat({
+      kind: "event",
+      technicalName: "item_viewed",
+      allowedFields: ["item_id"],
+    });
+    expect(JSON.stringify(scopedFormat)).toContain('"enum":["item_id","event","occurred_at"]');
+    expect(JSON.stringify(scopedFormat)).not.toContain('"target"');
   });
 });
 
@@ -204,7 +213,7 @@ describe("parseJudgeResponse", () => {
     });
   });
 
-  it("drops failures that belong only to a related log", () => {
+  it("rejects evidence fields outside the server-owned current target", () => {
     const result = parseJudgeResponse(
       JSON.stringify({
         results: [
@@ -213,7 +222,7 @@ describe("parseJudgeResponse", () => {
             verdict: "failed",
             reasoning: "cart_remove_completed 로그가 잘못됐습니다",
             evidence: {
-              refs: [{ target: "cart_remove_completed", field: "item_id" }],
+              refs: [{ field: "remove_reason" }],
             },
           },
         ],
@@ -222,10 +231,13 @@ describe("parseJudgeResponse", () => {
       { kind: "event", technicalName: "cart_add_completed", allowedFields: ["item_id"] },
     );
 
-    expect(result).toMatchObject({ ok: true, verdict: "passed", evidence: [] });
+    expect(result).toEqual({
+      ok: false,
+      error: "AI가 현재 검증 대상에 없는 필드를 근거로 반환했어요.",
+    });
   });
 
-  it("keeps only current-target failures for structurally eligible fields", () => {
+  it("uses the server scope instead of an AI-written target name", () => {
     const result = parseJudgeResponse(
       JSON.stringify({
         results: [
@@ -234,15 +246,7 @@ describe("parseJudgeResponse", () => {
             verdict: "failed",
             reasoning: "현재 item_id 형식이 잘못됐습니다",
             evidence: {
-              refs: [{ target: "cart_add_completed", field: "item_id" }],
-            },
-          },
-          {
-            rule_id: "sequence",
-            verdict: "failed",
-            reasoning: "누락 필드를 다시 검사했습니다",
-            evidence: {
-              refs: [{ target: "cart_add_completed", field: "missing_property" }],
+              refs: [{ target: "event cart_add_completed", field: "item_id" }],
             },
           },
         ],
@@ -267,7 +271,7 @@ describe("parseJudgeResponse", () => {
             rule_id: "format",
             verdict: "failed",
             reasoning: "배열 원소에 필수 내부 필드가 없습니다",
-            evidence: { refs: [{ target: "cart_list", field: "value" }] },
+            evidence: { refs: [{ field: "value" }] },
           },
         ],
       }),

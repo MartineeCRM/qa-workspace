@@ -1,8 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import {
   buildJudgeRequest,
+  buildJudgeResponseFormat,
   JUDGE_SYSTEM_PROMPT,
-  JUDGE_RESPONSE_FORMAT,
   parseJudgeResponse,
   type JudgePromptInput,
 } from "@/lib/ai-judge-prompt";
@@ -63,7 +63,7 @@ export const judgeChecklistItemWithAI = createServerFn({ method: "POST" })
           ],
           prompt_cache_key: "qa-workspace-judge-v1",
           reasoning: { effort: "low" },
-          text: { format: JUDGE_RESPONSE_FORMAT },
+          text: { format: buildJudgeResponseFormat(data.scope) },
           max_output_tokens: judgeOutputTokenBudget(data.rules.length),
         }),
         signal: controller.signal,

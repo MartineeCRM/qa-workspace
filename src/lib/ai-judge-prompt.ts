@@ -21,41 +21,59 @@ export type JudgeResponse =
     }
   | { ok: false; error: string };
 
-export const JUDGE_RESPONSE_FORMAT = {
-  type: "json_schema",
-  name: "qa_judgement",
-  strict: true,
-  schema: {
-    type: "object",
-    additionalProperties: false,
-    required: ["results"],
-    properties: {
-      results: {
-        type: "array",
-        items: {
-          type: "object",
-          additionalProperties: false,
-          required: ["rule_id", "verdict", "reasoning", "evidence"],
-          properties: {
-            rule_id: { type: "string" },
-            verdict: { type: "string", enum: ["failed"] },
-            reasoning: { type: "string" },
-            evidence: {
-              type: "object",
-              additionalProperties: false,
-              required: ["mismatch_dimensions", "observed_summary", "refs"],
-              properties: {
-                mismatch_dimensions: { type: "array", items: { type: "string" } },
-                observed_summary: { type: "string" },
-                refs: {
-                  type: "array",
-                  items: {
-                    type: "object",
-                    additionalProperties: false,
-                    required: ["target", "field"],
-                    properties: {
-                      target: { type: "string" },
-                      field: { type: "string" },
+function allowedJudgeFields(scope?: JudgePromptInput["scope"]): string[] | undefined {
+  if (!scope) return undefined;
+  return Array.from(
+    new Set([
+      ...scope.allowedFields,
+      ...(scope.kind === "custom_attribute"
+        ? ["value", "payload", ...scope.allowedFields.map((field) => `payload.${field}`)]
+        : []),
+      "event",
+      "occurred_at",
+    ]),
+  );
+}
+
+export function buildJudgeResponseFormat(scope?: JudgePromptInput["scope"]) {
+  const allowedFields = allowedJudgeFields(scope);
+  return {
+    type: "json_schema",
+    name: "qa_judgement",
+    strict: true,
+    schema: {
+      type: "object",
+      additionalProperties: false,
+      required: ["results"],
+      properties: {
+        results: {
+          type: "array",
+          items: {
+            type: "object",
+            additionalProperties: false,
+            required: ["rule_id", "verdict", "reasoning", "evidence"],
+            properties: {
+              rule_id: { type: "string" },
+              verdict: { type: "string", enum: ["failed"] },
+              reasoning: { type: "string" },
+              evidence: {
+                type: "object",
+                additionalProperties: false,
+                required: ["mismatch_dimensions", "observed_summary", "refs"],
+                properties: {
+                  mismatch_dimensions: { type: "array", items: { type: "string" } },
+                  observed_summary: { type: "string" },
+                  refs: {
+                    type: "array",
+                    items: {
+                      type: "object",
+                      additionalProperties: false,
+                      required: ["field"],
+                      properties: {
+                        field: allowedFields
+                          ? { type: "string", enum: allowedFields }
+                          : { type: "string" },
+                      },
                     },
                   },
                 },
@@ -65,8 +83,10 @@ export const JUDGE_RESPONSE_FORMAT = {
         },
       },
     },
-  },
-} as const;
+  } as const;
+}
+
+export const JUDGE_RESPONSE_FORMAT = buildJudgeResponseFormat();
 
 function compactPromptEvidence(value: unknown): unknown {
   if (Array.isArray(value)) {
@@ -121,36 +141,25 @@ export function parseJudgeResponse(
   if (failed.length !== parsed.results.length) {
     return { ok: false, error: "AI가 요청하지 않은 규칙의 결과를 반환했어요." };
   }
-  const scoped = scope
-    ? failed.filter((result) => {
-        const evidence = result.evidence as { refs?: unknown } | undefined;
-        if (!Array.isArray(evidence?.refs)) return false;
-        const currentRefs = evidence.refs.filter((ref) => {
-          if (!ref || typeof ref !== "object") return false;
-          const target = (ref as { target?: unknown }).target;
-          return (
-            typeof target === "string" &&
-            (target === scope.technicalName || target.startsWith(`${scope.technicalName}.`))
-          );
-        });
-        return (
-          currentRefs.length > 0 &&
-          currentRefs.every((ref) => {
-            const field = (ref as { field?: unknown }).field;
-            return (
-              typeof field === "string" &&
-              (scope.allowedFields.includes(field) ||
-                (scope.kind === "custom_attribute" &&
-                  (field === "value" ||
-                    field === "payload" ||
-                    scope.allowedFields.some((allowed) => field === `payload.${allowed}`))) ||
-                field === "event" ||
-                field === "occurred_at")
-            );
-          })
-        );
-      })
-    : failed;
+  if (scope) {
+    const allowedFields = new Set(allowedJudgeFields(scope));
+    const hasInvalidReference = failed.some((result) => {
+      const evidence = result.evidence as { refs?: unknown } | undefined;
+      return (
+        !Array.isArray(evidence?.refs) ||
+        evidence.refs.length === 0 ||
+        evidence.refs.some((ref) => {
+          if (!ref || typeof ref !== "object") return true;
+          const field = (ref as { field?: unknown }).field;
+          return typeof field !== "string" || !allowedFields.has(field);
+        })
+      );
+    });
+    if (hasInvalidReference) {
+      return { ok: false, error: "AI가 현재 검증 대상에 없는 필드를 근거로 반환했어요." };
+    }
+  }
+  const scoped = failed;
   const deduped = Array.from(
     new Map(scoped.map((result) => [result.reasoning?.trim(), result])).values(),
   );
@@ -172,7 +181,8 @@ export const JUDGE_SYSTEM_PROMPT = [
   "- 데이터 타입이 같다는 이유만으로 통과시키지 마세요.",
   "- 이 단계에 전달된 값은 앞선 Rule-based 데이터 타입 및 enum 검사를 통과했습니다. 특히 택소노미 타입이 array이면 실제 배열을 문자열이어야 한다고 판단하지 마세요.",
   "- '현재 판정 대상'만 판정하세요. 함께 제공된 연관 로그는 현재 대상의 규칙을 확인하기 위한 근거일 뿐, 연관 로그 자체의 독립적인 오류를 이 결과에 넣지 마세요.",
-  "- 결과의 refs에는 반드시 현재 판정 대상과 허용된 판정 필드 중 하나를 포함하세요. 누락·타입·enum 검사에서 제외된 필드는 언급하지 마세요.",
+  "- 현재 판정 대상은 서버가 고정합니다. 결과에 대상명이나 대상 종류를 다시 쓰지 마세요.",
+  "- refs에는 target 없이 현재 대상의 허용된 판정 필드만 field로 적으세요. 연관 로그를 비교했더라도 field는 그 비교로 오류가 확인된 현재 대상의 필드입니다. 누락·타입·enum 검사에서 제외된 필드는 언급하지 마세요.",
   "- 같은 원인과 실제값이 여러 필드에서 반복되면 프로퍼티명을 묶어 한 번만 설명하세요.",
   "- 배열 타입은 배열 여부만 확인하고 끝내지 마세요. 배열 원소가 문자열이면 각 문자열의 내부 구조, 구분자, 필드명, 필드별 값 형식까지 검증하세요.",
   "- 배열의 문자열 예시가 `|` 등으로 구분된 `키_값` 구조라면 예시에 반복해서 나타나는 키 집합을 원소의 구조 계약으로 봅니다. 설명에서 선택 항목이라고 밝히지 않은 키가 실제 원소에 빠지면 실패입니다.",
@@ -207,7 +217,7 @@ export const JUDGE_SYSTEM_PROMPT = [
   "",
   "응답 형식:",
   "- 다른 설명이나 마크다운 코드 블록 없이 순수 JSON만 출력하세요.",
-  '- {"results":[{"rule_id":"실패한 규칙 ID","verdict":"failed","reasoning":"쉽고 짧은 실패 이유 1~2문장","evidence":{"mismatch_dimensions":["불일치 차원"],"observed_summary":"실제 근거의 짧은 요약","refs":[{"target":"대상 기술명","field":"근거 필드명"}]}}]} 형식입니다.',
+  '- {"results":[{"rule_id":"실패한 규칙 ID","verdict":"failed","reasoning":"쉽고 짧은 실패 이유 1~2문장","evidence":{"mismatch_dimensions":["불일치 차원"],"observed_summary":"실제 근거의 짧은 요약","refs":[{"field":"현재 대상의 근거 필드명"}]}}]} 형식입니다.',
   '- results에는 실패한 규칙만 넣고 각 verdict는 반드시 "failed"여야 합니다. 모두 통과하면 {"results":[]}를 반환하세요.',
 ].join("\n");
 
@@ -221,8 +231,9 @@ export function buildJudgeRequest(input: JudgePromptInput): string {
   return [
     ...(input.scope
       ? [
-          `현재 판정 대상: ${input.scope.kind} ${JSON.stringify(input.scope.technicalName)}`,
-          `허용된 판정 필드: ${JSON.stringify(input.scope.allowedFields)}`,
+          `현재 판정 대상 종류: ${input.scope.kind}`,
+          `현재 판정 대상 기술명: ${JSON.stringify(input.scope.technicalName)}`,
+          `refs.field 허용값: ${JSON.stringify(allowedJudgeFields(input.scope))}`,
           "연관 로그는 비교 근거로만 사용하세요.",
           "",
         ]
