@@ -172,6 +172,17 @@ export function useMyMemberships() {
   });
 }
 
+export function useIsPlatformAdmin() {
+  return useQuery({
+    queryKey: ["platform-admin"],
+    queryFn: async () => {
+      const { data, error } = await db.rpc("is_platform_admin");
+      if (error) throw error;
+      return Boolean(data);
+    },
+  });
+}
+
 export function useWorkspace(workspaceId: string) {
   return useQuery({
     queryKey: ["workspace", workspaceId],

@@ -21,7 +21,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useMyMemberships, db } from "@/lib/queries";
+import { useIsPlatformAdmin, useMyMemberships, db } from "@/lib/queries";
 import { ROLE_LABEL, errorMessage, formatDate } from "@/lib/domain";
 import { useAuth } from "@/lib/auth";
 
@@ -42,6 +42,7 @@ export const Route = createFileRoute("/_authenticated/workspaces")({
 
 function WorkspacesPage() {
   const { data, isLoading } = useMyMemberships();
+  const { data: isPlatformAdmin, isLoading: isAdminLoading } = useIsPlatformAdmin();
   const { signOut } = useAuth();
   const memberships = (data ?? []).filter((m) => m.workspaces);
   const active = memberships.filter((m) => !m.workspaces.archived_at);
@@ -54,16 +55,20 @@ function WorkspacesPage() {
         <PageHeader
           title="워크스페이스"
           description="워크스페이스는 고객 프로젝트와 함께 일하는 사람들을 묶어주는 공간이에요."
-          actions={!isLoading && memberships.length > 0 ? <CreateWorkspaceDialog /> : undefined}
+          actions={
+            !isLoading && !isAdminLoading && (memberships.length > 0 || isPlatformAdmin) ? (
+              <CreateWorkspaceDialog />
+            ) : undefined
+          }
         />
 
         <div className="mt-6 space-y-8">
-          {isLoading ? (
+          {isLoading || isAdminLoading ? (
             <div className="grid gap-3 sm:grid-cols-2">
               <Skeleton className="h-24" />
               <Skeleton className="h-24" />
             </div>
-          ) : memberships.length === 0 ? (
+          ) : memberships.length === 0 && !isPlatformAdmin ? (
             <EmptyState
               icon={ShieldX}
               title="접근 권한이 없어요"
@@ -73,6 +78,13 @@ function WorkspacesPage() {
                   다른 계정으로 로그인
                 </Button>
               }
+            />
+          ) : memberships.length === 0 ? (
+            <EmptyState
+              icon={ShieldX}
+              title="첫 워크스페이스를 만들어주세요"
+              description="운영 관리자로 등록되어 있어요. 첫 워크스페이스를 만들면 팀원을 초대할 수 있습니다."
+              action={<CreateWorkspaceDialog />}
             />
           ) : (
             <>

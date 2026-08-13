@@ -1366,6 +1366,7 @@ export type Database = {
       };
       can_admin_ws: { Args: { _ws: string }; Returns: boolean };
       can_edit_ws: { Args: { _ws: string }; Returns: boolean };
+      is_platform_admin: { Args: never; Returns: boolean };
       ensure_profile: {
         Args: { _display_name?: string };
         Returns: {
