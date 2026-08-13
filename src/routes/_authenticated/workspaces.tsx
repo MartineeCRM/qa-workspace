@@ -2,7 +2,7 @@ import { useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Plus, FolderKanban } from "lucide-react";
+import { Plus, ShieldX } from "lucide-react";
 
 import { TopBar } from "@/components/app/top-bar";
 import { PageHeader, EmptyState } from "@/components/app/layout-parts";
@@ -42,6 +42,7 @@ export const Route = createFileRoute("/_authenticated/workspaces")({
 
 function WorkspacesPage() {
   const { data, isLoading } = useMyMemberships();
+  const { signOut } = useAuth();
   const memberships = (data ?? []).filter((m) => m.workspaces);
   const active = memberships.filter((m) => !m.workspaces.archived_at);
   const archived = memberships.filter((m) => m.workspaces.archived_at);
@@ -53,7 +54,7 @@ function WorkspacesPage() {
         <PageHeader
           title="워크스페이스"
           description="워크스페이스는 고객 프로젝트와 함께 일하는 사람들을 묶어주는 공간이에요."
-          actions={<CreateWorkspaceDialog />}
+          actions={!isLoading && memberships.length > 0 ? <CreateWorkspaceDialog /> : undefined}
         />
 
         <div className="mt-6 space-y-8">
@@ -64,10 +65,14 @@ function WorkspacesPage() {
             </div>
           ) : memberships.length === 0 ? (
             <EmptyState
-              icon={FolderKanban}
-              title="아직 워크스페이스가 없어요"
-              description="첫 워크스페이스를 만들면 고객 택소노미를 정의할 수 있어요."
-              action={<CreateWorkspaceDialog />}
+              icon={ShieldX}
+              title="접근 권한이 없어요"
+              description="QA Workspace는 초대받은 사용자만 이용할 수 있어요. 관리자에게 초대를 요청해주세요."
+              action={
+                <Button variant="outline" onClick={() => void signOut()}>
+                  다른 계정으로 로그인
+                </Button>
+              }
             />
           ) : (
             <>
