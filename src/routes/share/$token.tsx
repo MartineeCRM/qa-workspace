@@ -205,7 +205,7 @@ function SharedIssuesPage() {
             <p className="text-[11px] font-semibold tracking-[0.12em] text-[#8fb9dc]">
               QA WORKSPACE
             </p>
-            <h1 className="mt-1 text-xl font-bold">{portal.projectName} · 이슈 모아보기</h1>
+            <h1 className="mt-1 text-xl font-bold">{portal.projectName} · 이슈 관리</h1>
             <p className="mt-1 text-xs text-[#aebdcb]">
               검증 이슈를 확인하고 상태와 댓글을 함께 관리합니다.
             </p>

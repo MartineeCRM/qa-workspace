@@ -1034,7 +1034,7 @@ export function QaItemView({
           ) : null}
           <Panel
             title="이슈 처리"
-            description={`${item.target_type === "event" ? "이벤트 전체나 프로퍼티" : "어트리뷰트"} 이슈에 댓글을 남겨요. 상태 변경과 이월은 이슈 모아보기에서 합니다.`}
+            description={`${item.target_type === "event" ? "이벤트 전체나 프로퍼티" : "어트리뷰트"} 이슈에 댓글을 남겨요. 상태 변경과 이월은 이슈 관리에서 합니다.`}
           >
             <div className="space-y-3 p-4">
               {discussions.length === 0 ? (
@@ -1227,7 +1227,7 @@ export function QaItemView({
                 params={(prev) => ({ wsId: prev.wsId, projectId: prev.projectId })}
                 className="block text-center text-[12px] font-medium text-[#4b4f8a] hover:underline"
               >
-                전체 이슈 모아보기
+                전체 이슈 관리
               </Link>
             </div>
           </Panel>

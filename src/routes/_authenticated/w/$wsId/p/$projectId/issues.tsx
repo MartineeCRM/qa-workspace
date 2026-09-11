@@ -138,9 +138,9 @@ function QaIssuesPage() {
                 if (sharedPage) sharedPage.location.href = url;
                 try {
                   await navigator.clipboard.writeText(url);
-                  toast.success("고객용 이슈 모아보기를 열고 주소를 복사했어요");
+                  toast.success("고객용 이슈 관리 화면을 열고 주소를 복사했어요");
                 } catch {
-                  toast.success("고객용 이슈 모아보기를 열었어요");
+                  toast.success("고객용 이슈 관리 화면을 열었어요");
                 }
               } catch (error) {
                 sharedPage?.close();
@@ -149,7 +149,7 @@ function QaIssuesPage() {
             }}
           >
             <Share2 className="mr-1.5 size-3.5" />
-            고객용 이슈 모아보기
+            고객용 이슈 관리
           </Button>
           <div className="flex items-center gap-[18px]">
             {STATUSES.map((status) => {
