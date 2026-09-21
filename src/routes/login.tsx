@@ -14,7 +14,8 @@ export const Route = createFileRoute("/login")({
   ssr: false,
   validateSearch: (search: Record<string, unknown>) => ({
     redirect:
-      typeof search.redirect === "string" && search.redirect.startsWith("/share/")
+      typeof search.redirect === "string" &&
+      (search.redirect.startsWith("/share/") || search.redirect.startsWith("/taxonomy-studio"))
         ? search.redirect
         : undefined,
   }),
