@@ -304,7 +304,7 @@ git commit -m "fix: preserve deep-link destination through the login redirect"
 조용히 `"string"`으로 바꾼다. 파서가 전체 텍스트를 한 번에 스캔하도록 바꾸고, 타입 폴백이
 일어나면 경고를 모아서 반환한다.
 
-- [ ] **Step 1: 실패하는 테스트 추가 — 멀티라인 값**
+- [x] **Step 1: 실패하는 테스트 추가 — 멀티라인 값**
 
 `src/lib/taxonomy-import.test.ts` 상단 import를 아래로 바꾸고:
 
@@ -339,12 +339,12 @@ describe("parseTaxonomyFile unknown data type warnings", () => {
 });
 ```
 
-- [ ] **Step 2: 테스트 실행해서 실패 확인**
+- [x] **Step 2: 테스트 실행해서 실패 확인**
 
 Run: `npm test -- taxonomy-import.test.ts`
 Expected: FAIL (`parseTaxonomyFileWithWarnings` not defined, 멀티라인 케이스도 실패)
 
-- [ ] **Step 3: CSV 토크나이저를 전체 텍스트 기준으로 재작성**
+- [x] **Step 3: CSV 토크나이저를 전체 텍스트 기준으로 재작성**
 
 `src/lib/taxonomy-import.ts:103-121`의 `splitCsvLine`을 지우고, 아래 함수로 교체한다.
 
@@ -408,7 +408,7 @@ function parseCsvRows(text: string): string[][] {
 }
 ```
 
-- [ ] **Step 4: `parseCsvTaxonomy`가 새 토크나이저를 쓰도록 수정**
+- [x] **Step 4: `parseCsvTaxonomy`가 새 토크나이저를 쓰도록 수정**
 
 ```ts
 function parseCsvTaxonomy(text: string, warnings: string[]): ImportedTaxonomy {
@@ -431,7 +431,7 @@ function parseCsvTaxonomy(text: string, warnings: string[]): ImportedTaxonomy {
 (`normaliseAttribute`가 지금 `allowSubProperties`를 세 번째 인자로 받으니, 시그니처를
 `(input, requiredByDefault, warnings, allowSubProperties = true)`로 바꾼다).
 
-- [ ] **Step 5: `normaliseAttribute`가 타입 폴백 시 경고를 남기도록 수정**
+- [x] **Step 5: `normaliseAttribute`가 타입 폴백 시 경고를 남기도록 수정**
 
 ```ts
 function normaliseAttribute(
@@ -456,7 +456,7 @@ function normaliseAttribute(
 `normaliseAttribute(p, false, false)`도 `normaliseAttribute(p, false, warnings, false)`로
 바꾼다.
 
-- [ ] **Step 6: `parseStructured`와 `parseTaxonomyFile`에 warnings 스레딩**
+- [x] **Step 6: `parseStructured`와 `parseTaxonomyFile`에 warnings 스레딩**
 
 `parseStructured(value, warnings)`로 시그니처를 바꾸고 내부 `normaliseAttribute` 호출 두
 곳(`:212`, `:230`)에 `warnings`를 추가한다. `parseTaxonomyFile`은 그대로 두고, 새 함수를
@@ -494,12 +494,12 @@ export function parseTaxonomyFileWithWarnings(
 타입은 그대로 `ImportedTaxonomy`이므로 `warnings` 필드는 구조적으로 초과 속성이라 기존
 호출부에 영향 없음.)
 
-- [ ] **Step 7: 테스트 재실행해서 통과 확인**
+- [x] **Step 7: 테스트 재실행해서 통과 확인**
 
 Run: `npm test -- taxonomy-import.test.ts`
 Expected: PASS
 
-- [ ] **Step 8: 가져오기 UI에서 경고를 토스트로 보여주기**
+- [x] **Step 8: 가져오기 UI에서 경고를 토스트로 보여주기**
 
 `src/components/app/taxonomy-import.tsx:53-69`의 `handleFile`을 수정한다.
 
@@ -533,12 +533,12 @@ async function handleFile(file: File) {
 `import { parseTaxonomyFileWithWarnings, ... } from "@/lib/taxonomy-import";`로 import도
 수정한다.
 
-- [ ] **Step 9: 전체 테스트 실행**
+- [x] **Step 9: 전체 테스트 실행**
 
 Run: `npm test`
 Expected: 전체 PASS
 
-- [ ] **Step 10: 커밋**
+- [x] **Step 10: 커밋**
 
 ```bash
 git add src/lib/taxonomy-import.ts src/lib/taxonomy-import.test.ts \
@@ -547,6 +547,10 @@ git commit -m "fix: handle quoted multiline CSV cells and surface unknown-type f
 ```
 
 ---
+
+
+**리뷰에서 발견 (후속 과제로 기록, 이번 범위 밖):** src/lib/run-events-csv.ts에도 같은 종류의
+줄바꿈-먼저-분리 버그가 있는 splitCsvLine이 따로 있음 — 이번 플랜 범위 밖이라 손대지 않음.
 
 ### Task 5: 이벤트 스크린샷 컬럼과 원자적 추가/삭제 함수
 
