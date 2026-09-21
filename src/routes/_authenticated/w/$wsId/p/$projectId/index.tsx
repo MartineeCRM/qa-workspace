@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useParams } from "@tanstack/react-router";
+import { useState } from "react";
 import {
   Activity,
   Braces,
@@ -13,6 +14,7 @@ import {
 } from "lucide-react";
 
 import { EmptyState, Panel, Stat } from "@/components/app/layout-parts";
+import { Button } from "@/components/ui/button";
 import { CoverageLegend, CoverageRow, CoverageTableHeader } from "@/components/app/coverage";
 import {
   buildCoverageItems,
@@ -32,6 +34,7 @@ import {
 } from "@/lib/qa-rounds-queries";
 import { checklistCoverageItems, environmentChecklistCoverage } from "@/lib/qa-workflow";
 import { formatDateTime } from "@/lib/domain";
+import { formatActivitySummary } from "@/lib/activity";
 
 const issueStatus: Record<
   "open" | "talk" | "fixing" | "done",
@@ -56,7 +59,7 @@ const issueStatus: Record<
     badgeClass: "border-blue-200 bg-blue-50 text-blue-700",
   },
   done: {
-    label: "다음 검증 대기",
+    label: "해결",
     icon: CircleCheck,
     iconClass: "bg-emerald-100 text-emerald-700",
     badgeClass: "border-emerald-200 bg-emerald-50 text-emerald-700",
@@ -98,7 +101,16 @@ function ProjectOverview() {
     events.map((event) => event.id),
     eventProperties.map((property) => property.id),
   );
-  const { data: activity = [] } = useActivity({ projectId, limit: 12 });
+  const [activityPagination, setActivityPagination] = useState({ projectId, page: 1 });
+  const activityPage = activityPagination.projectId === projectId ? activityPagination.page : 1;
+  const {
+    data: activityData,
+    isPending: activityPending,
+    isError: activityError,
+    refetch: refetchActivity,
+  } = useActivity({ projectId, limit: 12, page: activityPage });
+  const activity = activityData?.entries ?? [];
+  const activityPages = Math.max(1, Math.ceil((activityData?.total ?? 0) / 12));
 
   const items = buildCoverageItems(events, eventProperties, customAttributes);
   const activeEvents = events.filter((e) => e.is_active).length;
@@ -270,14 +282,30 @@ function ProjectOverview() {
           )}
         </Panel>
 
-        <Panel title="최근 활동" description="이 프로젝트에서 최근에 일어난 변경이에요.">
-          {activity.length === 0 ? (
+        <Panel title="최근 활동" description="이 프로젝트의 활동 기록을 최신순으로 확인해요.">
+          {activityPending ? (
+            <p className="px-4 py-3 text-sm text-muted-foreground" role="status">
+              활동 기록을 불러오고 있어요.
+            </p>
+          ) : activityError ? (
+            <div className="px-4 py-3 text-sm" role="alert">
+              활동 기록을 불러오지 못했어요.
+              <Button
+                variant="outline"
+                size="sm"
+                className="ml-2"
+                onClick={() => refetchActivity()}
+              >
+                다시 시도
+              </Button>
+            </div>
+          ) : activity.length === 0 ? (
             <EmptyState icon={Activity} title="아직 활동 기록이 없어요" />
           ) : (
             <ul className="divide-y">
               {activity.map((entry) => (
                 <li key={entry.id} className="px-4 py-2 text-sm">
-                  <p>{entry.summary}</p>
+                  <p>{formatActivitySummary(entry)}</p>
                   <p className="text-xs text-muted-foreground">
                     {formatDateTime(entry.created_at)}
                   </p>
@@ -285,6 +313,32 @@ function ProjectOverview() {
               ))}
             </ul>
           )}
+          <nav
+            aria-label="활동 기록 페이지"
+            className="flex items-center justify-between gap-2 border-t px-4 py-3"
+          >
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={activityPage === 1}
+              onClick={() => setActivityPagination({ projectId, page: activityPage - 1 })}
+            >
+              이전
+            </Button>
+            <span className="text-xs text-muted-foreground" aria-live="polite">
+              {activityData
+                ? `전체 ${activityData.total}건 · ${activityPage} / ${activityPages} 페이지`
+                : `${activityPage} 페이지`}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={activityPending || activityError || activityPage >= activityPages}
+              onClick={() => setActivityPagination({ projectId, page: activityPage + 1 })}
+            >
+              다음
+            </Button>
+          </nav>
         </Panel>
       </div>
     </div>
