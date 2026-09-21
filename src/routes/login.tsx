@@ -7,19 +7,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
-import { authErrorMessage } from "@/lib/domain";
+import { authErrorMessage, isAllowedAuthRedirect } from "@/lib/domain";
 import { useAuth } from "@/lib/auth";
 
 export const Route = createFileRoute("/login")({
   ssr: false,
   validateSearch: (search: Record<string, unknown>) => ({
-    redirect:
-      typeof search.redirect === "string" &&
-      (search.redirect.startsWith("/share/") ||
-        search.redirect === "/taxonomy-studio" ||
-        search.redirect.startsWith("/taxonomy-studio/"))
-        ? search.redirect
-        : undefined,
+    redirect: isAllowedAuthRedirect(search.redirect) ? search.redirect : undefined,
   }),
   head: () => ({
     meta: [

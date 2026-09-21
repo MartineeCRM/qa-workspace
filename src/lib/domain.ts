@@ -15,6 +15,15 @@ export const ROLE_DESCRIPTION: Record<WorkspaceRole, string> = {
   viewer: "워크스페이스의 모든 내용을 읽기 전용으로 볼 수 있어요.",
 };
 
+export function isAllowedAuthRedirect(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    (value.startsWith("/share/") ||
+      value === "/taxonomy-studio" ||
+      value.startsWith("/taxonomy-studio/"))
+  );
+}
+
 export function canEdit(role: WorkspaceRole | null | undefined) {
   return role === "owner" || role === "admin" || role === "editor";
 }
