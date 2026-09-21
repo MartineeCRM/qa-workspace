@@ -174,7 +174,7 @@ git commit -m "fix: make validation rule target save atomic"
 해결책은 로딩이 끝나기 전엔 편집·추가 버튼 자체를 못 누르게 막는 것이다 — 다이얼로그 내부
 로직은 건드리지 않는다.
 
-- [ ] **Step 1: 로딩 상태를 가져와서 트리거 버튼에 전달**
+- [x] **Step 1: 로딩 상태를 가져와서 트리거 버튼에 전달**
 
 `src/components/app/taxonomy-tab.tsx:118-124` 근처를 수정한다.
 
@@ -192,7 +192,7 @@ const { data: channelExclusions, isLoading: exclusionsLoading } = useQaChannelEx
 const channelDataLoading = channelsLoading || exclusionsLoading;
 ```
 
-- [ ] **Step 2: "추가" 드롭다운과 각 행의 "수정" 버튼을 로딩 중엔 비활성화**
+- [x] **Step 2: "추가" 드롭다운과 각 행의 "수정" 버튼을 로딩 중엔 비활성화**
 
 `:291` 근처의 "추가" 드롭다운 트리거와, 이벤트/프로퍼티 행의 `onEdit`을 여는 버튼들에
 `disabled={channelDataLoading}`를 추가한다. 정확한 지점은 `DropdownMenuTrigger`를 감싼
@@ -210,12 +210,12 @@ const channelDataLoading = channelsLoading || exclusionsLoading;
 버튼 위에 `title="채널 설정을 불러오는 중이에요"` 툴팁을 달아 왜 눌리지 않는지 알 수 있게
 한다.
 
-- [ ] **Step 3: 수동 확인**
+- [x] **Step 3: 수동 확인**
 
 Run: `npm run dev`, 네트워크를 느리게 스로틀링한 상태로 `/taxonomy` 페이지를 열어서 로딩 중엔
 수정/추가 버튼이 비활성화되는지, 로딩이 끝나면 다시 눌리는지 확인.
 
-- [ ] **Step 4: 커밋**
+- [x] **Step 4: 커밋**
 
 ```bash
 git add src/components/app/taxonomy-tab.tsx
@@ -223,6 +223,15 @@ git commit -m "fix: block taxonomy edit dialogs while channel data is still load
 ```
 
 ---
+
+
+**구현 후 발견된 사항 (완료, 후속 과제로 기록):** 버튼/딥링크/qa-item-view 3곳에서 독립적으로
+같은 다이얼로그를 여는 경로가 있어서 각각 개별 fix가 필요했다 (커밋 3개: d9bc1c6, dfc629a,
+22e33b5). 코드 리뷰에서 지적: 지금은 "트리거마다 막기" 방식이라 다이얼로그 자체(EventDialog/
+TaxonomyAttributeDialog)의 selectedChannelIds 지연 초기화가 근본 원인으로 남아있고, 나중에
+네 번째 호출부가 생기면 같은 버그가 재발할 수 있다. 후속 과제: 두 다이얼로그가 channels/
+excludedKeys prop이 바뀔 때 재동기화하도록 만들거나, isChannelDataLoading prop을 받아 스스로
+방어하게 바꾸는 것을 고려할 것. 이번 태스크 범위 밖이라 지금은 안 함.
 
 ### Task 3: 로그인 후 원래 딥링크로 돌아가게 하기
 
