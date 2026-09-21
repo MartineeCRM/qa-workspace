@@ -76,8 +76,9 @@ function QaIssuesPage() {
   const count = (status: IssueStatus) =>
     activeIssues.filter((issue) => statusOf(issue) === status).length;
   const submittable = activeIssues.filter((issue) => SUBMITTABLE.has(statusOf(issue)));
+  const resolved = activeIssues.filter((issue) => statusOf(issue) === "done");
   const selected = submittable.filter((issue) => checked.has(issue.id));
-  const allChecked = submittable.length > 0 && selected.length === submittable.length;
+  const allChecked = resolved.length > 0 && resolved.every((issue) => checked.has(issue.id));
   const shown = activeIssues.filter((issue) => filter === "all" || statusOf(issue) === filter);
   const nextRounds = new Set(selected.map((issue) => issue.round_number + 1));
   const nextRoundLabel = nextRounds.size === 1 ? `${[...nextRounds][0]}차` : "다음 차수";
@@ -121,8 +122,8 @@ function QaIssuesPage() {
           <div>
             <h2 className="text-[15px] font-bold tracking-[-0.2px]">처리할 이슈</h2>
             <p className="mt-0.5 text-[12.5px] text-[#64748b]">
-              이슈는 그대로 두면 계속 남아요. 개발 수정이 끝난 항목만 골라서 다음 차수 검증 목록으로
-              제출합니다.
+              해결은 현재 차수에서 이슈 처리를 마친 상태예요. 추가 검증이 필요한 경우에만 항목을
+              선택해 다음 차수로 제출하세요. 배포를 기다리는 항목은 제출하지 않고 둘 수 있어요.
             </p>
           </div>
           <div className="flex-1" />
@@ -175,9 +176,18 @@ function QaIssuesPage() {
           <label className="flex cursor-pointer items-center gap-2 text-xs font-medium text-[#475569]">
             <button
               type="button"
-              aria-label="수정 완료 항목 전체 선택"
+              aria-label="해결 항목 전체 선택"
+              aria-pressed={allChecked}
+              disabled={resolved.length === 0}
               onClick={() =>
-                setChecked(allChecked ? new Set() : new Set(submittable.map((i) => i.id)))
+                setChecked((current) => {
+                  const next = new Set(current);
+                  resolved.forEach((issue) => {
+                    if (allChecked) next.delete(issue.id);
+                    else next.add(issue.id);
+                  });
+                  return next;
+                })
               }
               className={cn(
                 "flex size-4 items-center justify-center rounded border-[1.5px]",
@@ -188,7 +198,7 @@ function QaIssuesPage() {
             >
               {allChecked ? <Check className="size-3" /> : null}
             </button>
-            수정 완료 항목 전체 선택
+            해결 항목 전체 선택
           </label>
           <div className="h-[18px] w-px bg-[#cbd5e1]" />
           <div className="flex flex-wrap gap-1 rounded-[9px] bg-[#e2e8f0] p-[3px]">
@@ -214,7 +224,7 @@ function QaIssuesPage() {
           </div>
           <div className="flex-1" />
           <p className="text-xs font-medium text-[#64748b]">
-            개발 수정 중·해결 {submittable.length}건이 제출 대상이에요
+            개발 수정 중·해결 {submittable.length}건 중 필요한 항목만 제출할 수 있어요
           </p>
         </div>
 
@@ -473,32 +483,46 @@ function QaIssuesPage() {
                         {STATUSES.map((option) => {
                           const active = status === option;
                           return (
-                            <button
+                            <div
                               key={option}
-                              type="button"
-                              disabled={updateIssue.isPending}
-                              onClick={() => changeStatus(issue, option)}
-                              className="flex items-center gap-[9px] rounded-[10px] border px-[11px] py-[9px] text-left"
+                              className="flex items-center gap-[9px] rounded-[10px] border px-[11px] py-[9px]"
                               style={{
                                 color: active ? STATUS[option].color : "#64748b",
                                 background: active ? STATUS[option].bg : "#fff",
                                 borderColor: active ? STATUS[option].color : "#cbd5e1",
                               }}
                             >
-                              <span
-                                className="size-2 shrink-0 rounded-full"
-                                style={{ background: active ? STATUS[option].color : "#94a3b8" }}
-                              />
-                              <span className="text-[12.5px] font-semibold">
-                                {STATUS[option].label}
-                              </span>
-                              <span className="flex-1" />
-                              {active && SUBMITTABLE.has(option) ? (
-                                <span className="text-[10.5px] font-semibold text-[#64748b]">
-                                  제출 가능
+                              <button
+                                type="button"
+                                disabled={updateIssue.isPending}
+                                onClick={() => changeStatus(issue, option)}
+                                className="flex flex-1 items-center gap-[9px] text-left"
+                              >
+                                <span
+                                  className="size-2 shrink-0 rounded-full"
+                                  style={{ background: active ? STATUS[option].color : "#94a3b8" }}
+                                />
+                                <span className="text-[12.5px] font-semibold">
+                                  {STATUS[option].label}
                                 </span>
+                              </button>
+                              {active && SUBMITTABLE.has(option) ? (
+                                <button
+                                  type="button"
+                                  disabled={submitIssues.isPending}
+                                  onClick={() =>
+                                    submitIssues.mutate([issue], {
+                                      onSuccess: () =>
+                                        toast.success(`${issue.round_number + 1}차로 넘겼어요`),
+                                      onError: (error) => toast.error(errorMessage(error)),
+                                    })
+                                  }
+                                  className="shrink-0 text-[10.5px] font-semibold text-[#2b6a9c] hover:underline disabled:opacity-50"
+                                >
+                                  다음 차수로 넘기기
+                                </button>
                               ) : null}
-                            </button>
+                            </div>
                           );
                         })}
                       </div>
