@@ -117,11 +117,15 @@ export function TaxonomyTab({
 }) {
   const qc = useQueryClient();
   const { user } = useAuth();
-  const { data: channels = [] } = useQaChannels(projectId);
-  const { data: channelExclusions } = useQaChannelExclusions(
+  const { data: channels = [], isLoading: channelsLoading } = useQaChannels(projectId);
+  const { data: channelExclusions, isLoading: exclusionsLoading } = useQaChannelExclusions(
     events.map((event) => event.id),
     eventProperties.map((property) => property.id),
   );
+  // 채널/제외 설정이 아직 로딩 중일 때 이벤트·프로퍼티 편집창을 열면
+  // selectedChannelIds가 빈 값으로 고정돼, 저장 시 기존 제외 설정을 전부
+  // "제외"로 덮어쓸 수 있다. 로딩이 끝날 때까지 편집·추가 진입을 막는다.
+  const channelDataLoading = channelsLoading || exclusionsLoading;
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [sortKey, setSortKey] = useState<SortKey>("name");
@@ -299,7 +303,11 @@ export function TaxonomyTab({
           />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button size="sm">
+              <Button
+                size="sm"
+                disabled={channelDataLoading}
+                title={channelDataLoading ? "채널 설정을 불러오는 중이에요" : undefined}
+              >
                 <Plus className="size-4" /> 추가 <ChevronDown className="size-3.5" />
               </Button>
             </DropdownMenuTrigger>
@@ -437,7 +445,9 @@ export function TaxonomyTab({
                                 label: "프로퍼티 추가",
                                 onClick: () =>
                                   setAttrDialog({ attribute: null, eventId: event.id }),
+                                disabled: channelDataLoading,
                               }}
+                              editDisabled={channelDataLoading}
                             />
                           </div>
                         </div>
@@ -455,6 +465,7 @@ export function TaxonomyTab({
                             }
                             onDelete={() => removeEventProperty(attr)}
                             onToggle={(v) => toggleActive("taxonomy_event_properties", attr.id, v)}
+                            editDisabled={channelDataLoading}
                           />
                         ))}
                       </ul>
@@ -497,6 +508,7 @@ export function TaxonomyTab({
                   onTogglePropertyActive={(p, v) =>
                     toggleActive("taxonomy_custom_attribute_properties", p.id, v)
                   }
+                  editDisabled={channelDataLoading}
                 />
               ) : (
                 <AttributeRow
@@ -507,6 +519,7 @@ export function TaxonomyTab({
                   onEdit={() => setAttrDialog({ attribute: attr, eventId: null })}
                   onDelete={() => removeCustomAttribute(attr)}
                   onToggle={(v) => toggleActive("taxonomy_custom_attributes", attr.id, v)}
+                  editDisabled={channelDataLoading}
                 />
               ),
             )}
@@ -591,6 +604,7 @@ function ExpandableCustomAttributeRow({
   onEditProperty,
   onDeleteProperty,
   onTogglePropertyActive,
+  editDisabled,
 }: {
   attribute: TaxonomyCustomAttribute;
   editable: boolean;
@@ -604,6 +618,10 @@ function ExpandableCustomAttributeRow({
   onEditProperty: (property: TaxonomyCustomAttributeProperty) => void;
   onDeleteProperty: (property: TaxonomyCustomAttributeProperty) => void;
   onTogglePropertyActive: (property: TaxonomyCustomAttributeProperty, value: boolean) => void;
+  // 어트리뷰트 자체 수정(TaxonomyAttributeDialog)만 채널 제외 설정을 다룬다.
+  // 필드(sub-property) 추가/수정은 CustomAttributePropertyDialog로 채널과
+  // 무관하므로 이 플래그의 영향을 받지 않는다.
+  editDisabled?: boolean;
 }) {
   return (
     <li className="group">
@@ -646,6 +664,7 @@ function ExpandableCustomAttributeRow({
                 onEdit={onEdit}
                 onDelete={onDelete}
                 extra={{ label: "필드 추가", onClick: onAddProperty }}
+                editDisabled={editDisabled}
               />
             </div>
           </div>
@@ -677,6 +696,7 @@ function AttributeRow({
   onDelete,
   onToggle,
   noun = "프로퍼티",
+  editDisabled,
 }: {
   attribute: AnyAttribute;
   editable: boolean;
@@ -684,6 +704,7 @@ function AttributeRow({
   onDelete: () => void;
   onToggle: (value: boolean) => void;
   noun?: string;
+  editDisabled?: boolean;
 }) {
   return (
     <li className="group flex items-center gap-2 px-5 py-2 pl-11 hover:bg-surface">
@@ -727,6 +748,7 @@ function AttributeRow({
               editLabel={`${noun} 수정`}
               onEdit={onEdit}
               onDelete={onDelete}
+              editDisabled={editDisabled}
             />
           </div>
         </div>
@@ -741,14 +763,17 @@ function RowActions({
   onEdit,
   onDelete,
   extra,
+  editDisabled,
 }: {
   label: string;
   editLabel: string;
   onEdit: () => void;
   onDelete: () => void;
-  extra?: { label: string; onClick: () => void };
+  extra?: { label: string; onClick: () => void; disabled?: boolean };
+  editDisabled?: boolean;
 }) {
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const loadingTitle = "채널 설정을 불러오는 중이에요";
   return (
     <>
       <DropdownMenu>
@@ -759,9 +784,21 @@ function RowActions({
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-40">
           {extra ? (
-            <DropdownMenuItem onSelect={extra.onClick}>{extra.label}</DropdownMenuItem>
+            <DropdownMenuItem
+              onSelect={extra.onClick}
+              disabled={extra.disabled}
+              title={extra.disabled ? loadingTitle : undefined}
+            >
+              {extra.label}
+            </DropdownMenuItem>
           ) : null}
-          <DropdownMenuItem onSelect={onEdit}>{editLabel}</DropdownMenuItem>
+          <DropdownMenuItem
+            onSelect={onEdit}
+            disabled={editDisabled}
+            title={editDisabled ? loadingTitle : undefined}
+          >
+            {editLabel}
+          </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem
             className="text-destructive focus:bg-destructive/10 focus:text-destructive"
