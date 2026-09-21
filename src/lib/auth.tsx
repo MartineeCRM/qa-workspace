@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import type { AuthError, Session, User } from "@supabase/supabase-js";
+import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
 export type Profile = {
@@ -26,6 +27,7 @@ type AuthContextValue = {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const queryClient = useQueryClient();
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -52,12 +54,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       session?.user.email?.split("@")[0] ??
       "New user";
     supabase.rpc("ensure_profile", { _display_name: fallbackName }).then(({ data }) => {
-      if (!cancelled && data) setProfile(data as unknown as Profile);
+      if (!cancelled && data) {
+        setProfile(data as unknown as Profile);
+        void queryClient.invalidateQueries({ queryKey: ["memberships"] });
+      }
     });
     return () => {
       cancelled = true;
     };
-  }, [userId, session?.user.email, session?.user.user_metadata?.display_name]);
+  }, [userId, session?.user.email, session?.user.user_metadata?.display_name, queryClient]);
 
   async function refreshProfile() {
     if (!userId) return;

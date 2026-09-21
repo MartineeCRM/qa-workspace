@@ -1,10 +1,18 @@
 import { describe, expect, it } from "vitest";
 import {
+  authErrorMessage,
   formatDate,
   formatDateTime,
   formatMergedTimelineTime,
   formatRawLogTime,
 } from "@/lib/domain";
+
+it("explains an unconfirmed email separately from incorrect credentials", () => {
+  expect(authErrorMessage({ message: "Email not confirmed" })).toContain("이메일 인증이 필요해요");
+  expect(authErrorMessage({ message: "Invalid login credentials" })).toBe(
+    "이메일 또는 비밀번호가 올바르지 않아요",
+  );
+});
 
 describe("formatDate / formatDateTime", () => {
   it("formats in Asia/Seoul time regardless of the runtime's local timezone", () => {
