@@ -167,6 +167,14 @@ describe("parseTaxonomyFile CSV quoted multiline values", () => {
     expect(parsed.events[0].attributes).toHaveLength(1);
     expect(parsed.events[0].attributes[0].description).toBe("1행\n2행");
   });
+
+  it("unescapes a doubled quote inside a quoted cell to a single literal quote", () => {
+    const csv =
+      "type,event,technical_name,description\n" +
+      'attribute,purchase,note,"say ""hi"" ok"\n';
+    const parsed = parseTaxonomyFile("taxonomy.csv", csv);
+    expect(parsed.events[0].attributes[0].description).toBe('say "hi" ok');
+  });
 });
 
 describe("parseTaxonomyFile unknown data type warnings", () => {
