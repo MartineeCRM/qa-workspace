@@ -203,11 +203,15 @@ export function QaItemView({
     useTaxonomyCustomAttributes(projectId);
   const { data: eventProperties = [], refetch: refetchEventProperties } =
     useTaxonomyEventProperties(projectId);
-  const { data: channels = [] } = useQaChannels(projectId);
-  const { data: exclusions } = useQaChannelExclusions(
+  const { data: channels = [], isLoading: channelsLoading } = useQaChannels(projectId);
+  const { data: exclusions, isLoading: exclusionsLoading } = useQaChannelExclusions(
     events.map((event) => event.id),
     eventProperties.map((property) => property.id),
   );
+  // 채널/제외 설정이 아직 로딩 중일 때 택소노미 편집창을 열면 selectedChannelIds가
+  // 빈 값으로 고정돼, 저장 시 기존 제외 설정을 전부 "제외"로 덮어쓸 수 있다.
+  // 로딩이 끝날 때까지 편집 진입을 막는다.
+  const channelDataLoading = channelsLoading || exclusionsLoading;
   const { data: rules = [] } = useRules(projectId);
   const { data: checklistItems = [] } = useQaChecklistItems(session.id);
   const { data: runEvents = [] } = useQaRunEvents(session.id);
@@ -780,6 +784,7 @@ export function QaItemView({
                   setTaxonomyDialog({ attribute: property, eventId: property.event_id });
                 }
               }}
+              editDisabled={channelDataLoading}
             />
           ) : currentAttribute ? (
             <Panel title="스펙 대조" description="스냅샷 수신 값과 어트리뷰트 정의를 비교해요.">
@@ -877,7 +882,9 @@ export function QaItemView({
                         onClick={() =>
                           setTaxonomyDialog({ attribute: currentAttribute, eventId: null })
                         }
-                        className="rounded-md border border-[#e3e8ef] px-2 py-1 text-left text-[11.5px] leading-tight text-[#64748b] hover:border-[#2b6a9c] hover:text-[#2b6a9c]"
+                        disabled={channelDataLoading}
+                        title={channelDataLoading ? "채널 설정을 불러오는 중이에요" : undefined}
+                        className="rounded-md border border-[#e3e8ef] px-2 py-1 text-left text-[11.5px] leading-tight text-[#64748b] hover:border-[#2b6a9c] hover:text-[#2b6a9c] disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         택소노미에서 수정
                       </button>
