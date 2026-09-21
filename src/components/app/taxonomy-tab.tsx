@@ -66,6 +66,14 @@ type SortKey = "name" | "updatedRecent";
 
 const PAGE_SIZE = 20;
 
+const dataTypeColors: Record<string, string> = {
+  string: "border-[#c5d5e5] bg-[#e1ebf5] text-[#4c6884]",
+  number: "border-[#c2d9cc] bg-[#deeee4] text-[#486b57]",
+  boolean: "border-[#e0cea6] bg-[#f5ead1] text-[#7b6537]",
+  array: "border-[#d1c5e3] bg-[#eae2f4] text-[#6c5689]",
+  "array of object": "border-[#e2c3cb] bg-[#f4e0e5] text-[#865863]",
+};
+
 function matchesStatus(isActive: boolean, filter: StatusFilter) {
   if (filter === "active") return isActive;
   if (filter === "inactive") return !isActive;
@@ -151,6 +159,7 @@ export function TaxonomyTab({
   }, [openAttributeId, customAttributes]);
 
   const refresh = () => {
+    qc.invalidateQueries({ queryKey: ["activity"] });
     qc.invalidateQueries({ queryKey: ["events", projectId] });
     qc.invalidateQueries({ queryKey: ["taxonomy-event-properties", projectId] });
     qc.invalidateQueries({ queryKey: ["taxonomy-custom-attributes", projectId] });
@@ -286,6 +295,7 @@ export function TaxonomyTab({
             events={events}
             eventProperties={eventProperties}
             customAttributes={customAttributes}
+            customAttributeProperties={customAttributeProperties}
           />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -609,7 +619,7 @@ function ExpandableCustomAttributeRow({
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <span className="mono-token text-sm">{attribute.technical_name}</span>
-            <Pill>{attribute.data_type}</Pill>
+            <Pill className={dataTypeColors[attribute.data_type]}>{attribute.data_type}</Pill>
             <Pill>필드 {subProperties.length}개</Pill>
             {!attribute.is_active ? <Pill>비활성</Pill> : null}
           </div>
@@ -680,12 +690,23 @@ function AttributeRow({
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           <span className="mono-token text-sm">{attribute.technical_name}</span>
-          <Pill>{attribute.data_type}</Pill>
-          {attribute.is_required ? <Pill>필수</Pill> : null}
+          <Pill className={dataTypeColors[attribute.data_type]}>{attribute.data_type}</Pill>
           {!attribute.is_active ? <Pill>비활성</Pill> : null}
         </div>
-        {attribute.display_name ? (
-          <p className="mt-0.5 text-xs text-muted-foreground">{attribute.display_name}</p>
+        {attribute.display_name ||
+        (attribute.example_value != null && String(attribute.example_value).trim() !== "") ? (
+          <p className="mt-0.5 break-all text-xs text-muted-foreground">
+            {attribute.display_name}
+            {attribute.example_value != null && String(attribute.example_value).trim() !== "" ? (
+              <span className={attribute.display_name ? "ml-1" : undefined}>
+                (예 :
+                {typeof attribute.example_value === "object"
+                  ? JSON.stringify(attribute.example_value)
+                  : String(attribute.example_value)}
+                )
+              </span>
+            ) : null}
+          </p>
         ) : null}
       </div>
       {editable ? (

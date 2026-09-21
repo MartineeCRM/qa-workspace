@@ -7,6 +7,9 @@ export type ImportedAttribute = {
   data_type: string;
   is_required: boolean;
   allowed_values: string[] | null;
+  example_value?: string | null;
+  /** array of object 하위 필드. array of object가 아니면 무시돼요. */
+  properties?: ImportedAttribute[];
 };
 
 export type ImportedEvent = {
@@ -60,17 +63,38 @@ function toList(value: unknown): string[] | null {
 function normaliseAttribute(
   input: Record<string, unknown>,
   requiredByDefault: boolean,
+  allowSubProperties = true,
 ): ImportedAttribute | null {
   const technical = str(input.technical_name ?? input.name ?? input.attribute);
   if (!technical) return null;
   const type = str(input.data_type ?? input.type).toLowerCase() || "string";
+  const dataType = DATA_TYPES.has(type) ? type : "string";
+
+  let properties: ImportedAttribute[] | undefined;
+  if (allowSubProperties && dataType === "array of object") {
+    const rawProps = (input.properties ?? input.attributes ?? input.fields) as unknown;
+    if (Array.isArray(rawProps)) {
+      properties = rawProps
+        .filter((p): p is Record<string, unknown> => Boolean(p) && typeof p === "object")
+        // 하위 필드는 한 단계만 지원해요. 그 안의 properties는 무시해요.
+        .map((p) => normaliseAttribute(p, false, false))
+        .filter((p): p is ImportedAttribute => p !== null);
+    }
+  }
+
   return {
     technical_name: technical,
     display_name: str(input.display_name ?? input.label) || null,
     description: str(input.description) || null,
-    data_type: DATA_TYPES.has(type) ? type : "string",
+    data_type: dataType,
     is_required: toBool(input.is_required ?? input.required, requiredByDefault),
     allowed_values: toList(input.allowed_values ?? input.allowed ?? input.enum),
+    example_value: input.example_value == null
+      ? null
+      : typeof input.example_value === "object"
+        ? JSON.stringify(input.example_value)
+        : String(input.example_value),
+    ...(properties ? { properties } : {}),
   };
 }
 
@@ -125,8 +149,15 @@ function parseCsvTaxonomy(text: string): ImportedTaxonomy {
     return ev;
   };
 
+  // array of object 하위 필드(user_attribute_property)는 부모가 먼저 만들어져 있어야 하니 뒤로 미뤄요.
+  const subPropertyRows: Record<string, string>[] = [];
+
   for (const row of rows) {
     const kind = (row.type || row.kind || "").toLowerCase();
+    if (kind === "user_attribute_property") {
+      subPropertyRows.push(row);
+      continue;
+    }
     const eventName = str(row.event ?? row.event_name);
     if (kind === "event" || (!kind && eventName && !str(row.technical_name))) {
       const ev = ensureEvent(eventName || str(row.technical_name));
@@ -145,6 +176,14 @@ function parseCsvTaxonomy(text: string): ImportedTaxonomy {
     } else {
       userAttributes.push(attr);
     }
+  }
+
+  for (const row of subPropertyRows) {
+    const parent = userAttributes.find((a) => a.technical_name === str(row.parent));
+    if (!parent || parent.data_type !== "array of object") continue;
+    const attr = normaliseAttribute(row, false, false);
+    if (!attr) continue;
+    (parent.properties ??= []).push(attr);
   }
 
   return { events: [...events.values()], userAttributes };
@@ -282,13 +321,45 @@ const SAMPLE: ImportedTaxonomy = {
       is_required: false,
       allowed_values: ["bronze", "silver", "gold"],
     },
+    {
+      technical_name: "cart_items",
+      display_name: "장바구니 상품 목록",
+      description: "현재 담긴 상품을 항목별로 담아요.",
+      data_type: "array of object",
+      is_required: false,
+      allowed_values: null,
+      properties: [
+        {
+          technical_name: "item_id",
+          display_name: "상품 ID",
+          description: "상품 고유 식별자예요.",
+          data_type: "string",
+          is_required: true,
+          allowed_values: null,
+        },
+        {
+          technical_name: "quantity",
+          display_name: "수량",
+          description: "담긴 개수예요.",
+          data_type: "number",
+          is_required: true,
+          allowed_values: null,
+        },
+      ],
+    },
   ],
 };
+
+/** events[].attributes → properties로 이름을 바꿔서 내보내요 (이벤트 속성을 부르는 실제 용어와 맞춰요). */
+function eventForExport(e: ImportedEvent) {
+  const { attributes, ...rest } = e;
+  return { ...rest, properties: attributes };
+}
 
 export function sampleJson() {
   return JSON.stringify(
     {
-      events: SAMPLE.events,
+      events: SAMPLE.events.map(eventForExport),
       user_attributes: SAMPLE.userAttributes,
     },
     null,
@@ -298,14 +369,14 @@ export function sampleJson() {
 
 export function sampleYaml() {
   return yaml.dump(
-    { events: SAMPLE.events, user_attributes: SAMPLE.userAttributes },
+    { events: SAMPLE.events.map(eventForExport), user_attributes: SAMPLE.userAttributes },
     { lineWidth: 100 },
   );
 }
 
 export function sampleCsv() {
   const header =
-    "type,event,technical_name,display_name,data_type,required,allowed_values,description,trigger_description";
+    "type,event,technical_name,parent,display_name,data_type,required,allowed_values,description,trigger_description";
   const esc = (v: string | null) => {
     const s = v ?? "";
     return /[",]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
@@ -316,6 +387,7 @@ export function sampleCsv() {
       [
         "event",
         e.technical_name,
+        "",
         "",
         esc(e.display_name),
         "",
@@ -331,6 +403,7 @@ export function sampleCsv() {
           "attribute",
           e.technical_name,
           a.technical_name,
+          "",
           esc(a.display_name),
           a.data_type,
           a.is_required ? "true" : "false",
@@ -347,6 +420,7 @@ export function sampleCsv() {
         "user_attribute",
         "",
         a.technical_name,
+        "",
         esc(a.display_name),
         a.data_type,
         a.is_required ? "true" : "false",
@@ -355,6 +429,23 @@ export function sampleCsv() {
         "",
       ].join(","),
     );
+    // array of object 하위 필드는 parent 컬럼에 부모 technical_name을 적어요.
+    for (const p of a.properties ?? []) {
+      lines.push(
+        [
+          "user_attribute_property",
+          "",
+          p.technical_name,
+          a.technical_name,
+          esc(p.display_name),
+          p.data_type,
+          p.is_required ? "true" : "false",
+          esc(p.allowed_values ? p.allowed_values.join("|") : ""),
+          esc(p.description),
+          "",
+        ].join(","),
+      );
+    }
   }
   return lines.join("\n");
 }
