@@ -22,7 +22,7 @@ import { errorMessage } from "@/lib/domain";
 import { useAuth } from "@/lib/auth";
 import {
   downloadText,
-  parseTaxonomyFile,
+  parseTaxonomyFileWithWarnings,
   sampleCsv,
   sampleJson,
   sampleYaml,
@@ -51,7 +51,7 @@ export function TaxonomyImport({
   async function handleFile(file: File) {
     setBusy(true);
     try {
-      const parsed = parseTaxonomyFile(file.name, await file.text());
+      const parsed = parseTaxonomyFileWithWarnings(file.name, await file.text());
       const result = await saveTaxonomyImport({
         projectId,
         userId: user?.id,
@@ -65,6 +65,13 @@ export function TaxonomyImport({
       toast.success(
         `이벤트 ${result.createdEvents}개, 프로퍼티·어트리뷰트 ${result.createdAttrs}개 추가 · 기존 항목 ${result.updated}개 수정했어요`,
       );
+      if (parsed.warnings.length > 0) {
+        toast.warning(
+          `타입을 인식 못해 string으로 등록한 항목 ${parsed.warnings.length}개가 있어요: ` +
+            parsed.warnings.slice(0, 3).join(", ") +
+            (parsed.warnings.length > 3 ? ` 외 ${parsed.warnings.length - 3}개` : ""),
+        );
+      }
     } catch (error) {
       toast.error(errorMessage(error, "파일을 읽지 못했어요"));
     } finally {

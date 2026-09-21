@@ -63,12 +63,18 @@ function toList(value: unknown): string[] | null {
 function normaliseAttribute(
   input: Record<string, unknown>,
   requiredByDefault: boolean,
+  warnings: string[],
   allowSubProperties = true,
 ): ImportedAttribute | null {
   const technical = str(input.technical_name ?? input.name ?? input.attribute);
   if (!technical) return null;
-  const type = str(input.data_type ?? input.type).toLowerCase() || "string";
-  const dataType = DATA_TYPES.has(type) ? type : "string";
+  const rawType = str(input.data_type ?? input.type).toLowerCase() || "string";
+  const dataType = DATA_TYPES.has(rawType) ? rawType : "string";
+  if (rawType !== dataType) {
+    const eventName = str(input.event ?? input.event_name);
+    const label = eventName ? `${eventName}.${technical}` : technical;
+    warnings.push(`${label}: 알 수 없는 타입 "${rawType}" → string으로 등록했어요`);
+  }
 
   let properties: ImportedAttribute[] | undefined;
   if (allowSubProperties && dataType === "array of object") {
@@ -77,7 +83,7 @@ function normaliseAttribute(
       properties = rawProps
         .filter((p): p is Record<string, unknown> => Boolean(p) && typeof p === "object")
         // 하위 필드는 한 단계만 지원해요. 그 안의 properties는 무시해요.
-        .map((p) => normaliseAttribute(p, false, false))
+        .map((p) => normaliseAttribute(p, false, warnings, false))
         .filter((p): p is ImportedAttribute => p !== null);
     }
   }
@@ -89,43 +95,79 @@ function normaliseAttribute(
     data_type: dataType,
     is_required: toBool(input.is_required ?? input.required, requiredByDefault),
     allowed_values: toList(input.allowed_values ?? input.allowed ?? input.enum),
-    example_value: input.example_value == null
-      ? null
-      : typeof input.example_value === "object"
-        ? JSON.stringify(input.example_value)
-        : String(input.example_value),
+    example_value:
+      input.example_value == null
+        ? null
+        : typeof input.example_value === "object"
+          ? JSON.stringify(input.example_value)
+          : String(input.example_value),
     ...(properties ? { properties } : {}),
   };
 }
 
 /* ---------------- CSV ---------------- */
 
-function splitCsvLine(line: string): string[] {
-  const out: string[] = [];
+// 따옴표 안의 줄바꿈은 셀 값의 일부로 취급해야 하므로, 줄 단위가 아니라
+// 전체 텍스트를 한 번에 스캔해서 행을 나눈다.
+function parseCsvRows(text: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [];
   let cur = "";
   let quoted = false;
-  for (let i = 0; i < line.length; i += 1) {
-    const ch = line[i];
-    if (ch === '"') {
-      if (quoted && line[i + 1] === '"') {
+  let i = 0;
+  while (i < text.length) {
+    const ch = text[i];
+    if (quoted) {
+      if (ch === '"' && text[i + 1] === '"') {
         cur += '"';
+        i += 2;
+        continue;
+      }
+      if (ch === '"') {
+        quoted = false;
         i += 1;
-      } else quoted = !quoted;
-    } else if (ch === "," && !quoted) {
-      out.push(cur);
+        continue;
+      }
+      cur += ch;
+      i += 1;
+      continue;
+    }
+    if (ch === '"') {
+      quoted = true;
+      i += 1;
+      continue;
+    }
+    if (ch === ",") {
+      row.push(cur.trim());
       cur = "";
-    } else cur += ch;
+      i += 1;
+      continue;
+    }
+    if (ch === "\r") {
+      i += 1;
+      continue;
+    }
+    if (ch === "\n") {
+      row.push(cur.trim());
+      if (row.some((cell) => cell.length > 0)) rows.push(row);
+      row = [];
+      cur = "";
+      i += 1;
+      continue;
+    }
+    cur += ch;
+    i += 1;
   }
-  out.push(cur);
-  return out.map((v) => v.trim());
+  row.push(cur.trim());
+  if (row.some((cell) => cell.length > 0)) rows.push(row);
+  return rows;
 }
 
-function parseCsvTaxonomy(text: string): ImportedTaxonomy {
-  const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
-  if (lines.length < 2) throw new Error("CSV에 데이터 행이 없어요");
-  const headers = splitCsvLine(lines[0]).map((h) => h.toLowerCase());
-  const rows = lines.slice(1).map((line) => {
-    const cells = splitCsvLine(line);
+function parseCsvTaxonomy(text: string, warnings: string[]): ImportedTaxonomy {
+  const rows = parseCsvRows(text);
+  if (rows.length < 2) throw new Error("CSV에 데이터 행이 없어요");
+  const headers = rows[0].map((h) => h.toLowerCase());
+  const dataRows = rows.slice(1).map((cells) => {
     const row: Record<string, string> = {};
     headers.forEach((h, i) => (row[h] = cells[i] ?? ""));
     return row;
@@ -152,7 +194,7 @@ function parseCsvTaxonomy(text: string): ImportedTaxonomy {
   // array of object 하위 필드(user_attribute_property)는 부모가 먼저 만들어져 있어야 하니 뒤로 미뤄요.
   const subPropertyRows: Record<string, string>[] = [];
 
-  for (const row of rows) {
+  for (const row of dataRows) {
     const kind = (row.type || row.kind || "").toLowerCase();
     if (kind === "user_attribute_property") {
       subPropertyRows.push(row);
@@ -167,7 +209,7 @@ function parseCsvTaxonomy(text: string): ImportedTaxonomy {
         str(row.trigger_description ?? row.trigger) || ev.trigger_description;
       continue;
     }
-    const attr = normaliseAttribute(row, Boolean(eventName));
+    const attr = normaliseAttribute(row, Boolean(eventName), warnings);
     if (!attr) continue;
     if (kind === "user_attribute" || (!eventName && kind !== "attribute")) {
       userAttributes.push(attr);
@@ -181,7 +223,7 @@ function parseCsvTaxonomy(text: string): ImportedTaxonomy {
   for (const row of subPropertyRows) {
     const parent = userAttributes.find((a) => a.technical_name === str(row.parent));
     if (!parent || parent.data_type !== "array of object") continue;
-    const attr = normaliseAttribute(row, false, false);
+    const attr = normaliseAttribute(row, false, warnings, false);
     if (!attr) continue;
     (parent.properties ??= []).push(attr);
   }
@@ -191,7 +233,7 @@ function parseCsvTaxonomy(text: string): ImportedTaxonomy {
 
 /* ---------------- JSON / YAML ---------------- */
 
-function parseStructured(value: unknown): ImportedTaxonomy {
+function parseStructured(value: unknown, warnings: string[]): ImportedTaxonomy {
   if (!value || typeof value !== "object") throw new Error("파일 구조를 이해하지 못했어요");
   const root = value as Record<string, unknown>;
   const rawEvents = (root.events ?? root.taxonomy ?? []) as unknown;
@@ -209,7 +251,7 @@ function parseStructured(value: unknown): ImportedTaxonomy {
       if (Array.isArray(attrsRaw)) {
         for (const a of attrsRaw) {
           if (!a || typeof a !== "object") continue;
-          const attr = normaliseAttribute(a as Record<string, unknown>, true);
+          const attr = normaliseAttribute(a as Record<string, unknown>, true, warnings);
           if (attr) attributes.push(attr);
         }
       }
@@ -227,7 +269,7 @@ function parseStructured(value: unknown): ImportedTaxonomy {
   if (Array.isArray(rawUserAttrs)) {
     for (const a of rawUserAttrs) {
       if (!a || typeof a !== "object") continue;
-      const attr = normaliseAttribute(a as Record<string, unknown>, false);
+      const attr = normaliseAttribute(a as Record<string, unknown>, false, warnings);
       if (attr) userAttributes.push(attr);
     }
   }
@@ -239,16 +281,29 @@ function parseStructured(value: unknown): ImportedTaxonomy {
 }
 
 export function parseTaxonomyFile(fileName: string, text: string): ImportedTaxonomy {
+  return parseTaxonomyFileWithWarnings(fileName, text);
+}
+
+export function parseTaxonomyFileWithWarnings(
+  fileName: string,
+  text: string,
+): ImportedTaxonomy & { warnings: string[] } {
+  const warnings: string[] = [];
   const lower = fileName.toLowerCase();
-  if (lower.endsWith(".csv")) return parseCsvTaxonomy(text);
-  if (lower.endsWith(".json")) return parseStructured(JSON.parse(text));
-  if (lower.endsWith(".yaml") || lower.endsWith(".yml")) return parseStructured(yaml.load(text));
-  // 확장자를 모르면 내용으로 추측해요.
-  const trimmed = text.trim();
-  if (trimmed.startsWith("{") || trimmed.startsWith("["))
-    return parseStructured(JSON.parse(trimmed));
-  if (trimmed.split(/\r?\n/)[0].includes(",")) return parseCsvTaxonomy(text);
-  return parseStructured(yaml.load(text));
+  let result: ImportedTaxonomy;
+  if (lower.endsWith(".csv")) result = parseCsvTaxonomy(text, warnings);
+  else if (lower.endsWith(".json")) result = parseStructured(JSON.parse(text), warnings);
+  else if (lower.endsWith(".yaml") || lower.endsWith(".yml"))
+    result = parseStructured(yaml.load(text), warnings);
+  else {
+    // 확장자를 모르면 내용으로 추측해요.
+    const trimmed = text.trim();
+    if (trimmed.startsWith("{") || trimmed.startsWith("["))
+      result = parseStructured(JSON.parse(trimmed), warnings);
+    else if (trimmed.split(/\r?\n/)[0].includes(",")) result = parseCsvTaxonomy(text, warnings);
+    else result = parseStructured(yaml.load(text), warnings);
+  }
+  return { ...result, warnings };
 }
 
 /* ---------------- 예시 데이터셋 ---------------- */

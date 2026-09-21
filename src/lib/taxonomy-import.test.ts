@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { parseAllowedValues, parseTaxonomyFile } from "@/lib/taxonomy-import";
+import {
+  parseAllowedValues,
+  parseTaxonomyFile,
+  parseTaxonomyFileWithWarnings,
+} from "@/lib/taxonomy-import";
 
 describe("parseAllowedValues", () => {
   it("removes wrapping quotes without changing the value itself", () => {
@@ -15,16 +19,26 @@ describe("parseAllowedValues", () => {
 
 describe("parseTaxonomyFile required defaults", () => {
   it("preserves example values including zero, false and nested arrays", () => {
-    const parsed = parseTaxonomyFile("taxonomy.json", JSON.stringify({
-      events: [{ name: "purchase", properties: [
-        { name: "amount", example_value: 0 },
-        { name: "active", example_value: false },
-        { name: "products", example_value: [{ code: "A" }] },
-      ] }],
-      user_attributes: [{ name: "grade", example_value: "gold" }],
-    }));
+    const parsed = parseTaxonomyFile(
+      "taxonomy.json",
+      JSON.stringify({
+        events: [
+          {
+            name: "purchase",
+            properties: [
+              { name: "amount", example_value: 0 },
+              { name: "active", example_value: false },
+              { name: "products", example_value: [{ code: "A" }] },
+            ],
+          },
+        ],
+        user_attributes: [{ name: "grade", example_value: "gold" }],
+      }),
+    );
     expect(parsed.events[0].attributes.map((a) => a.example_value)).toEqual([
-      "0", "false", '[{"code":"A"}]',
+      "0",
+      "false",
+      '[{"code":"A"}]',
     ]);
     expect(parsed.userAttributes[0].example_value).toBe("gold");
   });
@@ -68,7 +82,11 @@ describe("array of object sub-fields", () => {
       }),
     );
     expect(parsed.userAttributes[0].properties).toEqual([
-      expect.objectContaining({ technical_name: "item_id", data_type: "string", is_required: true }),
+      expect.objectContaining({
+        technical_name: "item_id",
+        data_type: "string",
+        is_required: true,
+      }),
       expect.objectContaining({
         technical_name: "quantity",
         data_type: "number",
@@ -98,9 +116,7 @@ describe("array of object sub-fields", () => {
     const parsed = parseTaxonomyFile(
       "taxonomy.json",
       JSON.stringify({
-        user_attributes: [
-          { name: "grade", data_type: "string", properties: [{ name: "sneaky" }] },
-        ],
+        user_attributes: [{ name: "grade", data_type: "string", properties: [{ name: "sneaky" }] }],
       }),
     );
     expect(parsed.userAttributes[0].properties).toBeUndefined();
@@ -139,6 +155,27 @@ describe("array of object sub-fields", () => {
     expect(parsed.userAttributes[0].properties).toEqual([
       expect.objectContaining({ technical_name: "item_id", data_type: "string" }),
       expect.objectContaining({ technical_name: "quantity", data_type: "number" }),
+    ]);
+  });
+});
+
+describe("parseTaxonomyFile CSV quoted multiline values", () => {
+  it("keeps a quoted newline inside one cell instead of splitting the row", () => {
+    const csv = "type,event,technical_name,description\n" + 'attribute,purchase,note,"1행\n2행"\n';
+    const parsed = parseTaxonomyFile("taxonomy.csv", csv);
+    expect(parsed.events).toHaveLength(1);
+    expect(parsed.events[0].attributes).toHaveLength(1);
+    expect(parsed.events[0].attributes[0].description).toBe("1행\n2행");
+  });
+});
+
+describe("parseTaxonomyFile unknown data type warnings", () => {
+  it("warns when a type isn't recognized and falls back to string", () => {
+    const csv = "type,event,technical_name,data_type\nattribute,purchase,note,timestamp\n";
+    const result = parseTaxonomyFileWithWarnings("taxonomy.csv", csv);
+    expect(result.events[0].attributes[0].data_type).toBe("string");
+    expect(result.warnings).toEqual([
+      'purchase.note: 알 수 없는 타입 "timestamp" → string으로 등록했어요',
     ]);
   });
 });
