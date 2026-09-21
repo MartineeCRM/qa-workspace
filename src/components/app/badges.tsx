@@ -24,9 +24,9 @@ export function ItemStatusBadge({ status }: { status: ItemStatus }) {
   return <span className={cn(base, styles[status])}>{ITEM_STATUS_LABEL[status]}</span>;
 }
 
-export function Pill({ children }: { children: React.ReactNode }) {
+export function Pill({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
-    <span className={cn(base, "border-border bg-surface-strong text-muted-foreground")}>
+    <span className={cn(base, "border-border bg-surface-strong text-muted-foreground", className)}>
       {children}
     </span>
   );
