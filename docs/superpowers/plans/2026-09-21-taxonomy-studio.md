@@ -243,7 +243,7 @@ excludedKeys prop이 바뀔 때 재동기화하도록 만들거나, isChannelDat
 고정으로 넘긴다. `login.tsx`의 `validateSearch`도 `/share/`로 시작하는 경로만 허용해서, 다른
 경로는 애초에 안 받아준다. Studio 딥링크(`/taxonomy-studio/...`)도 허용 목록에 추가한다.
 
-- [ ] **Step 1: `_authenticated/route.tsx`가 현재 경로를 넘기도록 수정**
+- [x] **Step 1: `_authenticated/route.tsx`가 현재 경로를 넘기도록 수정**
 
 ```tsx
 // src/routes/_authenticated/route.tsx
@@ -263,7 +263,7 @@ export const Route = createFileRoute("/_authenticated")({
 });
 ```
 
-- [ ] **Step 2: `login.tsx`의 허용 목록에 `/taxonomy-studio/` 추가**
+- [x] **Step 2: `login.tsx`의 허용 목록에 `/taxonomy-studio/` 추가**
 
 ```tsx
 // src/routes/login.tsx:15-20
@@ -276,14 +276,14 @@ validateSearch: (search: Record<string, unknown>) => ({
 }),
 ```
 
-- [ ] **Step 3: 수동 확인**
+- [x] **Step 3: 수동 확인**
 
 Run: `npm run dev`, 로그아웃 상태에서 `/taxonomy-studio` 같은 내부 경로로 직접 접속 →
 로그인 화면으로 이동 → 로그인 성공 후 원래 요청했던 경로로 돌아가는지 확인. `/w/...` 같은 다른
 내부 경로는 이번에 허용 목록에 안 넣었으므로 `/workspaces`로 가는 게 맞다 — Studio 딥링크만
 목표로 좁힌다.
 
-- [ ] **Step 4: 커밋**
+- [x] **Step 4: 커밋**
 
 ```bash
 git add src/routes/_authenticated/route.tsx src/routes/login.tsx
