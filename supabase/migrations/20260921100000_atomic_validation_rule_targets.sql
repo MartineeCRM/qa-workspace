@@ -4,7 +4,7 @@ CREATE OR REPLACE FUNCTION public.replace_validation_rule_targets(
   p_rule_id uuid,
   p_targets jsonb -- [{"target_type": "event"|"property"|"custom_attribute", "target_id": "uuid"}]
 ) RETURNS void
-LANGUAGE plpgsql AS $$
+LANGUAGE plpgsql SET search_path = public AS $$
 BEGIN
   DELETE FROM public.validation_rule_targets WHERE rule_id = p_rule_id;
   INSERT INTO public.validation_rule_targets (rule_id, target_type, target_id)
