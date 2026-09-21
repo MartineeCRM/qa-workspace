@@ -337,27 +337,24 @@ function RuleDialog({
       return toast.error(errorMessage(error));
     }
 
-    if (rule) {
-      const { error: deleteError } = await db
-        .from("validation_rule_targets")
-        .delete()
-        .eq("rule_id", rule.id);
-      if (deleteError) {
-        setSaving(false);
-        return toast.error(errorMessage(deleteError));
-      }
-    }
-    if (scope === "targets" && staged.length > 0) {
-      const { error: targetError } = await db.from("validation_rule_targets").insert(
-        staged.map((t) => ({
-          rule_id: savedRule.id,
-          target_type: t.kind,
-          target_id: t.id,
-        })),
-      );
+    if (scope === "targets") {
+      const { error: targetError } = await db.rpc("replace_validation_rule_targets", {
+        p_rule_id: savedRule.id,
+        p_targets: staged.map((t) => ({ target_type: t.kind, target_id: t.id })),
+      });
       if (targetError) {
         setSaving(false);
         return toast.error(errorMessage(targetError));
+      }
+    } else if (rule) {
+      // scope가 project로 바뀐 경우 기존 대상을 전부 지운다.
+      const { error: clearError } = await db.rpc("replace_validation_rule_targets", {
+        p_rule_id: savedRule.id,
+        p_targets: [],
+      });
+      if (clearError) {
+        setSaving(false);
+        return toast.error(errorMessage(clearError));
       }
     }
 
