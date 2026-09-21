@@ -148,19 +148,21 @@ export function TaxonomyTab({
     if (!openPropertyId || openedFromLinkRef.current) return;
     const prop = eventProperties.find((p) => p.id === openPropertyId);
     if (!prop) return; // not loaded yet — retry once eventProperties arrives
+    if (channelDataLoading) return; // channel/exclusion data not loaded yet — retry once it arrives
     openedFromLinkRef.current = true;
     setOpen((s) => ({ ...s, [prop.event_id]: true }));
     setAttrDialog({ attribute: prop, eventId: prop.event_id });
-  }, [openPropertyId, eventProperties]);
+  }, [openPropertyId, eventProperties, channelDataLoading]);
 
   useEffect(() => {
     if (!openAttributeId || openedFromLinkRef.current) return;
     const attribute = customAttributes.find((candidate) => candidate.id === openAttributeId);
     if (!attribute) return;
+    if (channelDataLoading) return; // channel/exclusion data not loaded yet — retry once it arrives
     openedFromLinkRef.current = true;
     setActiveTab("attributes");
     setAttrDialog({ attribute, eventId: null });
-  }, [openAttributeId, customAttributes]);
+  }, [openAttributeId, customAttributes, channelDataLoading]);
 
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ["activity"] });
