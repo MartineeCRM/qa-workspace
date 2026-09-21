@@ -41,7 +41,7 @@
 요청 두 개다(`rules-tab.tsx:341-357`). 삽입이 실패하면 대상 없는 규칙이 남고, 화면은 이를
 "프로젝트 전체 적용"으로 해석한다. 삭제·삽입을 하나의 DB 함수로 묶어 원자적으로 처리한다.
 
-- [ ] **Step 1: 마이그레이션 작성 — 원자적 저장 함수**
+- [x] **Step 1: 마이그레이션 작성 — 원자적 저장 함수**
 
 ```sql
 -- supabase/migrations/20260921100000_atomic_validation_rule_targets.sql
@@ -62,12 +62,12 @@ $$;
 GRANT EXECUTE ON FUNCTION public.replace_validation_rule_targets(uuid, jsonb) TO authenticated;
 ```
 
-- [ ] **Step 2: 로컬 DB에 적용**
+- [x] **Step 2: 로컬 DB에 적용**
 
 Run: `supabase db reset --local` (또는 `supabase migration up --local`)
 Expected: 마이그레이션이 에러 없이 적용됨
 
-- [ ] **Step 3: 실패 테스트 작성 — 삽입이 실패해도 기존 대상이 남아있는지**
+- [x] **Step 3: 실패 테스트 작성 — 삽입이 실패해도 기존 대상이 남아있는지**
 
 ```sql
 -- supabase/tests/validation_rule_targets_atomic.sql
@@ -114,12 +114,12 @@ $$;
 ROLLBACK;
 ```
 
-- [ ] **Step 4: 테스트 실행**
+- [x] **Step 4: 테스트 실행**
 
 Run: `supabase test db supabase/tests/validation_rule_targets_atomic.sql --local`
 Expected: PASS (ASSERT 실패 없음)
 
-- [ ] **Step 5: `rules-tab.tsx`를 원자적 함수 호출로 교체**
+- [x] **Step 5: `rules-tab.tsx`를 원자적 함수 호출로 교체**
 
 `src/components/app/rules-tab.tsx:340-362`의 delete-then-insert 블록을 RPC 호출 하나로
 바꾼다.
@@ -148,12 +148,12 @@ if (scope === "targets") {
 }
 ```
 
-- [ ] **Step 6: 수동 확인**
+- [x] **Step 6: 수동 확인**
 
 Run: `npm run dev`, 규칙 수정 화면에서 "선택 대상"으로 규칙 하나를 저장 → 새로고침해도 대상이
 유지되는지 확인.
 
-- [ ] **Step 7: 커밋**
+- [x] **Step 7: 커밋**
 
 ```bash
 git add supabase/migrations/20260921100000_atomic_validation_rule_targets.sql \
