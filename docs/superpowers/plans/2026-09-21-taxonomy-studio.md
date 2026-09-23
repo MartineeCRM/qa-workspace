@@ -1323,7 +1323,7 @@ git commit -m "feat: add taxonomy studio entry point with workspace/project pick
 **배경:** Task 8에서 Studio → qa-workspace 링크("QA 현황 보기")는 이미 만들었다. 반대 방향만
 추가한다.
 
-- [ ] **Step 1: `/taxonomy` 헤더에 Studio 링크 추가**
+- [x] **Step 1: `/taxonomy` 헤더에 Studio 링크 추가**
 
 ```tsx
 // src/routes/_authenticated/w/$wsId/p/$projectId/taxonomy.tsx
@@ -1348,13 +1348,13 @@ import { ExternalLink } from "lucide-react";
 `Button` import가 이미 있는지 파일 상단을 확인하고, 없으면 `import { Button } from
 "@/components/ui/button";`을 추가한다.
 
-- [ ] **Step 2: 수동 확인**
+- [x] **Step 2: 수동 확인**
 
 `/taxonomy` 페이지에서 "Studio에서 편집" 클릭 → 같은 프로젝트의 Studio 페이지로 이동하는지
 확인. Studio에서 "QA 현황 보기" 클릭 → 다시 qa-workspace `/taxonomy`로 돌아오는지 확인 (양방향
 왕복).
 
-- [ ] **Step 3: 커밋**
+- [x] **Step 3: 커밋**
 
 ```bash
 git add src/routes/_authenticated/w/\$wsId/p/\$projectId/taxonomy.tsx
