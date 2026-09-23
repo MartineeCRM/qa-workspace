@@ -84,16 +84,7 @@ function StudioProjectPage() {
             삭제됐거나 접근 권한이 없는 프로젝트예요.
           </p>
           <Button asChild className="mt-4">
-            {/* Task 9가 /taxonomy-studio 인덱스 라우트를 아직 추가하지 않아 라우트
-                트리 타입에 없다 — w/$wsId/route.tsx의 SideLink와 같은 방식으로 `as any`를
-                써서 지금도 실제 SPA 내비게이션이 되게 하고, Task 9가 라우트를 추가하면
-                타입 캐스트만 지우면 된다. */}
-            <Link
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              to={"/taxonomy-studio" as any}
-            >
-              Studio 프로젝트 목록으로
-            </Link>
+            <Link to="/taxonomy-studio">Studio 프로젝트 목록으로</Link>
           </Button>
         </div>
       </div>
