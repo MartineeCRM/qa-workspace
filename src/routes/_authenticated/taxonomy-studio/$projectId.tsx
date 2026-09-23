@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft } from "lucide-react";
 
 import { TopBar } from "@/components/app/top-bar";
-import { SectionHeader, Stat, EmptyState } from "@/components/app/layout-parts";
+import { SectionHeader, Stat } from "@/components/app/layout-parts";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
@@ -75,25 +75,26 @@ function StudioProjectPage() {
     return (
       <div className="min-h-screen">
         <TopBar />
-        <div className="p-6">
-          <EmptyState
-            title="프로젝트를 열 수 없어요"
-            description="삭제됐거나 접근 권한이 없는 프로젝트예요."
-            action={
-              <Button asChild>
-                {/* Task 9가 /taxonomy-studio 인덱스 라우트를 아직 추가하지 않아 라우트
-                    트리 타입에 없다 — w/$wsId/route.tsx의 SideLink와 같은 방식으로 `as any`를
-                    써서 지금도 실제 SPA 내비게이션이 되게 하고, Task 9가 라우트를 추가하면
-                    타입 캐스트만 지우면 된다. */}
-                <Link
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  to={"/taxonomy-studio" as any}
-                >
-                  Studio 프로젝트 목록으로
-                </Link>
-              </Button>
-            }
-          />
+        {/* w/$wsId/route.tsx, w/$wsId/p/$projectId/route.tsx의 "열 수 없어요" 화면과
+            같은 레이아웃(가운데 정렬된 일반 블록)으로 맞춘다 — EmptyState는 목록 안
+            placeholder용 컴포넌트라 전체 화면 에러 상태엔 안 맞는다. */}
+        <div className="mx-auto max-w-md px-6 py-24 text-center">
+          <h1 className="text-lg font-semibold">프로젝트를 열 수 없어요</h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            삭제됐거나 접근 권한이 없는 프로젝트예요.
+          </p>
+          <Button asChild className="mt-4">
+            {/* Task 9가 /taxonomy-studio 인덱스 라우트를 아직 추가하지 않아 라우트
+                트리 타입에 없다 — w/$wsId/route.tsx의 SideLink와 같은 방식으로 `as any`를
+                써서 지금도 실제 SPA 내비게이션이 되게 하고, Task 9가 라우트를 추가하면
+                타입 캐스트만 지우면 된다. */}
+            <Link
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              to={"/taxonomy-studio" as any}
+            >
+              Studio 프로젝트 목록으로
+            </Link>
+          </Button>
         </div>
       </div>
     );
