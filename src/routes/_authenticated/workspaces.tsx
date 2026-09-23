@@ -118,10 +118,10 @@ function WorkspaceGrid({ items }: { items: ReturnType<typeof useMyMemberships>["
         >
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="truncate text-sm font-semibold group-hover:text-primary">
+              <p className="truncate text-[15px] font-semibold text-foreground group-hover:text-primary">
                 {m.workspaces.name}
               </p>
-              <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
+              <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
                 {m.workspaces.description || "설명이 없어요"}
               </p>
             </div>

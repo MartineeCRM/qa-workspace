@@ -93,7 +93,7 @@ export function AttributeApiSettings({
               onChange={(e) => setBaseUrl(e.target.value)}
               placeholder="https://rest.iad-01.braze.com"
             />
-            <p className="text-xs text-muted-foreground">
+            <p className="text-sm text-muted-foreground">
               Braze 대시보드 → Settings → APIs and Identifiers → REST API Key 페이지에서 확인할 수
               있어요. 경로(/users/export/ids)는 자동으로 붙어요.
             </p>

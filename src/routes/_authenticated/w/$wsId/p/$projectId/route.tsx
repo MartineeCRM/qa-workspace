@@ -55,7 +55,7 @@ function ProjectShell() {
   if (!project) {
     return (
       <div className="mx-auto max-w-md px-6 py-24 text-center">
-        <h1 className="text-lg font-semibold">프로젝트를 열 수 없어요</h1>
+        <h1 className="text-xl font-bold text-foreground">프로젝트를 열 수 없어요</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           삭제됐거나 접근 권한이 없는 프로젝트예요.
         </p>
@@ -83,8 +83,8 @@ function ProjectShell() {
           </ol>
         </nav>
         <div className="mt-1 flex flex-wrap items-center gap-2">
-          <h1 className="text-lg font-semibold tracking-tight">{project.name}</h1>
-          <span className="mono-token text-xs text-muted-foreground">{project.project_key}</span>
+          <h1 className="text-lg font-bold tracking-tight text-foreground">{project.name}</h1>
+          <span className="mono-token text-muted-foreground">{project.project_key}</span>
           {project.archived_at ? <Pill>보관됨</Pill> : null}
           {editable ? (
             <div className="ml-auto flex gap-2">

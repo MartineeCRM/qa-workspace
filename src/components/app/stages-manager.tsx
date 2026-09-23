@@ -131,7 +131,7 @@ export function StagesManager({
               <li key={stage.id} className="flex items-center gap-2 px-3 py-2">
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium">{stage.name}</p>
-                  <p className="mono-token truncate text-xs text-muted-foreground">{stage.slug}</p>
+                  <p className="mono-token truncate text-muted-foreground">{stage.slug}</p>
                 </div>
                 <Button
                   size="icon"

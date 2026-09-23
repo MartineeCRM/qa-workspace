@@ -214,7 +214,7 @@ function ProjectsPage() {
                         {p.archived_at ? <Pill>보관됨</Pill> : null}
                       </div>
                       {p.description ? (
-                        <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
+                        <p className="mt-0.5 line-clamp-1 text-sm text-muted-foreground">
                           {p.description}
                         </p>
                       ) : null}
