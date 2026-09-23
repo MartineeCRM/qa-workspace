@@ -31,6 +31,7 @@ export type TaxonomyEvent = {
   display_name: string | null;
   description: string | null;
   trigger_description: string | null;
+  trigger_screenshots: string[];
   is_active: boolean;
   sort_order: number;
   created_at: string;
@@ -135,6 +136,8 @@ export type ActivityLog = {
   action_type: string;
   summary: string;
   created_at: string;
+  metadata?: Record<string, unknown>;
+  actor?: { display_name: string | null } | null;
 };
 
 export type WorkspaceInvite = {
@@ -196,6 +199,7 @@ export function useWorkspace(workspaceId: string) {
 export function useMyRole(workspaceId: string) {
   return useQuery({
     queryKey: ["role", workspaceId],
+    enabled: Boolean(workspaceId),
     queryFn: async () => {
       const { data } = await supabase.auth.getUser();
       const uid = data.user?.id;
@@ -351,6 +355,7 @@ export function useAddDiscoveredEventProperty(projectId: string) {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["taxonomy-event-properties", projectId] });
+      qc.invalidateQueries({ queryKey: ["activity"] });
     },
   });
 }
@@ -370,6 +375,7 @@ export function useUpdateEventPropertyDataType(projectId: string) {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["taxonomy-event-properties", projectId] });
+      qc.invalidateQueries({ queryKey: ["activity"] });
     },
   });
 }
@@ -386,6 +392,7 @@ export function useUpdateEventPropertyRequired(projectId: string) {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["taxonomy-event-properties", projectId] });
+      qc.invalidateQueries({ queryKey: ["activity"] });
     },
   });
 }
@@ -402,6 +409,7 @@ export function useUpdateEventPropertyAllowedValues(projectId: string) {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["taxonomy-event-properties", projectId] });
+      qc.invalidateQueries({ queryKey: ["activity"] });
     },
   });
 }
@@ -421,7 +429,46 @@ export function useRenameEventProperty(projectId: string) {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["taxonomy-event-properties", projectId] });
+      qc.invalidateQueries({ queryKey: ["activity"] });
     },
+  });
+}
+
+// 이미지 경로 배열을 읽고 통째로 다시 쓰면(read-modify-write) 거의 동시에 추가된
+// 다른 사람의 스크린샷이 지워질 수 있어, DB 함수로 원자적 append/remove를 수행한다.
+export function useAppendEventScreenshot(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { eventId: string; path: string }) => {
+      const { data, error } = await db.rpc("append_taxonomy_event_screenshot", {
+        p_event_id: input.eventId,
+        p_path: input.path,
+      });
+      if (error) throw error;
+      if (data === null) {
+        throw new Error("이미지를 등록하지 못했어요 (이벤트를 찾을 수 없거나 권한이 없어요)");
+      }
+      return data as string[];
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["events", projectId] }),
+  });
+}
+
+export function useRemoveEventScreenshot(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { eventId: string; path: string }) => {
+      const { data, error } = await db.rpc("remove_taxonomy_event_screenshot", {
+        p_event_id: input.eventId,
+        p_path: input.path,
+      });
+      if (error) throw error;
+      if (data === null) {
+        throw new Error("이미지를 삭제하지 못했어요 (이벤트를 찾을 수 없거나 권한이 없어요)");
+      }
+      return data as string[];
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["events", projectId] }),
   });
 }
 
@@ -485,19 +532,28 @@ export function useEnvironments(projectId: string) {
   });
 }
 
-export function useActivity(params: { workspaceId?: string; projectId?: string; limit?: number }) {
-  const { workspaceId, projectId, limit = 15 } = params;
+export function useActivity(params: {
+  workspaceId?: string;
+  projectId?: string;
+  limit?: number;
+  page?: number;
+}) {
+  const { workspaceId, projectId, limit = 15, page = 1 } = params;
   return useQuery({
-    queryKey: ["activity", workspaceId ?? null, projectId ?? null, limit],
+    queryKey: ["activity", workspaceId ?? null, projectId ?? null, limit, page],
     queryFn: async () => {
       let q = db
         .from("activity_logs")
-        .select("*")
+        .select("*, actor:profiles!activity_logs_actor_user_id_fkey(display_name)", {
+          count: "exact",
+        })
         .order("created_at", { ascending: false })
-        .limit(limit);
+        .order("id", { ascending: false })
+        .range((page - 1) * limit, page * limit - 1);
       if (projectId) q = q.eq("project_id", projectId);
       else if (workspaceId) q = q.eq("workspace_id", workspaceId);
-      return unwrap<ActivityLog[]>(await q);
+      const result = await q;
+      return { entries: unwrap<ActivityLog[]>(result), total: result.count ?? 0 };
     },
     enabled: Boolean(workspaceId || projectId),
   });

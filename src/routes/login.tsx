@@ -7,16 +7,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
-import { authErrorMessage } from "@/lib/domain";
+import { authErrorMessage, isAllowedAuthRedirect } from "@/lib/domain";
 import { useAuth } from "@/lib/auth";
 
 export const Route = createFileRoute("/login")({
   ssr: false,
   validateSearch: (search: Record<string, unknown>) => ({
-    redirect:
-      typeof search.redirect === "string" && search.redirect.startsWith("/share/")
-        ? search.redirect
-        : undefined,
+    redirect: isAllowedAuthRedirect(search.redirect) ? search.redirect : undefined,
   }),
   head: () => ({
     meta: [
@@ -38,13 +35,28 @@ function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
+  const [needsConfirmation, setNeedsConfirmation] = useState(false);
+
+  async function resendConfirmation() {
+    setBusy(true);
+    try {
+      const { error } = await supabase.auth.resend({ type: "signup", email: email.trim() });
+      if (error) return toast.error(authErrorMessage(error));
+      toast.success("가입 확인 메일을 다시 요청했어요. 받은편지함과 스팸함을 확인해주세요.");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
     const { error } = await signIn(email.trim(), password);
     setBusy(false);
-    if (error) return toast.error(authErrorMessage(error, "로그인에 실패했어요"));
+    if (error) {
+      setNeedsConfirmation(error.code === "email_not_confirmed");
+      return toast.error(authErrorMessage(error, "로그인에 실패했어요"));
+    }
     navigate({ href: redirectTo ?? "/workspaces" });
   }
 
@@ -92,6 +104,17 @@ function LoginPage() {
         <Button type="submit" className="w-full" disabled={busy || !email.trim() || !password}>
           {busy ? "로그인 중…" : "로그인"}
         </Button>
+        {needsConfirmation && (
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full"
+            disabled={busy || !email.trim()}
+            onClick={() => void resendConfirmation()}
+          >
+            가입 확인 메일 다시 보내기
+          </Button>
+        )}
       </form>
     </AuthCard>
   );

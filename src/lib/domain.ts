@@ -15,6 +15,15 @@ export const ROLE_DESCRIPTION: Record<WorkspaceRole, string> = {
   viewer: "워크스페이스의 모든 내용을 읽기 전용으로 볼 수 있어요.",
 };
 
+export function isAllowedAuthRedirect(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    (value.startsWith("/share/") ||
+      value === "/taxonomy-studio" ||
+      value.startsWith("/taxonomy-studio/"))
+  );
+}
+
 export function canEdit(role: WorkspaceRole | null | undefined) {
   return role === "owner" || role === "admin" || role === "editor";
 }
@@ -202,6 +211,8 @@ export function errorMessage(error: unknown, fallback = "문제가 발생했어�
 
 export function authErrorMessage(error: unknown, fallback = "문제가 발생했어요") {
   const msg = errorMessage(error, fallback);
+  if (msg === "Email not confirmed")
+    return "이메일 인증이 필요해요. 가입 확인 메일의 링크를 눌러주세요";
   if (msg === "Invalid login credentials") return "이메일 또는 비밀번호가 올바르지 않아요";
   return msg;
 }

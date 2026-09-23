@@ -105,6 +105,7 @@ export function QaItemSpecDiffTable({
   onEditEvent,
   onEditProperty,
   onHighlightChange,
+  editDisabled,
 }: {
   projectId: string;
   eventId: string;
@@ -121,6 +122,7 @@ export function QaItemSpecDiffTable({
   onEditEvent: () => void;
   onEditProperty: (propertyId: string) => void;
   onHighlightChange: (propertyNames: string[], tone: "pass" | "issue" | null) => void;
+  editDisabled?: boolean;
 }) {
   const { user } = useAuth();
   const updateDataType = useUpdateEventPropertyDataType(projectId);
@@ -367,7 +369,7 @@ export function QaItemSpecDiffTable({
             <button
               type="button"
               onClick={onCreateEventIssue}
-              className="rounded-md border border-[#f0dfc0] bg-[#fdf9f1] px-2 py-1 text-left text-[11.5px] font-semibold leading-tight text-[#b45309]"
+              className="rounded-md border border-[#d6e0e8] bg-white px-2 py-1 text-left text-[11.5px] leading-tight text-[#64748b] hover:border-[#2b6a9c] hover:text-[#2b6a9c]"
             >
               이슈 있음
             </button>
@@ -474,7 +476,7 @@ export function QaItemSpecDiffTable({
                             label: row.name,
                           })
                         }
-                        className="rounded-md border border-[#f0dfc0] bg-[#fdf9f1] px-2 py-1 text-left text-[11.5px] font-semibold leading-tight text-[#b45309]"
+                        className="rounded-md border border-[#e3e8ef] px-2 py-1 text-left text-[11.5px] leading-tight text-[#64748b] hover:border-[#2b6a9c] hover:text-[#2b6a9c]"
                       >
                         이슈 있음
                       </button>
@@ -482,7 +484,9 @@ export function QaItemSpecDiffTable({
                         <button
                           type="button"
                           onClick={() => onEditProperty(row.propertyId as string)}
-                          className="rounded-md border border-[#e3e8ef] px-2 py-1 text-left text-[11.5px] leading-tight text-[#64748b] hover:border-[#2b6a9c] hover:text-[#2b6a9c]"
+                          disabled={editDisabled}
+                          title={editDisabled ? "채널 설정을 불러오는 중이에요" : undefined}
+                          className="rounded-md border border-[#e3e8ef] px-2 py-1 text-left text-[11.5px] leading-tight text-[#64748b] hover:border-[#2b6a9c] hover:text-[#2b6a9c] disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           택소노미에서 수정
                         </button>

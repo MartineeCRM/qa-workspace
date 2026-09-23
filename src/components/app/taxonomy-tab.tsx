@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ChevronDown, ChevronRight, MoreHorizontal, Plus } from "lucide-react";
+import { ChevronDown, ChevronRight, MoreHorizontal, Plus, X } from "lucide-react";
 
 import { EmptyState } from "@/components/app/layout-parts";
 import { Pill } from "@/components/app/badges";
@@ -47,6 +47,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import {
   db,
+  useAppendEventScreenshot,
+  useRemoveEventScreenshot,
   type TaxonomyCustomAttribute,
   type TaxonomyCustomAttributeProperty,
   type TaxonomyEvent,
@@ -57,6 +59,7 @@ import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 import { parseAllowedValues } from "@/lib/taxonomy-import";
 import { useQaChannelExclusions, useQaChannels, type QaChannel } from "@/lib/qa-rounds-queries";
+import { supabase } from "@/integrations/supabase/client";
 
 type AnyAttribute =
   TaxonomyEventProperty | TaxonomyCustomAttribute | TaxonomyCustomAttributeProperty;
@@ -65,6 +68,14 @@ type StatusFilter = "all" | "active" | "inactive";
 type SortKey = "name" | "updatedRecent";
 
 const PAGE_SIZE = 20;
+
+const dataTypeColors: Record<string, string> = {
+  string: "border-[#c5d5e5] bg-[#e1ebf5] text-[#4c6884]",
+  number: "border-[#c2d9cc] bg-[#deeee4] text-[#486b57]",
+  boolean: "border-[#e0cea6] bg-[#f5ead1] text-[#7b6537]",
+  array: "border-[#d1c5e3] bg-[#eae2f4] text-[#6c5689]",
+  "array of object": "border-[#e2c3cb] bg-[#f4e0e5] text-[#865863]",
+};
 
 function matchesStatus(isActive: boolean, filter: StatusFilter) {
   if (filter === "active") return isActive;
@@ -109,11 +120,15 @@ export function TaxonomyTab({
 }) {
   const qc = useQueryClient();
   const { user } = useAuth();
-  const { data: channels = [] } = useQaChannels(projectId);
-  const { data: channelExclusions } = useQaChannelExclusions(
+  const { data: channels = [], isLoading: channelsLoading } = useQaChannels(projectId);
+  const { data: channelExclusions, isLoading: exclusionsLoading } = useQaChannelExclusions(
     events.map((event) => event.id),
     eventProperties.map((property) => property.id),
   );
+  // 채널/제외 설정이 아직 로딩 중일 때 이벤트·프로퍼티 편집창을 열면
+  // selectedChannelIds가 빈 값으로 고정돼, 저장 시 기존 제외 설정을 전부
+  // "제외"로 덮어쓸 수 있다. 로딩이 끝날 때까지 편집·추가 진입을 막는다.
+  const channelDataLoading = channelsLoading || exclusionsLoading;
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [sortKey, setSortKey] = useState<SortKey>("name");
@@ -136,21 +151,24 @@ export function TaxonomyTab({
     if (!openPropertyId || openedFromLinkRef.current) return;
     const prop = eventProperties.find((p) => p.id === openPropertyId);
     if (!prop) return; // not loaded yet — retry once eventProperties arrives
+    if (channelDataLoading) return; // channel/exclusion data not loaded yet — retry once it arrives
     openedFromLinkRef.current = true;
     setOpen((s) => ({ ...s, [prop.event_id]: true }));
     setAttrDialog({ attribute: prop, eventId: prop.event_id });
-  }, [openPropertyId, eventProperties]);
+  }, [openPropertyId, eventProperties, channelDataLoading]);
 
   useEffect(() => {
     if (!openAttributeId || openedFromLinkRef.current) return;
     const attribute = customAttributes.find((candidate) => candidate.id === openAttributeId);
     if (!attribute) return;
+    if (channelDataLoading) return; // channel/exclusion data not loaded yet — retry once it arrives
     openedFromLinkRef.current = true;
     setActiveTab("attributes");
     setAttrDialog({ attribute, eventId: null });
-  }, [openAttributeId, customAttributes]);
+  }, [openAttributeId, customAttributes, channelDataLoading]);
 
   const refresh = () => {
+    qc.invalidateQueries({ queryKey: ["activity"] });
     qc.invalidateQueries({ queryKey: ["events", projectId] });
     qc.invalidateQueries({ queryKey: ["taxonomy-event-properties", projectId] });
     qc.invalidateQueries({ queryKey: ["taxonomy-custom-attributes", projectId] });
@@ -235,6 +253,16 @@ export function TaxonomyTab({
   async function removeEvent(event: TaxonomyEvent) {
     const { error } = await db.from("taxonomy_events").delete().eq("id", event.id);
     if (error) return toast.error(errorMessage(error));
+    // 이벤트 행이 사라지면 trigger_screenshots(어떤 파일이 있었는지 기록)도 같이 사라져서,
+    // 나중엔 이 이벤트가 쓰던 Storage 파일을 찾을 방법이 없어진다 — 행을 지우기 전에 기록해둔
+    // 경로로 지금 바로 정리한다. 실패해도 조용히 넘어간다(Task 7의 이미지 삭제와 같은 방침).
+    if (event.trigger_screenshots.length > 0) {
+      try {
+        await supabase.storage.from("taxonomy-event-images").remove(event.trigger_screenshots);
+      } catch (cleanupError) {
+        console.error("failed to remove storage screenshots for deleted event", cleanupError);
+      }
+    }
     toast.success("택소노미에서 이벤트를 삭제했어요");
     refresh();
   }
@@ -286,10 +314,15 @@ export function TaxonomyTab({
             events={events}
             eventProperties={eventProperties}
             customAttributes={customAttributes}
+            customAttributeProperties={customAttributeProperties}
           />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button size="sm">
+              <Button
+                size="sm"
+                disabled={channelDataLoading}
+                title={channelDataLoading ? "채널 설정을 불러오는 중이에요" : undefined}
+              >
                 <Plus className="size-4" /> 추가 <ChevronDown className="size-3.5" />
               </Button>
             </DropdownMenuTrigger>
@@ -427,7 +460,9 @@ export function TaxonomyTab({
                                 label: "프로퍼티 추가",
                                 onClick: () =>
                                   setAttrDialog({ attribute: null, eventId: event.id }),
+                                disabled: channelDataLoading,
                               }}
+                              editDisabled={channelDataLoading}
                             />
                           </div>
                         </div>
@@ -445,6 +480,7 @@ export function TaxonomyTab({
                             }
                             onDelete={() => removeEventProperty(attr)}
                             onToggle={(v) => toggleActive("taxonomy_event_properties", attr.id, v)}
+                            editDisabled={channelDataLoading}
                           />
                         ))}
                       </ul>
@@ -487,6 +523,7 @@ export function TaxonomyTab({
                   onTogglePropertyActive={(p, v) =>
                     toggleActive("taxonomy_custom_attribute_properties", p.id, v)
                   }
+                  editDisabled={channelDataLoading}
                 />
               ) : (
                 <AttributeRow
@@ -497,6 +534,7 @@ export function TaxonomyTab({
                   onEdit={() => setAttrDialog({ attribute: attr, eventId: null })}
                   onDelete={() => removeCustomAttribute(attr)}
                   onToggle={(v) => toggleActive("taxonomy_custom_attributes", attr.id, v)}
+                  editDisabled={channelDataLoading}
                 />
               ),
             )}
@@ -581,6 +619,7 @@ function ExpandableCustomAttributeRow({
   onEditProperty,
   onDeleteProperty,
   onTogglePropertyActive,
+  editDisabled,
 }: {
   attribute: TaxonomyCustomAttribute;
   editable: boolean;
@@ -594,6 +633,10 @@ function ExpandableCustomAttributeRow({
   onEditProperty: (property: TaxonomyCustomAttributeProperty) => void;
   onDeleteProperty: (property: TaxonomyCustomAttributeProperty) => void;
   onTogglePropertyActive: (property: TaxonomyCustomAttributeProperty, value: boolean) => void;
+  // 어트리뷰트 자체 수정(TaxonomyAttributeDialog)만 채널 제외 설정을 다룬다.
+  // 필드(sub-property) 추가/수정은 CustomAttributePropertyDialog로 채널과
+  // 무관하므로 이 플래그의 영향을 받지 않는다.
+  editDisabled?: boolean;
 }) {
   return (
     <li className="group">
@@ -609,7 +652,7 @@ function ExpandableCustomAttributeRow({
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <span className="mono-token text-sm">{attribute.technical_name}</span>
-            <Pill>{attribute.data_type}</Pill>
+            <Pill className={dataTypeColors[attribute.data_type]}>{attribute.data_type}</Pill>
             <Pill>필드 {subProperties.length}개</Pill>
             {!attribute.is_active ? <Pill>비활성</Pill> : null}
           </div>
@@ -636,6 +679,7 @@ function ExpandableCustomAttributeRow({
                 onEdit={onEdit}
                 onDelete={onDelete}
                 extra={{ label: "필드 추가", onClick: onAddProperty }}
+                editDisabled={editDisabled}
               />
             </div>
           </div>
@@ -667,6 +711,7 @@ function AttributeRow({
   onDelete,
   onToggle,
   noun = "프로퍼티",
+  editDisabled,
 }: {
   attribute: AnyAttribute;
   editable: boolean;
@@ -674,18 +719,30 @@ function AttributeRow({
   onDelete: () => void;
   onToggle: (value: boolean) => void;
   noun?: string;
+  editDisabled?: boolean;
 }) {
   return (
     <li className="group flex items-center gap-2 px-5 py-2 pl-11 hover:bg-surface">
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           <span className="mono-token text-sm">{attribute.technical_name}</span>
-          <Pill>{attribute.data_type}</Pill>
-          {attribute.is_required ? <Pill>필수</Pill> : null}
+          <Pill className={dataTypeColors[attribute.data_type]}>{attribute.data_type}</Pill>
           {!attribute.is_active ? <Pill>비활성</Pill> : null}
         </div>
-        {attribute.display_name ? (
-          <p className="mt-0.5 text-xs text-muted-foreground">{attribute.display_name}</p>
+        {attribute.display_name ||
+        (attribute.example_value != null && String(attribute.example_value).trim() !== "") ? (
+          <p className="mt-0.5 break-all text-xs text-muted-foreground">
+            {attribute.display_name}
+            {attribute.example_value != null && String(attribute.example_value).trim() !== "" ? (
+              <span className={attribute.display_name ? "ml-1" : undefined}>
+                (예 :
+                {typeof attribute.example_value === "object"
+                  ? JSON.stringify(attribute.example_value)
+                  : String(attribute.example_value)}
+                )
+              </span>
+            ) : null}
+          </p>
         ) : null}
       </div>
       {editable ? (
@@ -706,6 +763,7 @@ function AttributeRow({
               editLabel={`${noun} 수정`}
               onEdit={onEdit}
               onDelete={onDelete}
+              editDisabled={editDisabled}
             />
           </div>
         </div>
@@ -720,14 +778,17 @@ function RowActions({
   onEdit,
   onDelete,
   extra,
+  editDisabled,
 }: {
   label: string;
   editLabel: string;
   onEdit: () => void;
   onDelete: () => void;
-  extra?: { label: string; onClick: () => void };
+  extra?: { label: string; onClick: () => void; disabled?: boolean };
+  editDisabled?: boolean;
 }) {
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const loadingTitle = "채널 설정을 불러오는 중이에요";
   return (
     <>
       <DropdownMenu>
@@ -738,9 +799,21 @@ function RowActions({
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-40">
           {extra ? (
-            <DropdownMenuItem onSelect={extra.onClick}>{extra.label}</DropdownMenuItem>
+            <DropdownMenuItem
+              onSelect={extra.onClick}
+              disabled={extra.disabled}
+              title={extra.disabled ? loadingTitle : undefined}
+            >
+              {extra.label}
+            </DropdownMenuItem>
           ) : null}
-          <DropdownMenuItem onSelect={onEdit}>{editLabel}</DropdownMenuItem>
+          <DropdownMenuItem
+            onSelect={onEdit}
+            disabled={editDisabled}
+            title={editDisabled ? loadingTitle : undefined}
+          >
+            {editLabel}
+          </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem
             className="text-destructive focus:bg-destructive/10 focus:text-destructive"
@@ -800,6 +873,92 @@ function EventDialog({
           .map((channel) => channel.id),
       ),
   );
+
+  const [screenshots, setScreenshots] = useState<string[]>(event?.trigger_screenshots ?? []);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const appendScreenshot = useAppendEventScreenshot(projectId);
+  const removeScreenshot = useRemoveEventScreenshot(projectId);
+  const MAX_IMAGES = 6;
+  const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+  const ALLOWED_IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
+
+  async function uploadScreenshot(file: File) {
+    if (!event) return;
+    if (!ALLOWED_IMAGE_TYPES.has(file.type)) {
+      return toast.error("png, jpg, webp 파일만 올릴 수 있어요");
+    }
+    if (file.size > MAX_IMAGE_BYTES) {
+      return toast.error("이미지는 5MB 이하만 가능해요");
+    }
+    if (screenshots.length >= MAX_IMAGES) {
+      return toast.error(`이벤트당 이미지는 최대 ${MAX_IMAGES}장이에요`);
+    }
+    setUploadingImage(true);
+    const path = `${projectId}/${event.id}/${crypto.randomUUID()}-${file.name}`;
+    const { error: uploadError } = await supabase.storage
+      .from("taxonomy-event-images")
+      .upload(path, file);
+    if (uploadError) {
+      setUploadingImage(false);
+      return toast.error(errorMessage(uploadError, "이미지 업로드에 실패했어요"));
+    }
+    try {
+      const updated = await appendScreenshot.mutateAsync({ eventId: event.id, path });
+      setScreenshots(updated);
+    } catch (error) {
+      await supabase.storage.from("taxonomy-event-images").remove([path]);
+      toast.error(errorMessage(error, "이미지 등록에 실패했어요"));
+    } finally {
+      setUploadingImage(false);
+    }
+  }
+
+  async function deleteScreenshot(path: string) {
+    if (!event) return;
+    let updated: string[];
+    try {
+      updated = await removeScreenshot.mutateAsync({ eventId: event.id, path });
+    } catch (error) {
+      return toast.error(errorMessage(error, "이미지 삭제에 실패했어요"));
+    }
+    // 여기까지 왔으면 DB 반영(사용자가 보는 실제 효과)은 이미 성공했다. Storage 파일 정리가
+    // 실패해도 삭제 자체를 실패로 보여주지 않는다 — 안 쓰는 파일이 하나 남을 뿐이다. 그래도
+    // 처리 안 된 예외로 새지 않도록 별도로 감싼다.
+    setScreenshots(updated);
+    try {
+      await supabase.storage.from("taxonomy-event-images").remove([path]);
+    } catch (error) {
+      // 사용자에겐 조용히 무시 — 위 주석 참고. 콘솔에만 남겨서 나중에 orphan 파일을
+      // 추적할 단서를 남긴다.
+      console.error("failed to remove orphaned taxonomy event screenshot", path, error);
+    }
+  }
+
+  // 버킷이 private이라 getPublicUrl은 접근 불가능한 URL을 돌려준다. 표시하려면
+  // createSignedUrl로 1시간짜리 임시 URL을 받아와야 하므로, screenshots가 바뀔 때마다
+  // 다시 발급한다.
+  const [screenshotUrls, setScreenshotUrls] = useState<Record<string, string>>({});
+  useEffect(() => {
+    let cancelled = false;
+    if (screenshots.length === 0) {
+      setScreenshotUrls({});
+      return;
+    }
+    supabase.storage
+      .from("taxonomy-event-images")
+      .createSignedUrls(screenshots, 3600)
+      .then(({ data, error }) => {
+        if (cancelled || error || !data) return;
+        const next: Record<string, string> = {};
+        data.forEach((entry) => {
+          if (entry.path && entry.signedUrl) next[entry.path] = entry.signedUrl;
+        });
+        setScreenshotUrls(next);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [screenshots]);
 
   async function submit() {
     if (!technicalName.trim()) return toast.error("기술 이름은 필수예요");
@@ -898,6 +1057,54 @@ function EventDialog({
               rows={2}
             />
           </div>
+          {event ? (
+            <div className="space-y-1.5">
+              <Label>트리거 스크린샷</Label>
+              <p className="text-xs text-muted-foreground">
+                이 이벤트가 어느 화면에서 무슨 액션으로 발생하는지 보여주는 이미지예요. 최대{" "}
+                {MAX_IMAGES}장, 장당 5MB.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {screenshots.map((path) => (
+                  <div key={path} className="group relative">
+                    {screenshotUrls[path] ? (
+                      <img
+                        src={screenshotUrls[path]}
+                        alt=""
+                        className="size-20 rounded-md border object-cover"
+                      />
+                    ) : (
+                      <div className="size-20 animate-pulse rounded-md border bg-muted" />
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => deleteScreenshot(path)}
+                      className="absolute -right-1.5 -top-1.5 rounded-full bg-destructive p-0.5 text-destructive-foreground opacity-0 group-hover:opacity-100"
+                      aria-label="이미지 삭제"
+                    >
+                      <X className="size-3" />
+                    </button>
+                  </div>
+                ))}
+                {screenshots.length < MAX_IMAGES ? (
+                  <label className="flex size-20 cursor-pointer items-center justify-center rounded-md border border-dashed text-xs text-muted-foreground hover:bg-accent">
+                    {uploadingImage ? "올리는 중…" : "+ 추가"}
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      className="hidden"
+                      disabled={uploadingImage}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) void uploadScreenshot(file);
+                        e.target.value = "";
+                      }}
+                    />
+                  </label>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>

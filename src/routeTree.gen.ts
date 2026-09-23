@@ -16,6 +16,8 @@ import { Route as SignupRouteImport } from './routes/signup'
 import { Route as AuthenticatedAccountRouteImport } from './routes/_authenticated/account'
 import { Route as AuthenticatedWorkspacesRouteImport } from './routes/_authenticated/workspaces'
 import { Route as ShareTokenRouteImport } from './routes/share/$token'
+import { Route as AuthenticatedTaxonomyStudioIndexRouteImport } from './routes/_authenticated/taxonomy-studio/index'
+import { Route as AuthenticatedTaxonomyStudioProjectIdRouteImport } from './routes/_authenticated/taxonomy-studio/$projectId'
 import { Route as AuthenticatedWWsIdRouteRouteImport } from './routes/_authenticated/w/$wsId/route'
 import { Route as AuthenticatedWWsIdIndexRouteImport } from './routes/_authenticated/w/$wsId/index'
 import { Route as AuthenticatedWWsIdSettingsRouteImport } from './routes/_authenticated/w/$wsId/settings'
@@ -65,6 +67,18 @@ const ShareTokenRoute = ShareTokenRouteImport.update({
   path: '/share/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedTaxonomyStudioIndexRoute =
+  AuthenticatedTaxonomyStudioIndexRouteImport.update({
+    id: '/taxonomy-studio/',
+    path: '/taxonomy-studio/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedTaxonomyStudioProjectIdRoute =
+  AuthenticatedTaxonomyStudioProjectIdRouteImport.update({
+    id: '/taxonomy-studio/$projectId',
+    path: '/taxonomy-studio/$projectId',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedWWsIdRouteRoute = AuthenticatedWWsIdRouteRouteImport.update({
   id: '/w/$wsId',
   path: '/w/$wsId',
@@ -166,6 +180,8 @@ export interface FileRoutesByFullPath {
   '/workspaces': typeof AuthenticatedWorkspacesRoute
   '/share/$token': typeof ShareTokenRoute
   '/w/$wsId': typeof AuthenticatedWWsIdRouteRouteWithChildren
+  '/taxonomy-studio/$projectId': typeof AuthenticatedTaxonomyStudioProjectIdRoute
+  '/taxonomy-studio/': typeof AuthenticatedTaxonomyStudioIndexRoute
   '/w/$wsId/settings': typeof AuthenticatedWWsIdSettingsRoute
   '/w/$wsId/': typeof AuthenticatedWWsIdIndexRoute
   '/w/$wsId/p/$projectId': typeof AuthenticatedWWsIdPProjectIdRouteRouteWithChildren
@@ -187,6 +203,8 @@ export interface FileRoutesByTo {
   '/account': typeof AuthenticatedAccountRoute
   '/workspaces': typeof AuthenticatedWorkspacesRoute
   '/share/$token': typeof ShareTokenRoute
+  '/taxonomy-studio/$projectId': typeof AuthenticatedTaxonomyStudioProjectIdRoute
+  '/taxonomy-studio': typeof AuthenticatedTaxonomyStudioIndexRoute
   '/w/$wsId/settings': typeof AuthenticatedWWsIdSettingsRoute
   '/w/$wsId': typeof AuthenticatedWWsIdIndexRoute
   '/w/$wsId/p/$projectId/issues': typeof AuthenticatedWWsIdPProjectIdIssuesRoute
@@ -207,6 +225,8 @@ export interface FileRoutesById {
   '/_authenticated/workspaces': typeof AuthenticatedWorkspacesRoute
   '/share/$token': typeof ShareTokenRoute
   '/_authenticated/w/$wsId': typeof AuthenticatedWWsIdRouteRouteWithChildren
+  '/_authenticated/taxonomy-studio/$projectId': typeof AuthenticatedTaxonomyStudioProjectIdRoute
+  '/_authenticated/taxonomy-studio/': typeof AuthenticatedTaxonomyStudioIndexRoute
   '/_authenticated/w/$wsId/settings': typeof AuthenticatedWWsIdSettingsRoute
   '/_authenticated/w/$wsId/': typeof AuthenticatedWWsIdIndexRoute
   '/_authenticated/w/$wsId/p/$projectId': typeof AuthenticatedWWsIdPProjectIdRouteRouteWithChildren
@@ -231,6 +251,8 @@ export interface FileRouteTypes {
     | '/workspaces'
     | '/share/$token'
     | '/w/$wsId'
+    | '/taxonomy-studio/$projectId'
+    | '/taxonomy-studio/'
     | '/w/$wsId/settings'
     | '/w/$wsId/'
     | '/w/$wsId/p/$projectId'
@@ -252,6 +274,8 @@ export interface FileRouteTypes {
     | '/account'
     | '/workspaces'
     | '/share/$token'
+    | '/taxonomy-studio/$projectId'
+    | '/taxonomy-studio'
     | '/w/$wsId/settings'
     | '/w/$wsId'
     | '/w/$wsId/p/$projectId/issues'
@@ -271,6 +295,8 @@ export interface FileRouteTypes {
     | '/_authenticated/workspaces'
     | '/share/$token'
     | '/_authenticated/w/$wsId'
+    | '/_authenticated/taxonomy-studio/$projectId'
+    | '/_authenticated/taxonomy-studio/'
     | '/_authenticated/w/$wsId/settings'
     | '/_authenticated/w/$wsId/'
     | '/_authenticated/w/$wsId/p/$projectId'
@@ -344,6 +370,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/share/$token'
       preLoaderRoute: typeof ShareTokenRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/taxonomy-studio/': {
+      id: '/_authenticated/taxonomy-studio/'
+      path: '/taxonomy-studio'
+      fullPath: '/taxonomy-studio/'
+      preLoaderRoute: typeof AuthenticatedTaxonomyStudioIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/taxonomy-studio/$projectId': {
+      id: '/_authenticated/taxonomy-studio/$projectId'
+      path: '/taxonomy-studio/$projectId'
+      fullPath: '/taxonomy-studio/$projectId'
+      preLoaderRoute: typeof AuthenticatedTaxonomyStudioProjectIdRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/w/$wsId': {
       id: '/_authenticated/w/$wsId'
@@ -547,12 +587,17 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedAccountRoute: typeof AuthenticatedAccountRoute
   AuthenticatedWorkspacesRoute: typeof AuthenticatedWorkspacesRoute
   AuthenticatedWWsIdRouteRoute: typeof AuthenticatedWWsIdRouteRouteWithChildren
+  AuthenticatedTaxonomyStudioProjectIdRoute: typeof AuthenticatedTaxonomyStudioProjectIdRoute
+  AuthenticatedTaxonomyStudioIndexRoute: typeof AuthenticatedTaxonomyStudioIndexRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAccountRoute: AuthenticatedAccountRoute,
   AuthenticatedWorkspacesRoute: AuthenticatedWorkspacesRoute,
   AuthenticatedWWsIdRouteRoute: AuthenticatedWWsIdRouteRouteWithChildren,
+  AuthenticatedTaxonomyStudioProjectIdRoute:
+    AuthenticatedTaxonomyStudioProjectIdRoute,
+  AuthenticatedTaxonomyStudioIndexRoute: AuthenticatedTaxonomyStudioIndexRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =
