@@ -839,7 +839,7 @@ git commit -m "feat: add taxonomy event images storage bucket with workspace-sco
 먼저 저장하고 다시 열어서 첨부하는 흐름). 업로드는 png/jpg/webp, 장당 5MB, 이벤트당 최대
 6장으로 제한한다.
 
-- [ ] **Step 1: 이미지 상태와 업로드/삭제 핸들러 추가**
+- [x] **Step 1: 이미지 상태와 업로드/삭제 핸들러 추가**
 
 `EventDialog` 함수 본문(`:811-823` 근처, `selectedChannelIds` state 다음)에 추가:
 
@@ -925,7 +925,7 @@ useEffect(() => {
 `import { useAppendEventScreenshot, useRemoveEventScreenshot, ... } from "@/lib/queries";`를
 파일 상단 import에 추가한다. `useEffect`는 이미 `:1`에서 import돼 있다.
 
-- [ ] **Step 2: JSX에 이미지 섹션 추가**
+- [x] **Step 2: JSX에 이미지 섹션 추가**
 
 `:920-921`(설명 필드 다음, `</div>` 닫기 전)에 추가:
 
@@ -982,14 +982,14 @@ useEffect(() => {
 
 `import { X } from "lucide-react";`를 이미 있는 lucide import(`:4`)에 합친다.
 
-- [ ] **Step 3: 수동 확인**
+- [x] **Step 3: 수동 확인**
 
 Run: `npm run dev`, 기존 이벤트를 열어 이미지 업로드 → 잠깐 회색 스켈레톤이 보이다가(서명 URL
 발급 대기) 이미지가 표시되는지, 삭제가 되는지, 6장 넘게/5MB 넘게/잘못된 형식 올릴 때 에러
 토스트가 뜨는지 확인. 업로드 성공 후 `taxonomy_events.trigger_screenshots`에 경로가 들어있는지
 Supabase Studio에서 확인.
 
-- [ ] **Step 4: 커밋**
+- [x] **Step 4: 커밋**
 
 ```bash
 git add src/components/app/taxonomy-tab.tsx
@@ -997,6 +997,11 @@ git commit -m "feat: add trigger screenshot upload to the event dialog"
 ```
 
 ---
+
+
+**리뷰에서 발견, 후속 과제로 기록 (이번 범위 밖):** 이벤트당 최대 6장 제한이 지금은 클라이언트
+UI 체크일 뿐이라, 두 세션이 동시에 업로드하면 넘어갈 수 있음 — Task 5의 append RPC에서
+서버 단에서도 길이를 강제하는 걸 고려할 것.
 
 ### Task 8: Studio 프로젝트 상세 라우트 (`$projectId.tsx`)
 
