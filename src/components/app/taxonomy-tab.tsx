@@ -917,8 +917,10 @@ function EventDialog({
     setScreenshots(updated);
     try {
       await supabase.storage.from("taxonomy-event-images").remove([path]);
-    } catch {
-      // 조용히 무시 — 위 주석 참고.
+    } catch (error) {
+      // 사용자에겐 조용히 무시 — 위 주석 참고. 콘솔에만 남겨서 나중에 orphan 파일을
+      // 추적할 단서를 남긴다.
+      console.error("failed to remove orphaned taxonomy event screenshot", path, error);
     }
   }
 
