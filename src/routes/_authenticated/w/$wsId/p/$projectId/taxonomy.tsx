@@ -1,6 +1,8 @@
 import { useState } from "react";
-import { createFileRoute, useParams } from "@tanstack/react-router";
+import { createFileRoute, Link, useParams } from "@tanstack/react-router";
+import { ExternalLink } from "lucide-react";
 import { SegmentedControl } from "@/components/ui/segmented-control";
+import { Button } from "@/components/ui/button";
 import { SectionHeader, Stat } from "@/components/app/layout-parts";
 import { TaxonomyTab } from "@/components/app/taxonomy-tab";
 import { RulesTab } from "@/components/app/rules-tab";
@@ -60,10 +62,20 @@ function TaxonomyPage() {
 
   return (
     <div className="mx-auto max-w-[1240px] space-y-5 p-6">
-      <SectionHeader
-        title="택소노미"
-        description="이 고객의 단일 기준이에요. 모든 QA 환경이 이 택소노미를 검증하고, 규칙을 환경별로 복사하지 않아요."
-      />
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <SectionHeader
+          className="flex-1"
+          title="택소노미"
+          description="이 고객의 단일 기준이에요. 모든 QA 환경이 이 택소노미를 검증하고, 규칙을 환경별로 복사하지 않아요."
+        />
+        {/* SectionHeader의 meta는 <p className="text-xs text-muted-foreground">로
+            감싸져서 버튼을 넣기엔 맞지 않는다(PageHeader의 actions와 다름) — 별도 행으로 뺐다. */}
+        <Button asChild variant="outline" size="sm">
+          <Link to="/taxonomy-studio/$projectId" params={{ projectId }}>
+            <ExternalLink className="size-3.5" /> Studio에서 편집
+          </Link>
+        </Button>
+      </div>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Stat label="전체 커버리지" value={items.length} />
