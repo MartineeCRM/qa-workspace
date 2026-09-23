@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ChevronDown, ChevronRight, MoreHorizontal, Plus } from "lucide-react";
+import { ChevronDown, ChevronRight, MoreHorizontal, Plus, X } from "lucide-react";
 
 import { EmptyState } from "@/components/app/layout-parts";
 import { Pill } from "@/components/app/badges";
@@ -47,6 +47,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import {
   db,
+  useAppendEventScreenshot,
+  useRemoveEventScreenshot,
   type TaxonomyCustomAttribute,
   type TaxonomyCustomAttributeProperty,
   type TaxonomyEvent,
@@ -57,6 +59,7 @@ import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 import { parseAllowedValues } from "@/lib/taxonomy-import";
 import { useQaChannelExclusions, useQaChannels, type QaChannel } from "@/lib/qa-rounds-queries";
+import { supabase } from "@/integrations/supabase/client";
 
 type AnyAttribute =
   TaxonomyEventProperty | TaxonomyCustomAttribute | TaxonomyCustomAttributeProperty;
@@ -861,6 +864,82 @@ function EventDialog({
       ),
   );
 
+  const [screenshots, setScreenshots] = useState<string[]>(event?.trigger_screenshots ?? []);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const appendScreenshot = useAppendEventScreenshot(projectId);
+  const removeScreenshot = useRemoveEventScreenshot(projectId);
+  const MAX_IMAGES = 6;
+  const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+  const ALLOWED_IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
+
+  async function uploadScreenshot(file: File) {
+    if (!event) return;
+    if (!ALLOWED_IMAGE_TYPES.has(file.type)) {
+      return toast.error("png, jpg, webp 파일만 올릴 수 있어요");
+    }
+    if (file.size > MAX_IMAGE_BYTES) {
+      return toast.error("이미지는 5MB 이하만 가능해요");
+    }
+    if (screenshots.length >= MAX_IMAGES) {
+      return toast.error(`이벤트당 이미지는 최대 ${MAX_IMAGES}장이에요`);
+    }
+    setUploadingImage(true);
+    const path = `${projectId}/${event.id}/${crypto.randomUUID()}-${file.name}`;
+    const { error: uploadError } = await supabase.storage
+      .from("taxonomy-event-images")
+      .upload(path, file);
+    if (uploadError) {
+      setUploadingImage(false);
+      return toast.error(errorMessage(uploadError, "이미지 업로드에 실패했어요"));
+    }
+    try {
+      const updated = await appendScreenshot.mutateAsync({ eventId: event.id, path });
+      setScreenshots(updated);
+    } catch (error) {
+      await supabase.storage.from("taxonomy-event-images").remove([path]);
+      toast.error(errorMessage(error, "이미지 등록에 실패했어요"));
+    } finally {
+      setUploadingImage(false);
+    }
+  }
+
+  async function deleteScreenshot(path: string) {
+    if (!event) return;
+    try {
+      const updated = await removeScreenshot.mutateAsync({ eventId: event.id, path });
+      setScreenshots(updated);
+      await supabase.storage.from("taxonomy-event-images").remove([path]);
+    } catch (error) {
+      toast.error(errorMessage(error, "이미지 삭제에 실패했어요"));
+    }
+  }
+
+  // 버킷이 private이라 getPublicUrl은 접근 불가능한 URL을 돌려준다. 표시하려면
+  // createSignedUrl로 1시간짜리 임시 URL을 받아와야 하므로, screenshots가 바뀔 때마다
+  // 다시 발급한다.
+  const [screenshotUrls, setScreenshotUrls] = useState<Record<string, string>>({});
+  useEffect(() => {
+    let cancelled = false;
+    if (screenshots.length === 0) {
+      setScreenshotUrls({});
+      return;
+    }
+    supabase.storage
+      .from("taxonomy-event-images")
+      .createSignedUrls(screenshots, 3600)
+      .then(({ data, error }) => {
+        if (cancelled || error || !data) return;
+        const next: Record<string, string> = {};
+        data.forEach((entry) => {
+          if (entry.path && entry.signedUrl) next[entry.path] = entry.signedUrl;
+        });
+        setScreenshotUrls(next);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [screenshots]);
+
   async function submit() {
     if (!technicalName.trim()) return toast.error("기술 이름은 필수예요");
     setSaving(true);
@@ -958,6 +1037,54 @@ function EventDialog({
               rows={2}
             />
           </div>
+          {event ? (
+            <div className="space-y-1.5">
+              <Label>트리거 스크린샷</Label>
+              <p className="text-xs text-muted-foreground">
+                이 이벤트가 어느 화면에서 무슨 액션으로 발생하는지 보여주는 이미지예요. 최대{" "}
+                {MAX_IMAGES}장, 장당 5MB.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {screenshots.map((path) => (
+                  <div key={path} className="group relative">
+                    {screenshotUrls[path] ? (
+                      <img
+                        src={screenshotUrls[path]}
+                        alt=""
+                        className="size-20 rounded-md border object-cover"
+                      />
+                    ) : (
+                      <div className="size-20 animate-pulse rounded-md border bg-muted" />
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => deleteScreenshot(path)}
+                      className="absolute -right-1.5 -top-1.5 rounded-full bg-destructive p-0.5 text-destructive-foreground opacity-0 group-hover:opacity-100"
+                      aria-label="이미지 삭제"
+                    >
+                      <X className="size-3" />
+                    </button>
+                  </div>
+                ))}
+                {screenshots.length < MAX_IMAGES ? (
+                  <label className="flex size-20 cursor-pointer items-center justify-center rounded-md border border-dashed text-xs text-muted-foreground hover:bg-accent">
+                    {uploadingImage ? "올리는 중…" : "+ 추가"}
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      className="hidden"
+                      disabled={uploadingImage}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) void uploadScreenshot(file);
+                        e.target.value = "";
+                      }}
+                    />
+                  </label>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>
