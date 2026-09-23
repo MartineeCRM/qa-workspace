@@ -199,6 +199,7 @@ export function useWorkspace(workspaceId: string) {
 export function useMyRole(workspaceId: string) {
   return useQuery({
     queryKey: ["role", workspaceId],
+    enabled: Boolean(workspaceId),
     queryFn: async () => {
       const { data } = await supabase.auth.getUser();
       const uid = data.user?.id;
