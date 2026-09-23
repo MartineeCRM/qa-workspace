@@ -1224,7 +1224,7 @@ git commit -m "feat: add taxonomy studio project route reusing the existing taxo
 **Files:**
 - Create: `src/routes/_authenticated/taxonomy-studio/index.tsx`
 
-- [ ] **Step 1: 라우트 파일 작성**
+- [x] **Step 1: 라우트 파일 작성**
 
 ```tsx
 // src/routes/_authenticated/taxonomy-studio/index.tsx
@@ -1296,17 +1296,17 @@ function StudioIndexPage() {
 }
 ```
 
-- [ ] **Step 2: 라우트 트리 재생성**
+- [x] **Step 2: 라우트 트리 재생성**
 
 Run: `npm run dev`
 Expected: `src/routeTree.gen.ts`에 `/_authenticated/taxonomy-studio/` 항목이 생김
 
-- [ ] **Step 3: 수동 확인**
+- [x] **Step 3: 수동 확인**
 
 `/taxonomy-studio`로 직접 접속(qa-workspace를 거치지 않고) → 내가 속한 워크스페이스별
 프로젝트 목록이 뜨는지, 클릭하면 `$projectId` 라우트로 이동하는지 확인.
 
-- [ ] **Step 4: 커밋**
+- [x] **Step 4: 커밋**
 
 ```bash
 git add src/routes/_authenticated/taxonomy-studio/index.tsx src/routeTree.gen.ts
