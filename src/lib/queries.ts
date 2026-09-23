@@ -31,6 +31,7 @@ export type TaxonomyEvent = {
   display_name: string | null;
   description: string | null;
   trigger_description: string | null;
+  trigger_screenshots: string[];
   is_active: boolean;
   sort_order: number;
   created_at: string;
@@ -429,6 +430,38 @@ export function useRenameEventProperty(projectId: string) {
       qc.invalidateQueries({ queryKey: ["taxonomy-event-properties", projectId] });
       qc.invalidateQueries({ queryKey: ["activity"] });
     },
+  });
+}
+
+// 이미지 경로 배열을 읽고 통째로 다시 쓰면(read-modify-write) 거의 동시에 추가된
+// 다른 사람의 스크린샷이 지워질 수 있어, DB 함수로 원자적 append/remove를 수행한다.
+export function useAppendEventScreenshot(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { eventId: string; path: string }) => {
+      const { data, error } = await db.rpc("append_taxonomy_event_screenshot", {
+        p_event_id: input.eventId,
+        p_path: input.path,
+      });
+      if (error) throw error;
+      return data as string[];
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["events", projectId] }),
+  });
+}
+
+export function useRemoveEventScreenshot(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { eventId: string; path: string }) => {
+      const { data, error } = await db.rpc("remove_taxonomy_event_screenshot", {
+        p_event_id: input.eventId,
+        p_path: input.path,
+      });
+      if (error) throw error;
+      return data as string[];
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["events", projectId] }),
   });
 }
 
