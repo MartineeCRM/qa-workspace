@@ -160,8 +160,8 @@ it("creates and updates array of object sub-fields on custom attributes", async 
     events: [],
     eventProperties: [],
     customAttributes: rows.taxonomy_custom_attributes as unknown as TaxonomyCustomAttribute[],
-    customAttributeProperties: rows.taxonomy_custom_attribute_properties as unknown as
-      TaxonomyCustomAttributeProperty[],
+    customAttributeProperties:
+      rows.taxonomy_custom_attribute_properties as unknown as TaxonomyCustomAttributeProperty[],
     parsed: parseTaxonomyFile(
       "taxonomy.json",
       JSON.stringify({
