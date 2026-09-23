@@ -18,7 +18,7 @@ export function PageHeader({
     <div className={cn("flex flex-wrap items-start justify-between gap-4", className)}>
       <div className="min-w-0 space-y-1">
         <div className="flex flex-wrap items-center gap-2">
-          <h1 className="text-[26px] font-bold tracking-[-0.02em]">{title}</h1>
+          <h1 className="text-[26px] font-bold tracking-[-0.02em] text-foreground">{title}</h1>
           {meta}
         </div>
         {description ? (
@@ -68,7 +68,7 @@ export function EmptyState({
   return (
     <div className="flex flex-col items-center justify-center rounded-lg border border-dashed bg-card px-6 py-14 text-center">
       {Icon ? <Icon className="mb-3 size-6 text-muted-foreground" /> : null}
-      <p className="text-sm font-semibold">{title}</p>
+      <p className="text-[15px] font-semibold text-foreground">{title}</p>
       {description ? (
         <p className="mt-1 max-w-md text-sm text-muted-foreground">{description}</p>
       ) : null}
@@ -95,7 +95,7 @@ export function Panel({
       {title ? (
         <header className="flex items-start justify-between gap-3 border-b px-4 py-3">
           <div>
-            <h2 className="text-sm font-semibold">{title}</h2>
+            <h2 className="text-base font-semibold text-foreground">{title}</h2>
             {description ? (
               <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>
             ) : null}
@@ -135,7 +135,9 @@ export function Stat({
         {hint ? <span className="text-xs text-muted-foreground">{hint}</span> : null}
       </div>
       <div className="mt-1.5 flex items-baseline gap-2">
-        <p className="text-[30px] font-bold tracking-[-0.02em] tabular-nums">{value}</p>
+        <p className="text-[30px] font-bold tracking-[-0.02em] tabular-nums text-foreground">
+          {value}
+        </p>
         {delta ? (
           <span
             className={cn(
@@ -148,7 +150,7 @@ export function Stat({
         ) : null}
       </div>
       {progress ? (
-        <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-muted">
+        <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-border">
           <div
             className="h-full bg-primary"
             style={{ width: `${Math.min(1, Math.max(0, progress.ratio)) * 100}%` }}
