@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 
 import { TopBar } from "@/components/app/top-bar";
 import { PageHeader, EmptyState } from "@/components/app/layout-parts";
+import { Pill } from "@/components/app/badges";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useMyMemberships, useProjects } from "@/lib/queries";
 
@@ -25,7 +26,10 @@ function ProjectList({ workspaceId }: { workspaceId: string }) {
             params={{ projectId: project.id }}
             className="flex items-center justify-between px-4 py-3 text-sm hover:bg-accent"
           >
-            <span>{project.name}</span>
+            <span className="flex items-center gap-2">
+              {project.name}
+              {project.archived_at ? <Pill>보관됨</Pill> : null}
+            </span>
             <span className="text-xs text-muted-foreground">{project.project_key}</span>
           </Link>
         </li>
