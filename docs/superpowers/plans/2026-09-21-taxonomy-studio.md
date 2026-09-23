@@ -727,7 +727,7 @@ git commit -m "feat: add atomic append/remove for taxonomy event screenshots"
 프로젝트끼리 격리"가 아니라 "같은 워크스페이스 멤버는 서로 볼 수 있다"는 뜻으로 정확히
 테스트한다.
 
-- [ ] **Step 1: 마이그레이션 작성**
+- [x] **Step 1: 마이그레이션 작성**
 
 ```sql
 -- supabase/migrations/20260921100200_taxonomy_event_images_bucket.sql
@@ -751,12 +751,12 @@ CREATE POLICY taxonomy_event_images_delete ON storage.objects FOR DELETE TO auth
 );
 ```
 
-- [ ] **Step 2: 로컬 DB 적용**
+- [x] **Step 2: 로컬 DB 적용**
 
 Run: `supabase db reset --local`
 Expected: 에러 없이 적용, `supabase status --local`로 Storage가 떠 있는지 확인
 
-- [ ] **Step 3: 권한 경계 테스트 작성**
+- [x] **Step 3: 권한 경계 테스트 작성**
 
 ```sql
 -- supabase/tests/taxonomy_event_images_bucket.sql
@@ -809,12 +809,12 @@ $$;
 ROLLBACK;
 ```
 
-- [ ] **Step 4: 테스트 실행**
+- [x] **Step 4: 테스트 실행**
 
 Run: `supabase test db supabase/tests/taxonomy_event_images_bucket.sql --local`
 Expected: PASS
 
-- [ ] **Step 5: 커밋**
+- [x] **Step 5: 커밋**
 
 ```bash
 git add supabase/migrations/20260921100200_taxonomy_event_images_bucket.sql \
@@ -823,6 +823,11 @@ git commit -m "feat: add taxonomy event images storage bucket with workspace-sco
 ```
 
 ---
+
+
+**리뷰에서 발견 (반영 완료):** 계획서의 원래 테스트는 SET LOCAL ROLE 없이 검증해서 실제로는
+아무것도 증명하지 못하는(오히려 무조건 실패하는) 테스트였음 — authenticated 롤로 전환하도록
+다시 작성하고, viewer 읽기/쓰기 권한 분리, 정상 DELETE 성공 케이스까지 추가함.
 
 ### Task 7: `EventDialog`에 이미지 업로드 UI 추가
 
