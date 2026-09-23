@@ -135,4 +135,27 @@ BEGIN
   ASSERT still_exists, 'viewer의 DELETE 시도 이후에도 원본 객체는 그대로 남아있어야 함';
 END;
 $$;
+
+-- member_a(편집 권한 있음)의 DELETE는 실제로 성공해야 한다 — 지금까지는 삭제 실패(거부) 경로만
+-- 확인했고, 정상 경로(허가된 사용자가 실제로 지울 수 있는지)는 아직 증명하지 않았다.
+DO $$
+DECLARE
+  path2 text;
+  deleted_count int;
+  still_exists boolean;
+BEGIN
+  PERFORM set_config('request.jwt.claim.sub', current_setting('test.member_a'), true);
+  path2 := current_setting('test.project2') || '/other-event-id/photo2.png';
+
+  DELETE FROM storage.objects
+    WHERE bucket_id = 'taxonomy-event-images' AND name = path2;
+  GET DIAGNOSTICS deleted_count = ROW_COUNT;
+  ASSERT deleted_count = 1, '편집 권한이 있는 member_a의 DELETE는 실제로 1행을 지워야 함';
+
+  SELECT EXISTS (
+    SELECT 1 FROM storage.objects WHERE bucket_id = 'taxonomy-event-images' AND name = path2
+  ) INTO still_exists;
+  ASSERT NOT still_exists, 'member_a가 지운 객체는 더 이상 남아있으면 안 됨';
+END;
+$$;
 ROLLBACK;
