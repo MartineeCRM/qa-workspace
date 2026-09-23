@@ -562,7 +562,7 @@ git commit -m "fix: handle quoted multiline CSV cells and surface unknown-type f
 **배경:** 이미지 경로 배열을 클라이언트가 통째로 읽고 통째로 다시 쓰면(read-modify-write) 두
 사람이 거의 동시에 추가할 때 한쪽이 지워진다. DB 함수로 원자적 append/remove를 만든다.
 
-- [ ] **Step 1: 마이그레이션 작성**
+- [x] **Step 1: 마이그레이션 작성**
 
 ```sql
 -- supabase/migrations/20260921100100_taxonomy_event_screenshots.sql
@@ -600,12 +600,12 @@ GRANT EXECUTE ON FUNCTION public.remove_taxonomy_event_screenshot(uuid, text) TO
 두 함수 모두 `LANGUAGE sql`이고 `SECURITY DEFINER`가 아니므로(기본값 INVOKER), 내부 `UPDATE`는
 호출자의 RLS(`te_update` — `can_edit_ws`)를 그대로 통과해야 한다.
 
-- [ ] **Step 2: 로컬 DB 적용**
+- [x] **Step 2: 로컬 DB 적용**
 
 Run: `supabase db reset --local`
 Expected: 에러 없이 적용
 
-- [ ] **Step 3: 동시성 테스트 작성 — 두 번의 append가 둘 다 남는지**
+- [x] **Step 3: 동시성 테스트 작성 — 두 번의 append가 둘 다 남는지**
 
 ```sql
 -- supabase/tests/taxonomy_event_screenshots.sql
@@ -647,12 +647,12 @@ $$;
 ROLLBACK;
 ```
 
-- [ ] **Step 4: 테스트 실행**
+- [x] **Step 4: 테스트 실행**
 
 Run: `supabase test db supabase/tests/taxonomy_event_screenshots.sql --local`
 Expected: PASS
 
-- [ ] **Step 5: `TaxonomyEvent` 타입과 훅 추가**
+- [x] **Step 5: `TaxonomyEvent` 타입과 훅 추가**
 
 `src/lib/queries.ts`의 `TaxonomyEvent` 타입(`:26-35` 근처)에 필드 추가:
 
@@ -706,7 +706,7 @@ export function useRemoveEventScreenshot(projectId: string) {
 }
 ```
 
-- [ ] **Step 6: 커밋**
+- [x] **Step 6: 커밋**
 
 ```bash
 git add supabase/migrations/20260921100100_taxonomy_event_screenshots.sql \
