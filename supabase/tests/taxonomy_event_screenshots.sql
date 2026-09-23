@@ -34,6 +34,24 @@ BEGIN
   SELECT trigger_screenshots INTO shots FROM public.taxonomy_events WHERE id = event;
   ASSERT shots = '["b.png"]'::jsonb, 'remove는 지정한 경로만 지워야 함, got: ' || shots::text;
 
+  -- 순서 보장 확인: 가운데 원소를 지워도 남은 원소들의 업로드 순서가 유지되는지.
+  -- (ORDER BY 없이 jsonb_agg만 썼다면 우연히 순서가 맞을 뿐이라, 이 케이스가 실제 검증이 됨)
+  -- 뒤의 RLS 테스트가 이 event의 최종 상태(["b.png"])에 의존하므로, 별도 이벤트에서 확인한다.
+  DECLARE
+    order_event uuid;
+    order_shots jsonb;
+  BEGIN
+    INSERT INTO public.taxonomy_events(project_id, technical_name, created_by)
+      VALUES (project, 'order_check', actor) RETURNING id INTO order_event;
+    PERFORM public.append_taxonomy_event_screenshot(order_event, 'x1.png');
+    PERFORM public.append_taxonomy_event_screenshot(order_event, 'x2.png');
+    PERFORM public.append_taxonomy_event_screenshot(order_event, 'x3.png');
+    PERFORM public.remove_taxonomy_event_screenshot(order_event, 'x2.png');
+    SELECT trigger_screenshots INTO order_shots FROM public.taxonomy_events WHERE id = order_event;
+    ASSERT order_shots = '["x1.png", "x3.png"]'::jsonb,
+      '가운데 원소를 지워도 남은 원소들의 업로드 순서가 유지돼야 함, got: ' || order_shots::text;
+  END;
+
   -- RLS 거부 테스트를 위해 편집 권한이 없는(can_edit_ws가 허용하지 않는 'viewer') 멤버를 준비한다.
   INSERT INTO public.profiles(id, display_name) VALUES (viewer, '뷰어 테스트');
   INSERT INTO public.workspace_members(workspace_id, user_id, role) VALUES (ws, viewer, 'viewer') ON CONFLICT DO NOTHING;

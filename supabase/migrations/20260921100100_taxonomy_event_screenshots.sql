@@ -20,8 +20,10 @@ CREATE OR REPLACE FUNCTION public.remove_taxonomy_event_screenshot(
 LANGUAGE sql SET search_path = public AS $$
   UPDATE public.taxonomy_events
   SET trigger_screenshots = (
-    SELECT coalesce(jsonb_agg(elem), '[]'::jsonb)
-    FROM jsonb_array_elements_text(trigger_screenshots) AS elem
+    -- WITH ORDINALITY + ORDER BY로 배열 순서(업로드 순)를 명시적으로 보장한다.
+    -- ORDER BY 없이 jsonb_agg만 쓰면 순서가 우연히 유지될 뿐, 스펙으로 보장되진 않는다.
+    SELECT coalesce(jsonb_agg(elem ORDER BY ord), '[]'::jsonb)
+    FROM jsonb_array_elements_text(trigger_screenshots) WITH ORDINALITY AS t(elem, ord)
     WHERE elem <> p_path
   )
   WHERE id = p_event_id

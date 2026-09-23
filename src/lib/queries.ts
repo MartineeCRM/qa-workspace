@@ -444,6 +444,9 @@ export function useAppendEventScreenshot(projectId: string) {
         p_path: input.path,
       });
       if (error) throw error;
+      if (data === null) {
+        throw new Error("이미지를 등록하지 못했어요 (이벤트를 찾을 수 없거나 권한이 없어요)");
+      }
       return data as string[];
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["events", projectId] }),
@@ -459,6 +462,9 @@ export function useRemoveEventScreenshot(projectId: string) {
         p_path: input.path,
       });
       if (error) throw error;
+      if (data === null) {
+        throw new Error("이미지를 삭제하지 못했어요 (이벤트를 찾을 수 없거나 권한이 없어요)");
+      }
       return data as string[];
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["events", projectId] }),
