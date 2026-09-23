@@ -905,12 +905,20 @@ function EventDialog({
 
   async function deleteScreenshot(path: string) {
     if (!event) return;
+    let updated: string[];
     try {
-      const updated = await removeScreenshot.mutateAsync({ eventId: event.id, path });
-      setScreenshots(updated);
-      await supabase.storage.from("taxonomy-event-images").remove([path]);
+      updated = await removeScreenshot.mutateAsync({ eventId: event.id, path });
     } catch (error) {
-      toast.error(errorMessage(error, "이미지 삭제에 실패했어요"));
+      return toast.error(errorMessage(error, "이미지 삭제에 실패했어요"));
+    }
+    // 여기까지 왔으면 DB 반영(사용자가 보는 실제 효과)은 이미 성공했다. Storage 파일 정리가
+    // 실패해도 삭제 자체를 실패로 보여주지 않는다 — 안 쓰는 파일이 하나 남을 뿐이다. 그래도
+    // 처리 안 된 예외로 새지 않도록 별도로 감싼다.
+    setScreenshots(updated);
+    try {
+      await supabase.storage.from("taxonomy-event-images").remove([path]);
+    } catch {
+      // 조용히 무시 — 위 주석 참고.
     }
   }
 
