@@ -1016,7 +1016,7 @@ UI 체크일 뿐이라, 두 세션이 동시에 업로드하면 넘어갈 수 �
 `workspace_id`가 아직 없어서 빈 문자열로 호출될 수 있다 — `workspace_id`가 uuid 컬럼이라 빈
 문자열로 비교하면 쿼리가 에러를 던진다. `useMyRole`에 `enabled` 가드를 추가해서 막는다.
 
-- [ ] **Step 1: `useMyRole`에 빈 workspaceId 가드 추가**
+- [x] **Step 1: `useMyRole`에 빈 workspaceId 가드 추가**
 
 `src/lib/queries.ts`의 `useMyRole`(기존 `:198-215` 근처)에 `enabled` 옵션을 추가한다. 기존
 호출부(`w/$wsId/route.tsx`)는 항상 유효한 `wsId`를 넘기므로 동작 변화 없음.
@@ -1033,7 +1033,7 @@ export function useMyRole(workspaceId: string) {
 }
 ```
 
-- [ ] **Step 2: 라우트 파일 작성**
+- [x] **Step 2: 라우트 파일 작성**
 
 ```tsx
 // src/routes/_authenticated/taxonomy-studio/$projectId.tsx
@@ -1188,19 +1188,19 @@ function StudioProjectPage() {
 `TopBar`가 필수 children을 요구하는지 `src/components/app/top-bar.tsx`를 열어 확인하고, 요구
 시 최소한의 children(예: 빈 조각)을 넘긴다.
 
-- [ ] **Step 3: 라우트 트리 재생성**
+- [x] **Step 3: 라우트 트리 재생성**
 
 Run: `npm run dev` (한 번 띄우면 TanStack Router 플러그인이 `src/routeTree.gen.ts`를 자동
 갱신함). 개발 서버를 잠깐 켰다가 꺼도 된다.
 Expected: `src/routeTree.gen.ts`에 `/_authenticated/taxonomy-studio/$projectId` 항목이 생김
 
-- [ ] **Step 4: 수동 확인**
+- [x] **Step 4: 수동 확인**
 
 기존 프로젝트의 ID로 `/taxonomy-studio/<projectId>`에 직접 접속 → 구조/규칙 탭이 qa-workspace
 `/taxonomy`와 동일하게 동작하는지 확인. 존재하지 않는 ID로 접속 → "프로젝트를 열 수 없어요"가
 뜨는지 확인.
 
-- [ ] **Step 5: 커밋**
+- [x] **Step 5: 커밋**
 
 ```bash
 git add src/lib/queries.ts src/routes/_authenticated/taxonomy-studio/\$projectId.tsx \
@@ -1209,6 +1209,15 @@ git commit -m "feat: add taxonomy studio project route reusing the existing taxo
 ```
 
 ---
+
+
+**리뷰에서 발견, 의도적으로 보류 (범위 밖):** `useStudioProject`가 `useProject`와 다른
+쿼리 키(`studio-project` vs `project`)를 써서, 프로젝트 이름을 바꾸는 뮤테이션이 이 라우트의
+캐시는 무효화하지 않는다 — 오늘은 이 라우트가 리마운트 없이 다른 화면과 공존할 일이 없어서
+실제로 발생하지 않는 문제다. `useProject`/`unwrap`을 직접 고치는 게 근본 해결책이지만,
+확인해보니 `w/\/p/\/route.tsx`에도 똑같은 `if (!project)` 버그가 이미 있어서
+(이 플랜 범위 밖의 기존 라우트) 고치면 그 라우트의 동작도 바뀐다 — 이번 플랜 범위를 넘는
+변경이라 지금은 손대지 않는다. 후속 과제로 남김.
 
 ### Task 9: Studio 진입점 (`index.tsx`)
 
