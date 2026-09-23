@@ -80,12 +80,17 @@ function StudioProjectPage() {
             title="프로젝트를 열 수 없어요"
             description="삭제됐거나 접근 권한이 없는 프로젝트예요."
             action={
-              // Task 9가 `/taxonomy-studio` 인덱스 라우트를 아직 추가하지 않은 시점이라
-              // 타입이 있는 <Link to="/taxonomy-studio">는 라우트 트리에 없는 경로라
-              // tsc를 통과하지 못한다. 일반 앵커로 링크해 두고, Task 9에서 인덱스 라우트가
-              // 생기면 <Link>로 바꿔도 된다.
               <Button asChild>
-                <a href="/taxonomy-studio">Studio 프로젝트 목록으로</a>
+                {/* Task 9가 /taxonomy-studio 인덱스 라우트를 아직 추가하지 않아 라우트
+                    트리 타입에 없다 — w/$wsId/route.tsx의 SideLink와 같은 방식으로 `as any`를
+                    써서 지금도 실제 SPA 내비게이션이 되게 하고, Task 9가 라우트를 추가하면
+                    타입 캐스트만 지우면 된다. */}
+                <Link
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  to={"/taxonomy-studio" as any}
+                >
+                  Studio 프로젝트 목록으로
+                </Link>
               </Button>
             }
           />
