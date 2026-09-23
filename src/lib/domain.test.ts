@@ -5,6 +5,7 @@ import {
   formatDateTime,
   formatMergedTimelineTime,
   formatRawLogTime,
+  isAllowedAuthRedirect,
 } from "@/lib/domain";
 
 it("explains an unconfirmed email separately from incorrect credentials", () => {
@@ -12,6 +13,30 @@ it("explains an unconfirmed email separately from incorrect credentials", () => 
   expect(authErrorMessage({ message: "Invalid login credentials" })).toBe(
     "이메일 또는 비밀번호가 올바르지 않아요",
   );
+});
+
+describe("isAllowedAuthRedirect", () => {
+  it("allows share links and taxonomy-studio links", () => {
+    expect(isAllowedAuthRedirect("/share/abc-123")).toBe(true);
+    expect(isAllowedAuthRedirect("/taxonomy-studio")).toBe(true);
+    expect(isAllowedAuthRedirect("/taxonomy-studio/some-project-id")).toBe(true);
+  });
+
+  it("rejects a path that merely starts with the taxonomy-studio prefix", () => {
+    // 실제로 있었던 버그: 경계 문자 없이 startsWith만 쓰면 이런 무관한 경로도 통과해버렸다.
+    expect(isAllowedAuthRedirect("/taxonomy-studio-evil")).toBe(false);
+  });
+
+  it("rejects paths outside the allow list", () => {
+    expect(isAllowedAuthRedirect("/w/123")).toBe(false);
+    expect(isAllowedAuthRedirect("/share")).toBe(false);
+  });
+
+  it("rejects non-string values", () => {
+    expect(isAllowedAuthRedirect(undefined)).toBe(false);
+    expect(isAllowedAuthRedirect(null)).toBe(false);
+    expect(isAllowedAuthRedirect(42)).toBe(false);
+  });
 });
 
 describe("formatDate / formatDateTime", () => {

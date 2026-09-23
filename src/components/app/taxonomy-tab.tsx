@@ -253,6 +253,16 @@ export function TaxonomyTab({
   async function removeEvent(event: TaxonomyEvent) {
     const { error } = await db.from("taxonomy_events").delete().eq("id", event.id);
     if (error) return toast.error(errorMessage(error));
+    // 이벤트 행이 사라지면 trigger_screenshots(어떤 파일이 있었는지 기록)도 같이 사라져서,
+    // 나중엔 이 이벤트가 쓰던 Storage 파일을 찾을 방법이 없어진다 — 행을 지우기 전에 기록해둔
+    // 경로로 지금 바로 정리한다. 실패해도 조용히 넘어간다(Task 7의 이미지 삭제와 같은 방침).
+    if (event.trigger_screenshots.length > 0) {
+      try {
+        await supabase.storage.from("taxonomy-event-images").remove(event.trigger_screenshots);
+      } catch (cleanupError) {
+        console.error("failed to remove storage screenshots for deleted event", cleanupError);
+      }
+    }
     toast.success("택소노미에서 이벤트를 삭제했어요");
     refresh();
   }
