@@ -6,7 +6,7 @@
 레거시 `useProjectItemStatuses`/`environmentCoverage`/`qa_item_status` 읽기 경로는 코드에서 완전히 제거됨 — `qa_item_status` 문자열은 `qa-workflow.ts:311-316`의 설계 의도를 설명하는 주석으로만 남아있다.
 이 문서 나머지는 당시 문제 정의를 보존하기 위한 기록이며, 더 이상 실행할 작업은 없다.
 
-직전 완료 작업: `개발 QA`/`운영 QA` 탭 라운드 › 세션 › 항목 재구성 (`docs/superpowers/plans/2026-08-03-dev-qa-workflow-redesign.md`, main에 머지 완료, origin에 push됨).
+직전 완료 작업: `개발 QA`/`운영 QA` 탭 라운드 › 세션 › 항목 재구성 (`docs/decisions/plans/2026-08-03-dev-qa-workflow-redesign.md`, main에 머지 완료, origin에 push됨).
 
 ## 문제
 

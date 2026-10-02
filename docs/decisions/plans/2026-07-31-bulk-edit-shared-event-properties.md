@@ -8,7 +8,7 @@
 
 **Tech Stack:** TanStack Start / React, Supabase JS client(`db`), Tailwind v4, Radix UI(`Checkbox`, `Dialog`). 이 프로젝트는 자동화된 테스트 스위트가 없어 수동 QA(agent-browser) 중심으로 검증한다.
 
-**참고 문서:** [docs/superpowers/specs/2026-07-31-bulk-edit-shared-event-properties-design.md](../specs/2026-07-31-bulk-edit-shared-event-properties-design.md)
+**참고 문서:** [docs/decisions/specs/2026-07-31-bulk-edit-shared-event-properties-design.md](../specs/2026-07-31-bulk-edit-shared-event-properties-design.md)
 
 ---
 

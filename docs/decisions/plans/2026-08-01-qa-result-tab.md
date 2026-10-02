@@ -9,8 +9,8 @@
 **Tech Stack:** TanStack Start (`createServerFn`), TanStack Query, Supabase, vitest(신규, 순수 로직 전용), Claude Messages API(fetch 직접 호출).
 
 **참고 문서:**
-- 설계: `docs/superpowers/specs/2026-08-01-qa-result-tab-design.md`
-- 선행 설계: `docs/superpowers/specs/2026-07-30-taxonomy-qa-redesign-design.md`
+- 설계: `docs/decisions/specs/2026-08-01-qa-result-tab-design.md`
+- 선행 설계: `docs/decisions/specs/2026-07-30-taxonomy-qa-redesign-design.md`
 - 승인된 구조 와이어프레임: https://claude.ai/code/artifact/463157ba-a0e1-4a55-96f9-f416731223d2
 
 **배치 위치 (중요):** 새 UI는 새 탭을 만들지 않는다. `src/components/app/qa-rounds-panel.tsx`의 `QaRoundsPanel` 안, 기존 `ChecklistPanel` 바로 다음에 이어붙인다. 최상단 탭 구조(라운드/업로드·분석 기록/검증 결과)는 그대로 둔다 — 맨 마지막 "검증 결과" 탭은 이 작업과 무관한 기존 `qa_item_status` 기반 화면이다.

@@ -8,7 +8,7 @@
 
 **Tech Stack:** TanStack Start / React, Supabase JS client(`db`), Tailwind v4. `qa_run_events`의 Row/Insert 타입은 `src/integrations/supabase/types.ts`에 이미 생성되어 있어 새 타입 정의가 필요 없다. 자동화된 테스트 스위트가 없어 수동 QA(agent-browser) 중심으로 검증한다.
 
-**참고 문서:** [docs/superpowers/specs/2026-08-01-qa-run-events-ingestion-design.md](../specs/2026-08-01-qa-run-events-ingestion-design.md)
+**참고 문서:** [docs/decisions/specs/2026-08-01-qa-run-events-ingestion-design.md](../specs/2026-08-01-qa-run-events-ingestion-design.md)
 
 ---
 
