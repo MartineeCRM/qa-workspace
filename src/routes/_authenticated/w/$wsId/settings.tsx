@@ -157,6 +157,7 @@ function SettingsPage() {
     setInviteRole("viewer");
     setInviteOpen(false);
     qc.invalidateQueries({ queryKey: ["invites", wsId] });
+    qc.invalidateQueries({ queryKey: ["members", wsId] });
   }
 
   async function cancelInvite(inviteId: string) {

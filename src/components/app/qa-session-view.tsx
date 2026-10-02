@@ -1,4 +1,7 @@
 import { useEffect, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { analyzeSessionRelations } from "@/lib/relation-analysis.functions";
+import { QaSessionRelationsPanel } from "@/components/app/qa-session-relations-panel";
 import { Check } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -77,6 +80,7 @@ export function QaSessionView({
   const [analysisProgress, setAnalysisProgress] = useState<{ completed: number; total: number }>();
   const [analysisRunning, setAnalysisRunning] = useState(false);
   const cancelAnalysisRef = useRef(false);
+  const qc = useQueryClient();
 
   // useState's initializer only runs once, and route params changing doesn't remount this
   // component (same session route, different :sessionId) — so without this effect,
@@ -155,6 +159,19 @@ export function QaSessionView({
       if (outcome?.cancelled) {
         toast.info(`${outcome.completed}/${outcome.total}개까지 완료하고 분석을 멈췄어요`);
       } else {
+        if (!cancelAnalysisRef.current) {
+          try {
+            await analyzeSessionRelations({ data: { sessionId: session.id } });
+            await qc.invalidateQueries({ queryKey: ["qa-relations", session.id] });
+          } catch (error) {
+            toast.warning(
+              errorMessage(
+                error,
+                "단건 판정은 완료했지만 관계 탐색에 실패했어요. 결과에서 다시 탐색해 주세요.",
+              ),
+            );
+          }
+        }
         toast.success("판정을 완료했어요");
         setViewingStep(3);
       }
@@ -257,7 +274,12 @@ export function QaSessionView({
           }}
         />
       ) : null}
-      {viewingStep === 3 ? <QaSessionResultsPanel projectId={projectId} session={session} /> : null}
+      {viewingStep === 3 ? (
+        <>
+          <QaSessionResultsPanel projectId={projectId} session={session} />
+          <QaSessionRelationsPanel projectId={projectId} sessionId={session.id} />
+        </>
+      ) : null}
     </div>
   );
 }

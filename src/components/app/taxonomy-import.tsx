@@ -13,8 +13,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
-  db,
   type TaxonomyCustomAttribute,
+  type TaxonomyCustomAttributeProperty,
   type TaxonomyEvent,
   type TaxonomyEventProperty,
 } from "@/lib/queries";
@@ -26,19 +26,22 @@ import {
   sampleCsv,
   sampleJson,
   sampleYaml,
-  type ImportedAttribute,
 } from "@/lib/taxonomy-import";
+
+import { saveTaxonomyImport } from "@/lib/taxonomy-import-save";
 
 export function TaxonomyImport({
   projectId,
   events,
   eventProperties,
   customAttributes,
+  customAttributeProperties,
 }: {
   projectId: string;
   events: TaxonomyEvent[];
   eventProperties: TaxonomyEventProperty[];
   customAttributes: TaxonomyCustomAttribute[];
+  customAttributeProperties: TaxonomyCustomAttributeProperty[];
 }) {
   const qc = useQueryClient();
   const { user } = useAuth();
@@ -49,73 +52,27 @@ export function TaxonomyImport({
     setBusy(true);
     try {
       const parsed = parseTaxonomyFile(file.name, await file.text());
-      const eventByName = new Map(events.map((e) => [e.technical_name, e]));
-      const existingProps = new Set(
-        eventProperties.map((p) => `${p.event_id}::${p.technical_name}`),
+      const result = await saveTaxonomyImport({
+        projectId,
+        userId: user?.id,
+        parsed,
+        events,
+        eventProperties,
+        customAttributes,
+        customAttributeProperties,
+      });
+
+      toast.success(
+        `이벤트 ${result.createdEvents}개, 프로퍼티·어트리뷰트 ${result.createdAttrs}개 추가 · 기존 항목 ${result.updated}개 수정했어요`,
       );
-      const existingCustom = new Set(customAttributes.map((a) => a.technical_name));
-
-      let createdEvents = 0;
-      let createdAttrs = 0;
-
-      for (const ev of parsed.events) {
-        let eventId = eventByName.get(ev.technical_name)?.id ?? null;
-        if (!eventId) {
-          const { data, error } = await db
-            .from("taxonomy_events")
-            .insert({
-              project_id: projectId,
-              technical_name: ev.technical_name,
-              display_name: ev.display_name,
-              description: ev.description,
-              trigger_description: ev.trigger_description,
-              created_by: user?.id,
-            })
-            .select("id")
-            .single();
-          if (error) throw error;
-          eventId = data.id as string;
-          eventByName.set(ev.technical_name, { id: eventId } as TaxonomyEvent);
-          createdEvents += 1;
-        }
-        const newProps = ev.attributes.filter(
-          (a) => !existingProps.has(`${eventId}::${a.technical_name}`),
-        );
-        if (newProps.length) {
-          const { error } = await db
-            .from("taxonomy_event_properties")
-            .insert(newProps.map((a, i) => propertyPayload(a, eventId as string, user?.id, i)));
-          if (error) throw error;
-          newProps.forEach((a) => existingProps.add(`${eventId}::${a.technical_name}`));
-          createdAttrs += newProps.length;
-        }
-      }
-
-      const newCustomAttrs = parsed.userAttributes.filter(
-        (a) => !existingCustom.has(a.technical_name),
-      );
-      if (newCustomAttrs.length) {
-        const { error } = await db
-          .from("taxonomy_custom_attributes")
-          .insert(newCustomAttrs.map((a, i) => customAttributePayload(a, projectId, user?.id, i)));
-        if (error) throw error;
-        createdAttrs += newCustomAttrs.length;
-      }
-
-      qc.invalidateQueries({ queryKey: ["events", projectId] });
-      qc.invalidateQueries({ queryKey: ["taxonomy-event-properties", projectId] });
-      qc.invalidateQueries({ queryKey: ["taxonomy-custom-attributes", projectId] });
-
-      if (createdEvents === 0 && createdAttrs === 0) {
-        toast.info("이미 등록된 항목이라 새로 추가된 내용은 없어요");
-      } else {
-        toast.success(
-          `이벤트 ${createdEvents}개, 프로퍼티·어트리뷰트 ${createdAttrs}개를 추가했어요`,
-        );
-      }
     } catch (error) {
       toast.error(errorMessage(error, "파일을 읽지 못했어요"));
     } finally {
+      qc.invalidateQueries({ queryKey: ["events", projectId] });
+      qc.invalidateQueries({ queryKey: ["activity"] });
+      qc.invalidateQueries({ queryKey: ["taxonomy-event-properties", projectId] });
+      qc.invalidateQueries({ queryKey: ["taxonomy-custom-attributes", projectId] });
+      qc.invalidateQueries({ queryKey: ["taxonomy-custom-attribute-properties", projectId] });
       setBusy(false);
       if (fileRef.current) fileRef.current.value = "";
     }
@@ -148,10 +105,13 @@ export function TaxonomyImport({
               <Upload className="size-4" /> 파일로 일괄 등록
             </span>
             <span className="text-xs font-normal text-muted-foreground">
-              CSV·JSON·YAML 파일을 올려서 이벤트·프로퍼티·어트리뷰트를 한 번에 추가해요
+              CSV·JSON·YAML 파일로 등록해요. 같은 기술명의 항목은 파일의 값으로 덮어써요.
             </span>
           </DropdownMenuItem>
           <DropdownMenuSeparator />
+          <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
+            파일의 빈 값도 반영하며, 파일에 없는 기존 항목은 유지해요
+          </DropdownMenuLabel>
           <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
             예시 데이터셋 내려받기
           </DropdownMenuLabel>
@@ -174,42 +134,4 @@ export function TaxonomyImport({
       </DropdownMenu>
     </>
   );
-}
-
-function propertyPayload(
-  a: ImportedAttribute,
-  eventId: string,
-  userId: string | undefined,
-  sort: number,
-) {
-  return {
-    event_id: eventId,
-    technical_name: a.technical_name,
-    display_name: a.display_name,
-    description: a.description,
-    data_type: a.data_type,
-    is_required: a.is_required,
-    allowed_values: a.allowed_values,
-    sort_order: sort,
-    created_by: userId,
-  };
-}
-
-function customAttributePayload(
-  a: ImportedAttribute,
-  projectId: string,
-  userId: string | undefined,
-  sort: number,
-) {
-  return {
-    project_id: projectId,
-    technical_name: a.technical_name,
-    display_name: a.display_name,
-    description: a.description,
-    data_type: a.data_type,
-    is_required: a.is_required,
-    allowed_values: a.allowed_values,
-    sort_order: sort,
-    created_by: userId,
-  };
 }

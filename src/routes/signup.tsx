@@ -51,7 +51,9 @@ function SignupPage() {
     setBusy(false);
     if (error) return toast.error(authErrorMessage(error, "가입에 실패했어요"));
     if (!data.session) {
-      toast.error("가입은 됐지만 로그인이 안 됐어요. 관리자에게 문의해주세요.");
+      toast.info(
+        "이메일의 가입 확인 링크를 눌러주세요. 메일이 없다면 로그인 화면에서 다시 보낼 수 있어요.",
+      );
       return;
     }
     navigate({ href: redirectTo ?? "/workspaces" });
@@ -60,7 +62,7 @@ function SignupPage() {
   return (
     <AuthCard
       title="가입하기"
-      description="회사 이메일로 가입하면 이메일 확인 없이 바로 로그인돼요."
+      description="초대받은 이메일로 가입해주세요. 이메일 인증이 필요하면 가입 후 안내해드려요."
       footer={
         <>
           이미 계정이 있으신가요?{" "}

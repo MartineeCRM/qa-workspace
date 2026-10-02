@@ -135,6 +135,8 @@ export type ActivityLog = {
   action_type: string;
   summary: string;
   created_at: string;
+  metadata?: Record<string, unknown>;
+  actor?: { display_name: string | null } | null;
 };
 
 export type WorkspaceInvite = {
@@ -351,6 +353,7 @@ export function useAddDiscoveredEventProperty(projectId: string) {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["taxonomy-event-properties", projectId] });
+      qc.invalidateQueries({ queryKey: ["activity"] });
     },
   });
 }
@@ -370,6 +373,7 @@ export function useUpdateEventPropertyDataType(projectId: string) {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["taxonomy-event-properties", projectId] });
+      qc.invalidateQueries({ queryKey: ["activity"] });
     },
   });
 }
@@ -386,6 +390,7 @@ export function useUpdateEventPropertyRequired(projectId: string) {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["taxonomy-event-properties", projectId] });
+      qc.invalidateQueries({ queryKey: ["activity"] });
     },
   });
 }
@@ -402,6 +407,7 @@ export function useUpdateEventPropertyAllowedValues(projectId: string) {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["taxonomy-event-properties", projectId] });
+      qc.invalidateQueries({ queryKey: ["activity"] });
     },
   });
 }
@@ -421,6 +427,7 @@ export function useRenameEventProperty(projectId: string) {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["taxonomy-event-properties", projectId] });
+      qc.invalidateQueries({ queryKey: ["activity"] });
     },
   });
 }
@@ -485,19 +492,28 @@ export function useEnvironments(projectId: string) {
   });
 }
 
-export function useActivity(params: { workspaceId?: string; projectId?: string; limit?: number }) {
-  const { workspaceId, projectId, limit = 15 } = params;
+export function useActivity(params: {
+  workspaceId?: string;
+  projectId?: string;
+  limit?: number;
+  page?: number;
+}) {
+  const { workspaceId, projectId, limit = 15, page = 1 } = params;
   return useQuery({
-    queryKey: ["activity", workspaceId ?? null, projectId ?? null, limit],
+    queryKey: ["activity", workspaceId ?? null, projectId ?? null, limit, page],
     queryFn: async () => {
       let q = db
         .from("activity_logs")
-        .select("*")
+        .select("*, actor:profiles!activity_logs_actor_user_id_fkey(display_name)", {
+          count: "exact",
+        })
         .order("created_at", { ascending: false })
-        .limit(limit);
+        .order("id", { ascending: false })
+        .range((page - 1) * limit, page * limit - 1);
       if (projectId) q = q.eq("project_id", projectId);
       else if (workspaceId) q = q.eq("workspace_id", workspaceId);
-      return unwrap<ActivityLog[]>(await q);
+      const result = await q;
+      return { entries: unwrap<ActivityLog[]>(result), total: result.count ?? 0 };
     },
     enabled: Boolean(workspaceId || projectId),
   });
