@@ -66,6 +66,14 @@ type SortKey = "name" | "updatedRecent";
 
 const PAGE_SIZE = 20;
 
+const dataTypeColors: Record<string, string> = {
+  string: "border-[#c5d5e5] bg-[#e1ebf5] text-[#4c6884]",
+  number: "border-[#c2d9cc] bg-[#deeee4] text-[#486b57]",
+  boolean: "border-[#e0cea6] bg-[#f5ead1] text-[#7b6537]",
+  array: "border-[#d1c5e3] bg-[#eae2f4] text-[#6c5689]",
+  "array of object": "border-[#e2c3cb] bg-[#f4e0e5] text-[#865863]",
+};
+
 function matchesStatus(isActive: boolean, filter: StatusFilter) {
   if (filter === "active") return isActive;
   if (filter === "inactive") return !isActive;
@@ -151,6 +159,7 @@ export function TaxonomyTab({
   }, [openAttributeId, customAttributes]);
 
   const refresh = () => {
+    qc.invalidateQueries({ queryKey: ["activity"] });
     qc.invalidateQueries({ queryKey: ["events", projectId] });
     qc.invalidateQueries({ queryKey: ["taxonomy-event-properties", projectId] });
     qc.invalidateQueries({ queryKey: ["taxonomy-custom-attributes", projectId] });
@@ -286,6 +295,7 @@ export function TaxonomyTab({
             events={events}
             eventProperties={eventProperties}
             customAttributes={customAttributes}
+            customAttributeProperties={customAttributeProperties}
           />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -400,7 +410,7 @@ export function TaxonomyTab({
                           {!event.is_active ? <Pill>비활성</Pill> : null}
                         </div>
                         {event.description ? (
-                          <p className="mt-0.5 text-xs text-muted-foreground">
+                          <p className="mt-0.5 text-sm text-muted-foreground">
                             {event.description}
                           </p>
                         ) : null}
@@ -609,12 +619,12 @@ function ExpandableCustomAttributeRow({
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <span className="mono-token text-sm">{attribute.technical_name}</span>
-            <Pill>{attribute.data_type}</Pill>
+            <Pill className={dataTypeColors[attribute.data_type]}>{attribute.data_type}</Pill>
             <Pill>필드 {subProperties.length}개</Pill>
             {!attribute.is_active ? <Pill>비활성</Pill> : null}
           </div>
           {attribute.display_name ? (
-            <p className="mt-0.5 text-xs text-muted-foreground">{attribute.display_name}</p>
+            <p className="mt-0.5 text-sm text-muted-foreground">{attribute.display_name}</p>
           ) : null}
         </div>
         {editable ? (
@@ -680,12 +690,23 @@ function AttributeRow({
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           <span className="mono-token text-sm">{attribute.technical_name}</span>
-          <Pill>{attribute.data_type}</Pill>
-          {attribute.is_required ? <Pill>필수</Pill> : null}
+          <Pill className={dataTypeColors[attribute.data_type]}>{attribute.data_type}</Pill>
           {!attribute.is_active ? <Pill>비활성</Pill> : null}
         </div>
-        {attribute.display_name ? (
-          <p className="mt-0.5 text-xs text-muted-foreground">{attribute.display_name}</p>
+        {attribute.display_name ||
+        (attribute.example_value != null && String(attribute.example_value).trim() !== "") ? (
+          <p className="mt-0.5 break-all text-sm text-muted-foreground">
+            {attribute.display_name}
+            {attribute.example_value != null && String(attribute.example_value).trim() !== "" ? (
+              <span className={attribute.display_name ? "ml-1" : undefined}>
+                (예 :
+                {typeof attribute.example_value === "object"
+                  ? JSON.stringify(attribute.example_value)
+                  : String(attribute.example_value)}
+                )
+              </span>
+            ) : null}
+          </p>
         ) : null}
       </div>
       {editable ? (
@@ -1098,7 +1119,7 @@ export function TaxonomyAttributeDialog({
               </SelectContent>
             </Select>
             {attribute ? (
-              <p className="text-xs text-muted-foreground">
+              <p className="text-sm text-muted-foreground">
                 이 프로퍼티가 어느 이벤트에 포함되는지는 여기서 바꿀 수 없어요. 다른 이벤트로
                 옮기려면 삭제한 뒤 원하는 이벤트에 다시 추가해 주세요.
               </p>
@@ -1167,7 +1188,7 @@ export function TaxonomyAttributeDialog({
           <div className="space-y-1.5">
             <Label htmlFor="at-allowed">허용 값 (쉼표로 구분)</Label>
             <Input id="at-allowed" value={allowed} onChange={(e) => setAllowed(e.target.value)} />
-            <p className="text-xs text-muted-foreground">
+            <p className="text-sm text-muted-foreground">
               여기 적은 값 외의 것이 들어오면 검증 시 오류로 처리돼요. 비워두면 값 자체는 제한하지
               않아요.
             </p>
@@ -1198,7 +1219,7 @@ export function TaxonomyAttributeDialog({
           <div className="flex items-center justify-between rounded-md border px-3 py-2">
             <div>
               <p className="text-sm font-medium">필수</p>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-sm text-muted-foreground">
                 항상 수집돼야 하는 {isProperty ? "프로퍼티" : "어트리뷰트"}예요.
               </p>
             </div>
@@ -1356,7 +1377,7 @@ function CustomAttributePropertyDialog({
           <div className="space-y-1.5">
             <Label htmlFor="cap-allowed">허용 값 (쉼표로 구분)</Label>
             <Input id="cap-allowed" value={allowed} onChange={(e) => setAllowed(e.target.value)} />
-            <p className="text-xs text-muted-foreground">
+            <p className="text-sm text-muted-foreground">
               여기 적은 값 외의 것이 들어오면 검증 시 오류로 처리돼요. 비워두면 값 자체는 제한하지
               않아요.
             </p>
@@ -1387,7 +1408,7 @@ function CustomAttributePropertyDialog({
           <div className="flex items-center justify-between rounded-md border px-3 py-2">
             <div>
               <p className="text-sm font-medium">필수</p>
-              <p className="text-xs text-muted-foreground">항상 수집돼야 하는 필드예요.</p>
+              <p className="text-sm text-muted-foreground">항상 수집돼야 하는 필드예요.</p>
             </div>
             <Switch checked={required} onCheckedChange={setRequired} />
           </div>

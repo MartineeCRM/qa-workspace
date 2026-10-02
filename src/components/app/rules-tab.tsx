@@ -144,7 +144,7 @@ export function RulesTab({
                   <TableCell className="font-medium">{rule.name}</TableCell>
                   <TableCell>
                     {rule.validation_rule_targets.length === 0 ? (
-                      <span className="mono-token text-xs">프로젝트 전체</span>
+                      <span className="mono-token">프로젝트 전체</span>
                     ) : (
                       <div className="flex flex-wrap gap-1">
                         {rule.validation_rule_targets.map((t) => (
@@ -153,7 +153,7 @@ export function RulesTab({
                       </div>
                     )}
                   </TableCell>
-                  <TableCell className="text-xs text-muted-foreground">
+                  <TableCell className="text-sm text-muted-foreground">
                     {rule.description ?? "—"}
                   </TableCell>
                   <TableCell>
@@ -381,7 +381,7 @@ function RuleDialog({
           <div className="space-y-1.5">
             <Label htmlFor="rule-name">이름</Label>
             <Input id="rule-name" value={name} onChange={(e) => setName(e.target.value)} />
-            <p className="text-xs text-muted-foreground">
+            <p className="text-sm text-muted-foreground">
               대상이 여러 개일 수 있어서, 목록에서 이 규칙을 한눈에 알아볼 이름이 필요해요.
             </p>
           </div>
@@ -396,7 +396,7 @@ function RuleDialog({
                 <RadioGroupItem value="project" className="mt-0.5" />
                 <span>
                   <span className="block text-sm font-medium">프로젝트 전체</span>
-                  <span className="mt-0.5 block text-xs text-muted-foreground">
+                  <span className="mt-0.5 block text-sm text-muted-foreground">
                     이 프로젝트에서 AI가 판정하는 모든 이벤트·프로퍼티·어트리뷰트에 적용해요.
                   </span>
                 </span>
@@ -405,7 +405,7 @@ function RuleDialog({
                 <RadioGroupItem value="targets" className="mt-0.5" />
                 <span>
                   <span className="block text-sm font-medium">선택 대상</span>
-                  <span className="mt-0.5 block text-xs text-muted-foreground">
+                  <span className="mt-0.5 block text-sm text-muted-foreground">
                     지정한 항목과 항목 사이의 관계에만 적용해요.
                   </span>
                 </span>
@@ -439,7 +439,7 @@ function RuleDialog({
                                 ? "프로퍼티"
                                 : "어트리뷰트"}
                           </span>
-                          <span className="mono-token text-xs">{t.label}</span>
+                          <span className="mono-token">{t.label}</span>
                         </button>
                       </li>
                     );
@@ -469,7 +469,7 @@ function RuleDialog({
                   })}
                 </ul>
               ) : null}
-              <p className="text-xs text-muted-foreground">
+              <p className="text-sm text-muted-foreground">
                 여러 이벤트·프로퍼티·어트리뷰트를 함께 골라서 서로 간의 관계(예: "이 값이 다른
                 이벤트의 값과 같아야 한다")도 이 규칙 하나로 표현할 수 있어요.
               </p>

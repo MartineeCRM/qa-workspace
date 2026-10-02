@@ -96,7 +96,7 @@ export function QaSessionResultsPanel({
   return (
     <Panel
       title="판정 결과"
-      description="항목을 눌러 검증 근거를 확인하고 필요한 대상을 이슈로 등록하세요. 상태 변경과 다음 차수 검증은 이슈 모아보기에서 관리합니다."
+      description="항목을 눌러 검증 근거를 확인하고 필요한 대상을 이슈로 등록하세요. 상태 변경과 다음 차수 검증은 이슈 관리 화면에서 진행합니다."
       actions={
         <div className="flex flex-wrap items-center gap-2">
           <label className="flex h-8 w-56 items-center gap-2 rounded-lg border border-[#dfe5ec] bg-white px-2.5">

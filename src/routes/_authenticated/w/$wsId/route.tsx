@@ -43,7 +43,7 @@ function WorkspaceShell() {
       <div className="min-h-screen">
         <TopBar />
         <div className="mx-auto max-w-md px-6 py-24 text-center">
-          <h1 className="text-lg font-semibold">워크스페이스를 열 수 없어요</h1>
+          <h1 className="text-xl font-bold text-foreground">워크스페이스를 열 수 없어요</h1>
           <p className="mt-2 text-sm text-muted-foreground">
             삭제됐거나 멤버가 아닌 워크스페이스예요.
           </p>
