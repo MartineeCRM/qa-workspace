@@ -1,6 +1,11 @@
 # 핸드오프 — 개요(Overview) 탭 커버리지 재설계
 
-상태: 시작 전. 아직 브랜치 안 팠음 — 이 문서 보고 새로 딸 것.
+상태: **완료 (2026-08-10, 커밋 `a2423c9` "feat: redesign QA coverage table")**.
+아래 "방향 B"로 구현됨 — `ProjectOverview`가 `useProjectChecklistCoverageRows`/`useProjectQaIssues`(`qa-rounds-queries.ts`)와
+`environmentChecklistCoverage`(`qa-workflow.ts`)를 통해 새 스키마(`qa_rounds` → `qa_sessions` → `qa_round_checklist_items` → `qa_checklist_item_results`)를 직접 읽는다.
+레거시 `useProjectItemStatuses`/`environmentCoverage`/`qa_item_status` 읽기 경로는 코드에서 완전히 제거됨 — `qa_item_status` 문자열은 `qa-workflow.ts:311-316`의 설계 의도를 설명하는 주석으로만 남아있다.
+이 문서 나머지는 당시 문제 정의를 보존하기 위한 기록이며, 더 이상 실행할 작업은 없다.
+
 직전 완료 작업: `개발 QA`/`운영 QA` 탭 라운드 › 세션 › 항목 재구성 (`docs/superpowers/plans/2026-08-03-dev-qa-workflow-redesign.md`, main에 머지 완료, origin에 push됨).
 
 ## 문제
@@ -19,9 +24,9 @@
 
 `ProjectOverview`가 `useProjectItemStatuses` + `environmentCoverage`로 커버리지·이슈 목록(`팔로업이 필요한 QA 이슈` 패널)을 만든다. 이 데이터 소스를 새 스키마 기준으로 바꿔야 한다.
 
-## 결정해야 할 것 (아직 안 정함 — 여기서부터 시작)
+## 결정했던 것 (해결됨 — 방향 B로 구현 완료)
 
-두 방향이 있고 둘 다 일리 있어서 미리 골라놓지 않았다:
+두 방향이 있고 둘 다 일리 있어서 미리 골라놓지 않았었다. 최종적으로 B로 구현됨:
 
 **방향 A — `qa_item_status`에 다시 쓰기 시작**
 새 워크플로우가 disposition이 바뀔 때마다(`useSetDisposition`, `useCarryOverItems` 등, `src/lib/qa-rounds-queries.ts`) `qa_item_status`에도 upsert하도록 추가. 개요 쪽 코드(`queries.ts`, `index.tsx`)는 그대로 둘 수 있어서 구현 범위는 작다. 다만 상태를 두 곳에서 유지해야 해서 나중에 또 어긋날 여지가 있다 — 정확히 이번에 겪은 것과 같은 종류의 drift.
