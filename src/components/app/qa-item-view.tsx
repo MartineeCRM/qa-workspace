@@ -1227,7 +1227,7 @@ export function QaItemView({
                 params={(prev) => ({ wsId: prev.wsId, projectId: prev.projectId })}
                 className="block text-center text-[12px] font-medium text-[#4b4f8a] hover:underline"
               >
-                전체 이슈 모아보기
+                전체 이슈 관리
               </Link>
             </div>
           </Panel>
