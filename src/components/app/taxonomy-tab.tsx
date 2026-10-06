@@ -52,7 +52,7 @@ import {
   type TaxonomyEvent,
   type TaxonomyEventProperty,
 } from "@/lib/queries";
-import { DATA_TYPES, errorMessage } from "@/lib/domain";
+import { DATA_TYPES, errorMessage, type DataType } from "@/lib/domain";
 import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 import { parseAllowedValues } from "@/lib/taxonomy-import";
@@ -933,6 +933,207 @@ function EventDialog({
   );
 }
 
+type PropertyFieldsSeed = {
+  technicalName?: string | null;
+  displayName?: string | null;
+  description?: string | null;
+  exampleValue?: unknown;
+  dataType?: string | null;
+  required: boolean;
+  allowedValues?: unknown;
+};
+
+// TaxonomyAttributeDialog와 CustomAttributePropertyDialog가 공유하던 8개 필드 상태 +
+// payload 조립 로직(technical_name/display_name/description/example_value/data_type/
+// is_required/allowed_values) — 두 다이얼로그 전용 로직(형제 동기화, 채널 제외, 부모 이벤트
+// 선택)은 각자 컴포넌트에 그대로 둔다.
+function usePropertyFieldsState(seed: PropertyFieldsSeed) {
+  const [technicalName, setTechnicalName] = useState(seed.technicalName ?? "");
+  const [displayName, setDisplayName] = useState(seed.displayName ?? "");
+  const [description, setDescription] = useState(seed.description ?? "");
+  const [exampleValue, setExampleValue] = useState(
+    seed.exampleValue == null ? "" : String(seed.exampleValue),
+  );
+  // 실제 taxonomy_* 테이블의 data_type 컬럼은 string으로만 타입이 붙어 있어 seed도 느슨하게
+  // 받지만, Select가 항상 DATA_TYPES 중 하나만 내보내므로 상태 자체는 도메인의 DataType
+  // 유니온으로 좁혀서 들고 있는다. setDataType의 시그니처는 Radix Select의
+  // onValueChange: (value: string) => void 계약과 맞춰 string을 그대로 받는다.
+  const [dataType, setDataTypeState] = useState<DataType>((seed.dataType ?? "string") as DataType);
+  function setDataType(value: string) {
+    setDataTypeState(value as DataType);
+  }
+  const [required, setRequired] = useState(seed.required);
+  const [allowed, setAllowed] = useState(
+    Array.isArray(seed.allowedValues) ? (seed.allowedValues as string[]).join(", ") : "",
+  );
+  const [saving, setSaving] = useState(false);
+
+  function buildPayload() {
+    const allowedValues = parseAllowedValues(allowed);
+    return {
+      technical_name: technicalName.trim(),
+      display_name: displayName.trim() || null,
+      description: description.trim() || null,
+      example_value: exampleValue.trim() || null,
+      data_type: dataType,
+      is_required: required,
+      allowed_values: allowedValues.length ? allowedValues : null,
+    };
+  }
+
+  return {
+    technicalName,
+    setTechnicalName,
+    displayName,
+    setDisplayName,
+    description,
+    setDescription,
+    exampleValue,
+    setExampleValue,
+    dataType,
+    setDataType,
+    required,
+    setRequired,
+    allowed,
+    setAllowed,
+    saving,
+    setSaving,
+    buildPayload,
+  };
+}
+
+function PropertyIdentityFields({
+  idPrefix,
+  technicalName,
+  onTechnicalNameChange,
+  technicalNamePlaceholder,
+  displayName,
+  onDisplayNameChange,
+  dataType,
+  onDataTypeChange,
+}: {
+  idPrefix: string;
+  technicalName: string;
+  onTechnicalNameChange: (value: string) => void;
+  technicalNamePlaceholder: string;
+  displayName: string;
+  onDisplayNameChange: (value: string) => void;
+  dataType: string;
+  onDataTypeChange: (value: string) => void;
+}) {
+  return (
+    <>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="space-y-1.5">
+          <Label htmlFor={`${idPrefix}-name`}>기술 이름</Label>
+          <Input
+            id={`${idPrefix}-name`}
+            value={technicalName}
+            onChange={(e) => onTechnicalNameChange(e.target.value)}
+            placeholder={technicalNamePlaceholder}
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor={`${idPrefix}-display`}>표시 이름</Label>
+          <Input
+            id={`${idPrefix}-display`}
+            value={displayName}
+            onChange={(e) => onDisplayNameChange(e.target.value)}
+          />
+        </div>
+      </div>
+      <div className="space-y-1.5">
+        <Label>데이터 타입</Label>
+        <Select value={dataType} onValueChange={onDataTypeChange}>
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {DATA_TYPES.map((t) => (
+              <SelectItem key={t} value={t}>
+                {t}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+    </>
+  );
+}
+
+function PropertyValueFields({
+  idPrefix,
+  allowed,
+  onAllowedChange,
+  exampleValue,
+  onExampleValueChange,
+  description,
+  onDescriptionChange,
+  required,
+  onRequiredChange,
+  requiredDescription,
+  requiredDescriptionClassName = "text-sm text-muted-foreground",
+}: {
+  idPrefix: string;
+  allowed: string;
+  onAllowedChange: (value: string) => void;
+  exampleValue: string;
+  onExampleValueChange: (value: string) => void;
+  description: string;
+  onDescriptionChange: (value: string) => void;
+  required: boolean;
+  onRequiredChange: (value: boolean) => void;
+  requiredDescription: string;
+  requiredDescriptionClassName?: string;
+}) {
+  return (
+    <>
+      <div className="space-y-1.5">
+        <Label htmlFor={`${idPrefix}-allowed`}>허용 값 (쉼표로 구분)</Label>
+        <Input
+          id={`${idPrefix}-allowed`}
+          value={allowed}
+          onChange={(e) => onAllowedChange(e.target.value)}
+        />
+        <p className="text-sm text-muted-foreground">
+          여기 적은 값 외의 것이 들어오면 검증 시 오류로 처리돼요. 비워두면 값 자체는 제한하지
+          않아요.
+        </p>
+      </div>
+      <div className="space-y-1.5">
+        <Label htmlFor={`${idPrefix}-example`}>예시값</Label>
+        <Textarea
+          id={`${idPrefix}-example`}
+          value={exampleValue}
+          onChange={(e) => onExampleValueChange(e.target.value)}
+          placeholder="2026-01-01T00:00:00.000+09:00"
+          rows={2}
+          className="resize-y"
+        />
+        <p className="text-xs text-muted-foreground">
+          기대하는 값의 형식과 의미를 보여주세요. AI가 실제 수신값과 비교해요.
+        </p>
+      </div>
+      <div className="space-y-1.5">
+        <Label htmlFor={`${idPrefix}-desc`}>설명</Label>
+        <Textarea
+          id={`${idPrefix}-desc`}
+          value={description}
+          onChange={(e) => onDescriptionChange(e.target.value)}
+          rows={2}
+        />
+      </div>
+      <div className="flex items-center justify-between rounded-md border px-3 py-2">
+        <div>
+          <p className="text-sm font-medium">필수</p>
+          <p className={requiredDescriptionClassName}>{requiredDescription}</p>
+        </div>
+        <Switch checked={required} onCheckedChange={onRequiredChange} />
+      </div>
+    </>
+  );
+}
+
 export function TaxonomyAttributeDialog({
   projectId,
   userId,
@@ -981,20 +1182,15 @@ export function TaxonomyAttributeDialog({
     setCheckedSiblings(Object.fromEntries(siblings.map((s) => [s.id, value])));
   }
 
-  const [technicalName, setTechnicalName] = useState(attribute?.technical_name ?? "");
-  const [displayName, setDisplayName] = useState(attribute?.display_name ?? "");
-  const [description, setDescription] = useState(attribute?.description ?? "");
-  const [exampleValue, setExampleValue] = useState(
-    attribute?.example_value == null ? "" : String(attribute.example_value),
-  );
-  const [dataType, setDataType] = useState(attribute?.data_type ?? "string");
-  const [required, setRequired] = useState(attribute?.is_required ?? eventId !== null);
-  const [allowed, setAllowed] = useState(
-    Array.isArray(attribute?.allowed_values)
-      ? (attribute!.allowed_values as string[]).join(", ")
-      : "",
-  );
-  const [saving, setSaving] = useState(false);
+  const fields = usePropertyFieldsState({
+    technicalName: attribute?.technical_name,
+    displayName: attribute?.display_name,
+    description: attribute?.description,
+    exampleValue: attribute?.example_value,
+    dataType: attribute?.data_type,
+    required: attribute?.is_required ?? eventId !== null,
+    allowedValues: attribute?.allowed_values,
+  });
   const isExistingEventProperty = Boolean(attribute && "event_id" in attribute);
   const [selectedChannelIds, setSelectedChannelIds] = useState(
     () =>
@@ -1022,18 +1218,9 @@ export function TaxonomyAttributeDialog({
   }
 
   async function submit() {
-    if (!technicalName.trim()) return toast.error("기술 이름은 필수예요");
-    setSaving(true);
-    const allowedValues = parseAllowedValues(allowed);
-    const basePayload = {
-      technical_name: technicalName.trim(),
-      display_name: displayName.trim() || null,
-      description: description.trim() || null,
-      example_value: exampleValue.trim() || null,
-      data_type: dataType,
-      is_required: required,
-      allowed_values: allowedValues.length ? allowedValues : null,
-    };
+    if (!fields.technicalName.trim()) return toast.error("기술 이름은 필수예요");
+    fields.setSaving(true);
+    const basePayload = fields.buildPayload();
     const table = isProperty ? "taxonomy_event_properties" : "taxonomy_custom_attributes";
 
     if (attribute && isProperty) {
@@ -1046,7 +1233,7 @@ export function TaxonomyAttributeDialog({
         .update(basePayload)
         .in("id", targetIds)
         .select("id");
-      setSaving(false);
+      fields.setSaving(false);
       if (error) return toast.error(errorMessage(error));
       const exclusionError = await savePropertyExclusions(targetIds);
       if (exclusionError) return toast.error(errorMessage(exclusionError));
@@ -1073,7 +1260,7 @@ export function TaxonomyAttributeDialog({
     const { error } = attribute
       ? await db.from(table).update(payload).eq("id", attribute.id)
       : await db.from(table).insert({ ...payload, created_by: userId });
-    setSaving(false);
+    fields.setSaving(false);
     if (error) return toast.error(errorMessage(error));
     if (attribute && isProperty) {
       const exclusionError = await savePropertyExclusions([attribute.id]);
@@ -1125,40 +1312,16 @@ export function TaxonomyAttributeDialog({
               </p>
             ) : null}
           </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label htmlFor="at-name">기술 이름</Label>
-              <Input
-                id="at-name"
-                value={technicalName}
-                onChange={(e) => setTechnicalName(e.target.value)}
-                placeholder="order_no"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="at-display">표시 이름</Label>
-              <Input
-                id="at-display"
-                value={displayName}
-                onChange={(e) => setDisplayName(e.target.value)}
-              />
-            </div>
-          </div>
-          <div className="space-y-1.5">
-            <Label>데이터 타입</Label>
-            <Select value={dataType} onValueChange={setDataType}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {DATA_TYPES.map((t) => (
-                  <SelectItem key={t} value={t}>
-                    {t}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          <PropertyIdentityFields
+            idPrefix="at"
+            technicalName={fields.technicalName}
+            onTechnicalNameChange={fields.setTechnicalName}
+            technicalNamePlaceholder="order_no"
+            displayName={fields.displayName}
+            onDisplayNameChange={fields.setDisplayName}
+            dataType={fields.dataType}
+            onDataTypeChange={fields.setDataType}
+          />
           {isExistingEventProperty && channels.length > 0 ? (
             <div className="space-y-1.5">
               <Label>수집 채널</Label>
@@ -1185,46 +1348,18 @@ export function TaxonomyAttributeDialog({
               </div>
             </div>
           ) : null}
-          <div className="space-y-1.5">
-            <Label htmlFor="at-allowed">허용 값 (쉼표로 구분)</Label>
-            <Input id="at-allowed" value={allowed} onChange={(e) => setAllowed(e.target.value)} />
-            <p className="text-sm text-muted-foreground">
-              여기 적은 값 외의 것이 들어오면 검증 시 오류로 처리돼요. 비워두면 값 자체는 제한하지
-              않아요.
-            </p>
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="at-example">예시값</Label>
-            <Textarea
-              id="at-example"
-              value={exampleValue}
-              onChange={(e) => setExampleValue(e.target.value)}
-              placeholder="2026-01-01T00:00:00.000+09:00"
-              rows={2}
-              className="resize-y"
-            />
-            <p className="text-xs text-muted-foreground">
-              기대하는 값의 형식과 의미를 보여주세요. AI가 실제 수신값과 비교해요.
-            </p>
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="at-desc">설명</Label>
-            <Textarea
-              id="at-desc"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={2}
-            />
-          </div>
-          <div className="flex items-center justify-between rounded-md border px-3 py-2">
-            <div>
-              <p className="text-sm font-medium">필수</p>
-              <p className="text-sm text-muted-foreground">
-                항상 수집돼야 하는 {isProperty ? "프로퍼티" : "어트리뷰트"}예요.
-              </p>
-            </div>
-            <Switch checked={required} onCheckedChange={setRequired} />
-          </div>
+          <PropertyValueFields
+            idPrefix="at"
+            allowed={fields.allowed}
+            onAllowedChange={fields.setAllowed}
+            exampleValue={fields.exampleValue}
+            onExampleValueChange={fields.setExampleValue}
+            description={fields.description}
+            onDescriptionChange={fields.setDescription}
+            required={fields.required}
+            onRequiredChange={fields.setRequired}
+            requiredDescription={`항상 수집돼야 하는 ${isProperty ? "프로퍼티" : "어트리뷰트"}예요.`}
+          />
           {siblings.length > 0 ? (
             <div className="space-y-2 rounded-md border px-3 py-2.5">
               <div className="flex items-center justify-between gap-2">
@@ -1271,7 +1406,7 @@ export function TaxonomyAttributeDialog({
           <Button variant="outline" onClick={onClose}>
             취소
           </Button>
-          <Button onClick={submit} disabled={saving}>
+          <Button onClick={submit} disabled={fields.saving}>
             {attribute ? "변경 저장" : isProperty ? "프로퍼티 추가" : "어트리뷰트 추가"}
           </Button>
         </DialogFooter>
@@ -1293,40 +1428,26 @@ function CustomAttributePropertyDialog({
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const [technicalName, setTechnicalName] = useState(property?.technical_name ?? "");
-  const [displayName, setDisplayName] = useState(property?.display_name ?? "");
-  const [description, setDescription] = useState(property?.description ?? "");
-  const [exampleValue, setExampleValue] = useState(
-    property?.example_value == null ? "" : String(property.example_value),
-  );
-  const [dataType, setDataType] = useState(property?.data_type ?? "string");
-  const [required, setRequired] = useState(property?.is_required ?? false);
-  const [allowed, setAllowed] = useState(
-    Array.isArray(property?.allowed_values)
-      ? (property!.allowed_values as string[]).join(", ")
-      : "",
-  );
-  const [saving, setSaving] = useState(false);
+  const fields = usePropertyFieldsState({
+    technicalName: property?.technical_name,
+    displayName: property?.display_name,
+    description: property?.description,
+    exampleValue: property?.example_value,
+    dataType: property?.data_type,
+    required: property?.is_required ?? false,
+    allowedValues: property?.allowed_values,
+  });
 
   async function submit() {
-    if (!technicalName.trim()) return toast.error("기술 이름은 필수예요");
-    setSaving(true);
-    const allowedValues = parseAllowedValues(allowed);
-    const payload = {
-      technical_name: technicalName.trim(),
-      display_name: displayName.trim() || null,
-      description: description.trim() || null,
-      example_value: exampleValue.trim() || null,
-      data_type: dataType,
-      is_required: required,
-      allowed_values: allowedValues.length ? allowedValues : null,
-    };
+    if (!fields.technicalName.trim()) return toast.error("기술 이름은 필수예요");
+    fields.setSaving(true);
+    const payload = fields.buildPayload();
     const { error } = property
       ? await db.from("taxonomy_custom_attribute_properties").update(payload).eq("id", property.id)
       : await db
           .from("taxonomy_custom_attribute_properties")
           .insert({ ...payload, custom_attribute_id: customAttributeId, created_by: userId });
-    setSaving(false);
+    fields.setSaving(false);
     if (error) return toast.error(errorMessage(error));
     toast.success(property ? "필드를 수정했어요" : "필드를 추가했어요");
     onSaved();
@@ -1340,84 +1461,34 @@ function CustomAttributePropertyDialog({
           <DialogTitle>{property ? "필드 수정" : "필드 추가"}</DialogTitle>
         </DialogHeader>
         <div className="space-y-3">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label htmlFor="cap-name">기술 이름</Label>
-              <Input
-                id="cap-name"
-                value={technicalName}
-                onChange={(e) => setTechnicalName(e.target.value)}
-                placeholder="offer_id"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="cap-display">표시 이름</Label>
-              <Input
-                id="cap-display"
-                value={displayName}
-                onChange={(e) => setDisplayName(e.target.value)}
-              />
-            </div>
-          </div>
-          <div className="space-y-1.5">
-            <Label>데이터 타입</Label>
-            <Select value={dataType} onValueChange={setDataType}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {DATA_TYPES.map((t) => (
-                  <SelectItem key={t} value={t}>
-                    {t}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="cap-allowed">허용 값 (쉼표로 구분)</Label>
-            <Input id="cap-allowed" value={allowed} onChange={(e) => setAllowed(e.target.value)} />
-            <p className="text-sm text-muted-foreground">
-              여기 적은 값 외의 것이 들어오면 검증 시 오류로 처리돼요. 비워두면 값 자체는 제한하지
-              않아요.
-            </p>
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="cap-example">예시값</Label>
-            <Textarea
-              id="cap-example"
-              value={exampleValue}
-              onChange={(e) => setExampleValue(e.target.value)}
-              placeholder="2026-01-01T00:00:00.000+09:00"
-              rows={2}
-              className="resize-y"
-            />
-            <p className="text-xs text-muted-foreground">
-              기대하는 값의 형식과 의미를 보여주세요. AI가 실제 수신값과 비교해요.
-            </p>
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="cap-desc">설명</Label>
-            <Textarea
-              id="cap-desc"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={2}
-            />
-          </div>
-          <div className="flex items-center justify-between rounded-md border px-3 py-2">
-            <div>
-              <p className="text-sm font-medium">필수</p>
-              <p className="text-sm text-muted-foreground">항상 수집돼야 하는 필드예요.</p>
-            </div>
-            <Switch checked={required} onCheckedChange={setRequired} />
-          </div>
+          <PropertyIdentityFields
+            idPrefix="cap"
+            technicalName={fields.technicalName}
+            onTechnicalNameChange={fields.setTechnicalName}
+            technicalNamePlaceholder="offer_id"
+            displayName={fields.displayName}
+            onDisplayNameChange={fields.setDisplayName}
+            dataType={fields.dataType}
+            onDataTypeChange={fields.setDataType}
+          />
+          <PropertyValueFields
+            idPrefix="cap"
+            allowed={fields.allowed}
+            onAllowedChange={fields.setAllowed}
+            exampleValue={fields.exampleValue}
+            onExampleValueChange={fields.setExampleValue}
+            description={fields.description}
+            onDescriptionChange={fields.setDescription}
+            required={fields.required}
+            onRequiredChange={fields.setRequired}
+            requiredDescription="항상 수집돼야 하는 필드예요."
+          />
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>
             취소
           </Button>
-          <Button onClick={submit} disabled={saving}>
+          <Button onClick={submit} disabled={fields.saving}>
             {property ? "변경 저장" : "필드 추가"}
           </Button>
         </DialogFooter>
