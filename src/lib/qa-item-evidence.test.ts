@@ -74,9 +74,9 @@ describe("extractAiRawResponse", () => {
   });
 
   it("recurses into qualitative to find a nested raw_response", () => {
-    expect(
-      extractAiRawResponse({ qualitative: { qualitative: { raw_response: "NESTED" } } }),
-    ).toBe("NESTED");
+    expect(extractAiRawResponse({ qualitative: { qualitative: { raw_response: "NESTED" } } })).toBe(
+      "NESTED",
+    );
   });
 
   it("returns null when nothing in the chain has raw_response", () => {
@@ -179,7 +179,13 @@ describe("isAttributeAiPending", () => {
 
 describe("selectRelevantEvidenceRows", () => {
   const timeline: MergedTimelineRow[] = [
-    { key: "event:1", occurredAt: "2026-01-01T00:00:00Z", source: "event", name: "purchase", change: "" },
+    {
+      key: "event:1",
+      occurredAt: "2026-01-01T00:00:00Z",
+      source: "event",
+      name: "purchase",
+      change: "",
+    },
     {
       key: "snapshot:order_no",
       occurredAt: "2026-01-01T00:01:00Z",
@@ -243,7 +249,14 @@ describe("isEvidenceLong", () => {
 
   it("is true when the combined raw/change JSON exceeds 3000 characters", () => {
     const rows: MergedTimelineRow[] = [
-      { key: "1", occurredAt: "", source: "event", name: "a", change: "", raw: { v: "x".repeat(4000) } },
+      {
+        key: "1",
+        occurredAt: "",
+        source: "event",
+        name: "a",
+        change: "",
+        raw: { v: "x".repeat(4000) },
+      },
     ];
     expect(isEvidenceLong(rows)).toBe(true);
   });

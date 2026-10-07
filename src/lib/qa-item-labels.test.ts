@@ -27,19 +27,25 @@ describe("formatAttributeExample", () => {
 describe("resolveDiscussionDisplayLabel", () => {
   it("uses the target label directly for a custom attribute", () => {
     expect(
-      resolveDiscussionDisplayLabel({ target_type: "custom_attribute", target_label: "age" }, "purchase"),
+      resolveDiscussionDisplayLabel(
+        { target_type: "custom_attribute", target_label: "age" },
+        "purchase",
+      ),
     ).toBe("age");
   });
 
   it("appends '전체' for a whole-event target", () => {
-    expect(resolveDiscussionDisplayLabel({ target_type: "event", target_label: "" }, "purchase")).toBe(
-      "purchase · 이벤트 전체",
-    );
+    expect(
+      resolveDiscussionDisplayLabel({ target_type: "event", target_label: "" }, "purchase"),
+    ).toBe("purchase · 이벤트 전체");
   });
 
   it("joins event label and property label for a property target", () => {
     expect(
-      resolveDiscussionDisplayLabel({ target_type: "property", target_label: "order_no" }, "purchase"),
+      resolveDiscussionDisplayLabel(
+        { target_type: "property", target_label: "order_no" },
+        "purchase",
+      ),
     ).toBe("purchase.order_no");
   });
 });
@@ -50,7 +56,11 @@ describe("resolveChecklistItemLabel", () => {
 
   it("resolves an event checklist item's technical name", () => {
     expect(
-      resolveChecklistItemLabel({ target_type: "event", target_id: "e1" }, events, customAttributes),
+      resolveChecklistItemLabel(
+        { target_type: "event", target_id: "e1" },
+        events,
+        customAttributes,
+      ),
     ).toBe("purchase");
   });
 
@@ -66,7 +76,11 @@ describe("resolveChecklistItemLabel", () => {
 
   it("falls back to the raw target id when nothing matches", () => {
     expect(
-      resolveChecklistItemLabel({ target_type: "event", target_id: "missing" }, events, customAttributes),
+      resolveChecklistItemLabel(
+        { target_type: "event", target_id: "missing" },
+        events,
+        customAttributes,
+      ),
     ).toBe("missing");
   });
 });
